@@ -20,9 +20,18 @@ test.beforeEach(async ({ page }) => {
 test('login selects role and enters dashboard', async ({ page }) => {
   await page.goto('/login');
   await page.getByText('HR 专员').click();
-  await page.locator('.login-box button').click();
+  await page.locator('.btn-login').click();
   await expect(page).toHaveURL(/\/recruit-dashboard$/);
   await expect(page.getByRole('heading', { name: '招聘看板' })).toBeVisible();
+});
+
+test('login background responds to mouse movement', async ({ page }) => {
+  await page.goto('/login');
+  const stage = page.locator('#loginStage');
+  await expect(stage).toBeVisible();
+  await page.mouse.move(1200, 180);
+  await expect.poll(async () => stage.evaluate((el) => getComputedStyle(el).getPropertyValue('--mx').trim())).not.toBe('50%');
+  await expect.poll(async () => stage.evaluate((el) => getComputedStyle(el).getPropertyValue('--my').trim())).not.toBe('50%');
 });
 
 for (const [path, heading] of pages) {

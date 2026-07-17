@@ -3,58 +3,363 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>登录 · 智能招聘系统</title>
+<title>登录 - 智能招聘系统</title>
 <link rel="stylesheet" href="css/style.css">
-<style>
-body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#1E293B}
-.login-box{background:#fff;border-radius:12px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
-.login-box h1{font-size:20px;text-align:center;margin-bottom:4px}
-.login-box .sub{text-align:center;font-size:12px;color:#94a3b8;margin-bottom:28px}
-.form-group{margin-bottom:16px}
-.form-group label{display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:#1e2433}
-.form-group input,.form-group select{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box}
-.btn-login{width:100%;padding:12px;background:#4080FF;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px}
-.btn-login:hover{background:#3570E0}
-.roles{display:flex;gap:8px;margin-bottom:16px}
-.role-card{flex:1;text-align:center;padding:12px 8px;border:2px solid #E8EAED;border-radius:8px;cursor:pointer;font-size:12px;transition:all .15s}
-.role-card:hover{border-color:#4080FF}
-.role-card.sel{border-color:#4080FF;background:#F5F8FF}
-.role-card .icon{font-size:24px;display:block;margin-bottom:4px}
-</style>
 </head>
 <body>
+<style>
+.login-stage{
+  --mx:50%;
+  --my:50%;
+  --tilt-x:0deg;
+  --tilt-y:0deg;
+  width:100%;
+  min-height:100vh;
+  position:relative;
+  overflow:hidden;
+  display:grid;
+  grid-template-columns:minmax(320px,1fr) minmax(360px,440px);
+  align-items:center;
+  gap:56px;
+  padding:52px clamp(24px,6vw,88px);
+  background:#05070b;
+  color:#f8fafc;
+  isolation:isolate;
+}
+.login-stage::before{
+  content:"";
+  position:absolute;
+  inset:-20%;
+  background:
+    radial-gradient(circle at var(--mx) var(--my), rgba(79,110,247,.42), transparent 0 16%, transparent 34%),
+    radial-gradient(circle at 76% 22%, rgba(0,230,118,.16), transparent 0 18%, transparent 38%),
+    linear-gradient(135deg,#05070b 0%,#0b1220 48%,#05070b 100%);
+  z-index:-3;
+}
+.login-stage::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background-image:
+    linear-gradient(rgba(148,163,184,.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148,163,184,.12) 1px, transparent 1px);
+  background-size:48px 48px;
+  background-position:
+    calc((var(--mx) - 50%) * .04) calc((var(--my) - 50%) * .04);
+  mask-image:radial-gradient(circle at var(--mx) var(--my), #000 0 36%, transparent 72%);
+  opacity:.5;
+  z-index:-2;
+}
+.login-orbit{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index:-1;
+}
+.login-orbit span{
+  position:absolute;
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  border:1px solid rgba(0,230,118,.7);
+  background:rgba(0,230,118,.18);
+  box-shadow:0 0 24px rgba(0,230,118,.3);
+  transform:translate(calc((var(--mx) - 50%) * var(--dx)), calc((var(--my) - 50%) * var(--dy)));
+  animation:login-float 6s ease-in-out infinite both;
+}
+.login-orbit span:nth-child(1){left:12%;top:18%;--dx:.05;--dy:.02}
+.login-orbit span:nth-child(2){left:34%;top:72%;--dx:-.035;--dy:.05;animation-delay:-1.2s}
+.login-orbit span:nth-child(3){left:58%;top:14%;--dx:.025;--dy:-.04;animation-delay:-2.4s}
+.login-orbit span:nth-child(4){left:82%;top:70%;--dx:-.05;--dy:-.025;animation-delay:-3.1s}
+@keyframes login-float{
+  0%,100%{opacity:.45;scale:.9}
+  50%{opacity:1;scale:1.25}
+}
+.login-copy{
+  max-width:720px;
+  transform:perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transition:transform .12s ease-out;
+}
+.login-kicker{
+  width:max-content;
+  max-width:100%;
+  border:1px solid rgba(79,110,247,.5);
+  color:#b9c4ff;
+  padding:8px 12px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:0;
+  background:rgba(79,110,247,.08);
+  margin-bottom:22px;
+}
+.login-copy h1{
+  margin:0;
+  font-size:clamp(44px,7vw,92px);
+  line-height:.94;
+  font-weight:900;
+  letter-spacing:0;
+}
+.login-copy p{
+  margin:24px 0 0;
+  max-width:560px;
+  color:#aab5c8;
+  font-size:16px;
+  line-height:1.8;
+}
+.login-signal{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+  max-width:560px;
+  margin-top:34px;
+}
+.login-signal div{
+  border:1px solid rgba(148,163,184,.18);
+  background:rgba(15,23,42,.46);
+  padding:14px;
+  border-radius:8px;
+}
+.login-signal b{
+  display:block;
+  color:#ffffff;
+  font-size:18px;
+  font-variant-numeric:tabular-nums;
+}
+.login-signal span{
+  display:block;
+  margin-top:4px;
+  color:#7e8aa0;
+  font-size:12px;
+}
+.login-box{
+  width:100%;
+  border:1px solid rgba(148,163,184,.24);
+  border-radius:8px;
+  background:linear-gradient(180deg,rgba(15,23,42,.84),rgba(2,6,23,.9));
+  box-shadow:0 28px 90px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.08);
+  padding:30px;
+  backdrop-filter:blur(18px);
+  transform:perspective(900px) rotateX(calc(var(--tilt-x) * -1)) rotateY(calc(var(--tilt-y) * -1));
+  transition:transform .12s ease-out,border-color .2s ease,box-shadow .2s ease;
+}
+.login-box:hover{
+  border-color:rgba(79,110,247,.55);
+  box-shadow:0 34px 110px rgba(0,0,0,.58),0 0 0 1px rgba(79,110,247,.12);
+}
+.login-box h2{
+  margin:0;
+  font-size:24px;
+  line-height:1.2;
+  font-weight:900;
+  letter-spacing:0;
+}
+.login-box .sub{
+  margin:8px 0 24px;
+  color:#8c95a6;
+  font-size:13px;
+}
+.role-label{
+  display:block;
+  margin-bottom:10px;
+  color:#d9e2f2;
+  font-size:13px;
+  font-weight:700;
+}
+.roles{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  margin-bottom:20px;
+}
+.role-card{
+  min-height:86px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:6px;
+  padding:12px 10px;
+  border:1px solid rgba(148,163,184,.24);
+  border-radius:8px;
+  background:rgba(15,23,42,.62);
+  color:#e5eaf4;
+  cursor:pointer;
+  transition:transform .18s ease,border-color .18s ease,background .18s ease;
+}
+.role-card:hover{
+  transform:translateY(-2px);
+  border-color:rgba(79,110,247,.72);
+}
+.role-card.sel{
+  border-color:#4f6ef7;
+  background:rgba(79,110,247,.16);
+  box-shadow:inset 0 0 0 1px rgba(79,110,247,.16);
+}
+.role-card .icon{
+  display:block;
+  font-size:20px;
+  font-weight:900;
+  color:#ffffff;
+}
+.role-card .role-name{
+  font-size:13px;
+  font-weight:800;
+}
+.role-card .role-note{
+  font-size:11px;
+  line-height:1.35;
+  color:#8390a4;
+}
+.login-box .form-group{
+  margin-bottom:16px;
+}
+.login-box label{
+  display:block;
+  margin-bottom:7px;
+  color:#cbd5e1;
+  font-size:13px;
+  font-weight:700;
+}
+.login-box input{
+  width:100%;
+  height:44px;
+  border:1px solid rgba(148,163,184,.28);
+  border-radius:8px;
+  background:rgba(2,6,23,.62);
+  color:#f8fafc;
+  padding:0 13px;
+  font-size:14px;
+  outline:none;
+  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease;
+}
+.login-box input::placeholder{color:#64748b}
+.login-box input:focus{
+  border-color:#4f6ef7;
+  box-shadow:0 0 0 3px rgba(79,110,247,.18);
+  background:rgba(2,6,23,.86);
+}
+.btn-login{
+  width:100%;
+  height:46px;
+  border:0;
+  border-radius:8px;
+  color:#fff;
+  background:linear-gradient(135deg,#4f6ef7,#6b84ff);
+  font-size:14px;
+  font-weight:900;
+  cursor:pointer;
+  transition:transform .18s ease,filter .18s ease,box-shadow .18s ease;
+  box-shadow:0 14px 34px rgba(79,110,247,.28);
+}
+.btn-login:hover{
+  transform:translateY(-1px);
+  filter:brightness(1.05);
+  box-shadow:0 18px 44px rgba(79,110,247,.36);
+}
+.login-foot{
+  margin-top:14px;
+  text-align:center;
+  color:#7e8aa0;
+  font-size:12px;
+}
+@media(max-width:860px){
+  .login-stage{
+    grid-template-columns:1fr;
+    gap:28px;
+    padding:34px 20px;
+  }
+  .login-copy h1{font-size:42px}
+  .login-copy p{font-size:14px}
+  .login-signal{grid-template-columns:1fr}
+}
+@media(max-width:520px){
+  .login-box{padding:22px}
+  .roles{grid-template-columns:1fr}
+  .role-card{min-height:68px}
+}
+@media(prefers-reduced-motion:reduce){
+  .login-orbit span{animation:none}
+  .login-copy,.login-box,.role-card,.btn-login{transition:none;transform:none!important}
+}
+</style>
 
-<div class="login-box">
-  <h1>智能招聘系统</h1>
-  <div class="sub">Recruitment Workbench</div>
+<section class="login-stage" id="loginStage">
+  <div class="login-orbit" aria-hidden="true">
+    <span></span><span></span><span></span><span></span>
+  </div>
 
-  <label style="font-size:13px;font-weight:600;color:#1e2433">演示角色</label>
-  <div class="roles">
-    <div class="role-card sel" data-role="admin" onclick="selRole(this)">
-      <span class="icon" style="font-size:28px">A</span>管理员<div style="font-size:10px;color:#94a3b8;margin-top:2px">全部功能+系统配置</div>
-    </div>
-    <div class="role-card" data-role="hr" onclick="selRole(this)">
-      <span class="icon" style="font-size:28px">HR</span>HR 专员<div style="font-size:10px;color:#94a3b8;margin-top:2px">招聘全流程操作</div>
-    </div>
-    <div class="role-card" data-role="interviewer" onclick="selRole(this)">
-      <span class="icon" style="font-size:28px">I</span>面试官<div style="font-size:10px;color:#94a3b8;margin-top:2px">仅面试评价与查看</div>
+  <div class="login-copy">
+    <div class="login-kicker">Recruitment Workbench</div>
+    <h1>智能招聘系统</h1>
+    <p>统一进入招聘看板、需求管理、人才库、面试计划和基础配置。登录后将根据演示角色展示对应菜单权限。</p>
+    <div class="login-signal" aria-label="系统概览">
+      <div><b>6</b><span>演示角色权限</span></div>
+      <div><b>7</b><span>招聘业务页面</span></div>
+      <div><b>AI</b><span>匹配与外呼能力</span></div>
     </div>
   </div>
 
-  <div class="form-group"><label>账号</label><input type="text" id="username" value="admin" placeholder="输入账号"></div>
-  <div class="form-group"><label>密码</label><input type="password" id="password" value="123456" placeholder="输入密码"></div>
-  <button class="btn-login" onclick="login()">登 录</button>
-  <div style="text-align:center;margin-top:12px;font-size:11px;color:#94a3b8">原型演示 · 点登录即可进入</div>
-</div>
+  <div class="login-box">
+    <h2>登录</h2>
+    <div class="sub">选择演示角色后进入系统</div>
+
+    <span class="role-label">演示角色</span>
+    <div class="roles">
+      <button type="button" class="role-card sel" data-role="admin" onclick="selRole(this)">
+        <span class="icon">A</span>
+        <span class="role-name">管理员</span>
+        <span class="role-note">全部功能与系统配置</span>
+      </button>
+      <button type="button" class="role-card" data-role="hr" onclick="selRole(this)">
+        <span class="icon">HR</span>
+        <span class="role-name">HR 专员</span>
+        <span class="role-note">招聘全流程操作</span>
+      </button>
+      <button type="button" class="role-card" data-role="interviewer" onclick="selRole(this)">
+        <span class="icon">I</span>
+        <span class="role-name">面试官</span>
+        <span class="role-note">面试评价与查看</span>
+      </button>
+    </div>
+
+    <div class="form-group"><label for="username">账号</label><input type="text" id="username" value="admin" placeholder="输入账号"></div>
+    <div class="form-group"><label for="password">密码</label><input type="password" id="password" value="123456" placeholder="输入密码"></div>
+    <button class="btn-login" onclick="login()">登录</button>
+    <div class="login-foot">原型演示，点击登录即可进入</div>
+  </div>
+</section>
 
 <script>
 let selectedRole = 'admin';
-function selRole(el){ document.querySelectorAll('.role-card').forEach(c=>c.classList.remove('sel')); el.classList.add('sel'); selectedRole = el.dataset.role; }
+function selRole(el){
+  document.querySelectorAll('.role-card').forEach(function(card){ card.classList.remove('sel'); });
+  el.classList.add('sel');
+  selectedRole = el.dataset.role;
+}
 function login(){
   localStorage.setItem('hr_role', selectedRole);
-  localStorage.setItem('hr_user', document.getElementById('username').value);
+  localStorage.setItem('hr_user', document.getElementById('username').value || '用户');
   location.href = 'recruit-dashboard.html';
 }
+(function(){
+  var stage = document.getElementById('loginStage');
+  if(!stage || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  stage.addEventListener('mousemove', function(event){
+    var rect = stage.getBoundingClientRect();
+    var x = ((event.clientX - rect.left) / rect.width) * 100;
+    var y = ((event.clientY - rect.top) / rect.height) * 100;
+    stage.style.setProperty('--mx', x.toFixed(2) + '%');
+    stage.style.setProperty('--my', y.toFixed(2) + '%');
+    stage.style.setProperty('--tilt-y', ((x - 50) / 24).toFixed(2) + 'deg');
+    stage.style.setProperty('--tilt-x', ((50 - y) / 32).toFixed(2) + 'deg');
+  });
+  stage.addEventListener('mouseleave', function(){
+    stage.style.setProperty('--mx','50%');
+    stage.style.setProperty('--my','50%');
+    stage.style.setProperty('--tilt-x','0deg');
+    stage.style.setProperty('--tilt-y','0deg');
+  });
+})();
 </script>
 </body>
 </html>
