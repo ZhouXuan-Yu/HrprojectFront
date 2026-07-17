@@ -94,11 +94,11 @@ function renderSidebar(activeId){
 
   // 无招聘权限：不渲染招聘管理一级菜单
   if(visible.length===0){
-    h += '<div class="logo"><div class="logo-icon">HR</div><div class="logo-text">智能招聘系统<span>Recruitment v0.1</span></div></div>';
+    h += '<div class="logo"><div class="logo-icon">HR</div><div class="logo-text">招聘管理系统<span>Recruitment v0.1</span></div></div>';
     h += '<nav><div style="padding:40px 18px;text-align:center;font-size:12px;color:#5a6180">暂无招聘模块权限<br><br>请联系管理员开通</div></nav>';
     h += '<div class="user-info"><div class="avatar">'+getUser().charAt(0).toUpperCase()+'</div><div>'+getUser()+'<span class="role-badge" style="background:#fff;border:1px solid var(--c-draft);color:var(--c-draft)">无权限</span></div><a class="logout" href="/login" onclick="localStorage.clear();sessionStorage.clear()">退出</a></div>';
   } else {
-    h += '<div class="logo"><div class="logo-icon">HR</div><div class="logo-text">智能招聘系统<span>Recruitment v0.1</span></div></div>';
+    h += '<div class="logo"><div class="logo-icon">HR</div><div class="logo-text">招聘管理系统<span>Recruitment v0.1</span></div></div>';
     h += '<nav>';
     h += '<div class="nav-main-menu open" id="navMainMenu">';
     h += '<div class="nav-main-label" onclick="document.getElementById(\'navMainMenu\').classList.toggle(\'open\')">招聘管理 <span class="nav-arrow">▾</span></div>';
@@ -1080,26 +1080,70 @@ function openInternalContactModal(name, manager){
     var kpiRow = document.getElementById('kpiRow');
     if(!body || !kpiRow || body.querySelector('.hero-analytics-grid')) return;
     var panel = document.createElement('section');
-    panel.className = 'hero-analytics-grid';
+    panel.className = 'hero-analytics-grid hero-analytics-grid--dashboard';
     panel.innerHTML =
-      '<article class="hero-chart-card hero-chart-card--wide" aria-label="招聘趋势">' +
-        '<div class="hero-card-head"><div><strong>招聘趋势</strong><span>简历、面试、入职 · 过去 10 天</span></div><div class="hero-card-tabs"><button class="active">日</button><button>周</button><button>月</button></div></div>' +
-        '<svg class="hero-line-chart" viewBox="0 0 720 220" role="img" aria-label="招聘趋势折线图">' +
-          '<defs><linearGradient id="heroLineFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#7C5CFF" stop-opacity=".22"/><stop offset="100%" stop-color="#7C5CFF" stop-opacity="0"/></linearGradient></defs>' +
+      '<article class="hero-chart-card hero-chart-card--wide" aria-label="招聘项目总览">' +
+        '<div class="hero-card-head"><div><strong>招聘项目总览</strong><span>简历、筛选、面试、Offer、入职 · 本月</span></div><div class="hero-card-tabs"><a href="/recruit-talent">候选人</a><a href="/recruit-demand">需求</a><a href="/recruit-interview">面试</a></div></div>' +
+        '<div class="hero-mini-kpis"><span><strong>346</strong>简历</span><span><strong>89</strong>筛选通过</span><span><strong>42</strong>面试</span><span><strong>8</strong>Offer</span><span><strong>5</strong>入职</span></div>' +
+        '<svg class="hero-line-chart" viewBox="0 0 720 220" role="img" aria-label="招聘项目趋势折线图">' +
           '<g class="grid"><path d="M40 40H700M40 90H700M40 140H700M40 190H700"/></g>' +
-          '<path class="area" d="M40 150 C100 124 134 128 182 104 S274 70 328 118 S418 160 482 98 S592 74 700 118 L700 198 L40 198 Z"/>' +
-          '<path class="line purple" d="M40 150 C100 124 134 128 182 104 S274 70 328 118 S418 160 482 98 S592 74 700 118"/>' +
+          '<path class="line blue" d="M40 150 C100 124 134 128 182 104 S274 70 328 118 S418 160 482 98 S592 74 700 118"/>' +
           '<path class="line amber" d="M40 132 C112 146 162 124 222 88 S316 142 384 122 S500 68 570 110 S646 140 700 122"/>' +
           '<g class="axis"><text x="40" y="214">07-08</text><text x="190" y="214">07-11</text><text x="340" y="214">07-14</text><text x="510" y="214">07-17</text><text x="660" y="214">07-20</text></g>' +
         '</svg>' +
-        '<div class="hero-chart-legend"><span><i class="purple"></i>简历量 346</span><span><i class="amber"></i>面试量 42</span></div>' +
+        '<div class="hero-chart-legend"><span><i class="blue"></i>简历量 346</span><span><i class="amber"></i>面试量 42</span></div>' +
       '</article>' +
-      '<article class="hero-chart-card" aria-label="候选人分布">' +
-        '<div class="hero-card-head"><div><strong>候选人分布</strong><span>按状态拆分</span></div></div>' +
-        '<div class="hero-donut-wrap"><div class="hero-donut" aria-hidden="true"></div><div class="hero-donut-center"><strong>346</strong><span>候选人</span></div></div>' +
-        '<div class="hero-donut-list"><span><i class="green"></i>可推进 55%</span><span><i class="purple"></i>待评估 25%</span><span><i class="amber"></i>需跟进 20%</span></div>' +
+      '<article class="hero-chart-card" aria-label="阶段转化">' +
+        '<div class="hero-card-head"><div><strong>阶段转化</strong><span>从候选人到入职的实际漏斗</span></div><a class="hero-text-link" href="/recruit-dashboard#funnel">查看漏斗</a></div>' +
+        '<div class="hero-stage-list">' +
+          '<a href="/recruit-talent"><span>收简历</span><b>346</b><em style="width:100%"></em></a>' +
+          '<a href="/recruit-demand"><span>筛选通过</span><b>89</b><em style="width:74%"></em></a>' +
+          '<a href="/recruit-interview"><span>面试</span><b>42</b><em style="width:48%"></em></a>' +
+          '<a href="/recruit-interview"><span>Offer</span><b>8</b><em style="width:28%"></em></a>' +
+          '<a href="/recruit-demand"><span>入职</span><b>5</b><em style="width:18%"></em></a>' +
+        '</div>' +
       '</article>';
     kpiRow.insertAdjacentElement('afterend', panel);
+
+    var command = document.createElement('section');
+    command.className = 'hero-workbench-grid';
+    command.setAttribute('aria-label','招聘看板总控区');
+    command.innerHTML =
+      '<article class="hero-chart-card hero-action-card" aria-label="待处理事项">' +
+        '<div class="hero-card-head"><div><strong>待处理事项</strong><span>按业务优先级排序</span></div></div>' +
+        '<div class="hero-action-list">' +
+          '<a href="/recruit-demand"><b>2</b><span>招聘需求待审批</span><em>需求管理</em></a>' +
+          '<a href="/recruit-interview"><b>3</b><span>候选人超 7 天未安排面试</span><em>面试计划</em></a>' +
+          '<a href="/recruit-demand-detail"><b>5</b><span>面试评价待回收</span><em>需求详情</em></a>' +
+          '<a href="/recruit-ai"><b>8</b><span>联系话术草稿待确认</span><em>招聘辅助中心</em></a>' +
+        '</div>' +
+      '</article>' +
+      '<article class="hero-chart-card hero-risk-card" aria-label="岗位风险">' +
+        '<div class="hero-card-head"><div><strong>岗位风险</strong><span>需要负责人介入的招聘项目</span></div><a class="hero-text-link" href="/recruit-demand">全部需求</a></div>' +
+        '<table class="hero-compact-table"><thead><tr><th>岗位</th><th>负责人</th><th>风险</th><th>动作</th></tr></thead><tbody>' +
+          '<tr><td>运营总监</td><td>陈总</td><td><span class="hero-risk high">20天零简历</span></td><td><a href="/recruit-demand-detail">查看</a></td></tr>' +
+          '<tr><td>前端工程师</td><td>刘博</td><td><span class="hero-risk mid">HC 剩 1</span></td><td><a href="/recruit-demand-detail">补候选人</a></td></tr>' +
+          '<tr><td>数据分析师</td><td>陈博</td><td><span class="hero-risk ok">已招满</span></td><td><a href="/recruit-demand">归档</a></td></tr>' +
+        '</tbody></table>' +
+      '</article>' +
+      '<article class="hero-chart-card hero-channel-card" aria-label="渠道效率">' +
+        '<div class="hero-card-head"><div><strong>渠道效率</strong><span>按简历量与面试转化排序</span></div><a class="hero-text-link" href="/recruit-talent">人才库</a></div>' +
+        '<div class="hero-bars">' +
+          '<a href="/recruit-talent"><span>邮箱采集</span><b>120</b><i style="width:100%"></i></a>' +
+          '<a href="/recruit-talent"><span>Boss 直聘</span><b>98</b><i style="width:82%"></i></a>' +
+          '<a href="/recruit-talent"><span>猎聘</span><b>65</b><i style="width:54%"></i></a>' +
+          '<a href="/recruit-talent"><span>内推</span><b>42</b><i style="width:35%"></i></a>' +
+        '</div>' +
+      '</article>' +
+      '<article class="hero-chart-card hero-schedule-card" aria-label="近期面试">' +
+        '<div class="hero-card-head"><div><strong>近期面试</strong><span>今日和本周待发生事项</span></div><a class="hero-text-link" href="/recruit-interview">打开日程</a></div>' +
+        '<ol class="hero-timeline-list">' +
+          '<li><time>10:00</time><span>前端工程师 · 技术一面</span><a href="/recruit-interview">安排</a></li>' +
+          '<li><time>14:30</time><span>产品经理 · 业务复试</span><a href="/recruit-interview">查看</a></li>' +
+          '<li><time>周五</time><span>运营总监 · 负责人面</span><a href="/recruit-demand-detail">候选人</a></li>' +
+        '</ol>' +
+      '</article>';
+    panel.insertAdjacentElement('afterend', command);
   }
 
   function ensureHeroPageSummary(){
@@ -1158,6 +1202,73 @@ function openInternalContactModal(name, manager){
     else body.insertBefore(summary, body.firstChild);
   }
 
+  function enhanceCollapses(){
+    Array.prototype.forEach.call(document.querySelectorAll('.collapse-toggle'), function(toggle, index){
+      if(toggle.dataset.collapseEnhanced === 'true') return;
+      var body = null;
+      var onclick = toggle.getAttribute('onclick') || '';
+      var match = onclick.match(/['"]([^'"]+)['"]/);
+      if(match) body = document.getElementById(match[1]);
+      if(!body){
+        var next = toggle.nextElementSibling;
+        if(next && next.classList.contains('collapse-body')) body = next;
+      }
+      if(!body) return;
+      if(!body.id) body.id = 'collapseBodyAuto' + index;
+      toggle.dataset.collapseEnhanced = 'true';
+      toggle.removeAttribute('onclick');
+      toggle.setAttribute('role','button');
+      toggle.setAttribute('tabindex','0');
+      toggle.setAttribute('aria-controls', body.id);
+
+      function setOpen(open){
+        toggle.classList.toggle('open', open);
+        body.classList.toggle('show', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      setOpen(body.classList.contains('show') || toggle.classList.contains('open'));
+
+      toggle.addEventListener('click', function(e){
+        e.preventDefault();
+        setOpen(!body.classList.contains('show'));
+      });
+      toggle.addEventListener('keydown', function(e){
+        if(e.key === 'Enter' || e.key === ' '){
+          e.preventDefault();
+          setOpen(!body.classList.contains('show'));
+        }
+      });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('.accordion-header'), function(header){
+      if(header.dataset.accordionEnhanced === 'true') return;
+      var item = header.closest('.accordion');
+      if(!item) return;
+      var body = item.querySelector('.accordion-body');
+      if(!body) return;
+      if(!body.id) body.id = 'accordionBody' + Math.random().toString(36).slice(2);
+      header.dataset.accordionEnhanced = 'true';
+      header.removeAttribute('onclick');
+      header.setAttribute('role','button');
+      header.setAttribute('tabindex','0');
+      header.setAttribute('aria-controls', body.id);
+
+      function setOpen(open){
+        item.classList.toggle('open', open);
+        header.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      setOpen(item.classList.contains('open'));
+
+      header.addEventListener('click', function(){ setOpen(!item.classList.contains('open')); });
+      header.addEventListener('keydown', function(e){
+        if(e.key === 'Enter' || e.key === ' '){
+          e.preventDefault();
+          setOpen(!item.classList.contains('open'));
+        }
+      });
+    });
+  }
+
   function enhanceCoreComponents(){
     document.body.classList.add('hero-pro-workbench');
     document.body.classList.add('core-components-ready');
@@ -1172,6 +1283,7 @@ function openInternalContactModal(name, manager){
     enhanceEmptyStates();
     enhanceVisualizationCards();
     ensureHeroDashboardAnalytics();
+    enhanceCollapses();
   }
 
   var componentTimer = null;

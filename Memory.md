@@ -206,3 +206,24 @@
   - 巡检报告：`test-results/phase3-heropro-final-console-report.json`
 
 下一步：进入 Phase 4 时逐页做业务级重构，不再只靠全局增强；优先改需求详情、人才库、面试计划这类业务对象页。
+
+## 2026-07-18 看板总控页与折叠栏修复
+
+- 用户反馈折叠栏不能正常折叠，并明确要求禁止渐变色、拒绝 AI 味。
+- 已定位折叠栏根因：Vue shell 注入 legacy body 时不会保留页面 `<head><style>`，导致 `recruit-dashboard.html` 内联的 `.collapse-body{display:none}` 没有生效。
+- 已修复：
+  - `public/js/app.js` 新增 `enhanceCollapses()`，统一增强 `.collapse-toggle` 和 `.accordion-header`，补齐 `aria-expanded`、键盘 Enter/Space 操作，并移除脆弱的内联 onclick 依赖。
+  - `public/css/style.css` 新增全局 `.collapse-toggle + .collapse-body` 显隐规则，确保折叠状态和可见性一致。
+  - 招聘看板新增总控区域：招聘项目总览、阶段转化、待处理事项、岗位风险、渠道效率、近期面试，并联动到需求、人才库、面试、需求详情、招聘辅助中心。
+  - 全项目 `public/src` 已清除 `gradient` 用法；登录页和 loading skeleton 改为纯色/细线。
+  - 去掉“智能风险预警”等 AI 味文案，改为“招聘风险预警”。
+- 本轮验证：
+  - `npm run build`：通过
+  - `npm test`：通过，25/25
+  - Playwright 截图巡检：16 张桌面/移动截图
+  - Console error：0
+  - 禁用文案：0
+  - 移动端页面级横向溢出：0
+  - 巡检报告：`test-results/phase-dashboard-command-final-report.json`
+
+下一步：Phase 4 中优先把旧“招聘全漏斗”明细区组件化，移动端避免下方漏斗文字挤压。

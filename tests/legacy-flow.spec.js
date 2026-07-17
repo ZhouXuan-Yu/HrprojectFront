@@ -114,6 +114,39 @@ test('global workbench shell exposes topbar actions and current navigation state
   await expect(page.locator('#commandInput')).toBeFocused();
 });
 
+test('dashboard collapse panels toggle with mouse and keyboard', async ({ page }) => {
+  await page.goto('/recruit-dashboard');
+
+  const deptToggle = page.locator('.collapse-toggle[aria-controls="bodyDept"]');
+  const deptBody = page.locator('#bodyDept');
+  await expect(deptToggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(deptBody).toBeHidden();
+
+  await deptToggle.click();
+  await expect(deptToggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(deptBody).toBeVisible();
+
+  await deptToggle.press('Enter');
+  await expect(deptToggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(deptBody).toBeHidden();
+
+  const channelToggle = page.locator('.collapse-toggle[aria-controls="bodyChannel"]');
+  await channelToggle.press(' ');
+  await expect(page.locator('#bodyChannel')).toBeVisible();
+});
+
+test('dashboard exposes executive recruiting overview and linked work queues', async ({ page }) => {
+  await page.goto('/recruit-dashboard');
+  await expect(page.locator('.hero-workbench-grid')).toBeVisible();
+  await expect(page.getByText('待处理事项')).toBeVisible();
+  await expect(page.getByText('岗位风险')).toBeVisible();
+  await expect(page.getByText('渠道效率')).toBeVisible();
+  await expect(page.getByText('近期面试')).toBeVisible();
+
+  await page.locator('.hero-action-list a[href="/recruit-interview"]').first().click();
+  await expect(page).toHaveURL(/\/recruit-interview$/);
+});
+
 test('core data components expose density, sorting, reset, KPI context, and dialog semantics', async ({ page }) => {
   await page.goto('/recruit-dashboard');
   await expect(page.locator('.metric-window').first()).toContainText('当前筛选范围');

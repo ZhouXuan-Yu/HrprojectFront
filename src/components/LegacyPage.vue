@@ -139,11 +139,7 @@ onBeforeUnmount(() => cleanupFns.forEach((fn) => fn()));
   height: 220px;
   border-radius: var(--e-radius-md, 8px);
   border: 1px solid var(--e-border, #e1e6ef);
-  background:
-    linear-gradient(90deg, transparent, var(--e-primary-subtle, rgba(79, 110, 247, .08)), transparent),
-    linear-gradient(var(--e-surface, #fff), var(--e-surface-soft, #f9fafc));
-  background-size: 240px 100%, 100% 100%;
-  animation: legacy-shimmer 1.2s linear infinite;
+  background: var(--e-surface, #fff);
 }
 .legacy-state--error {
   color: var(--e-ink, #172033);
