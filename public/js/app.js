@@ -3,12 +3,12 @@
 
 // ========== 菜单定义 ==========
 var MENU_ROUTES = [
-  { id:'recruit-dashboard', label:'招聘看板', href:'recruit-dashboard.html' },
-  { id:'recruit-demand',    label:'需求管理',   href:'recruit-demand.html' },
-  { id:'recruit-talent',    label:'人才库',     href:'recruit-talent.html' },
-  { id:'recruit-interview', label:'面试计划',   href:'recruit-interview.html' },
-  { id:'recruit-ai',        label:'AI 智能自动化中心', href:'recruit-ai.html' },
-  { id:'recruit-config',    label:'招聘基础配置',      href:'recruit-config.html' },
+  { id:'recruit-dashboard', label:'招聘看板', href:'/recruit-dashboard' },
+  { id:'recruit-demand',    label:'需求管理',   href:'/recruit-demand' },
+  { id:'recruit-talent',    label:'人才库',     href:'/recruit-talent' },
+  { id:'recruit-interview', label:'面试计划',   href:'/recruit-interview' },
+  { id:'recruit-ai',        label:'AI 智能自动化中心', href:'/recruit-ai' },
+  { id:'recruit-config',    label:'招聘基础配置',      href:'/recruit-config' },
 ];
 
 // ========== 6 角色权限矩阵 ==========
@@ -88,7 +88,7 @@ function renderSidebar(activeId){
   if(visible.length===0){
     h += '<div class="logo"><div class="logo-icon">HR</div><div class="logo-text">智能招聘系统<span>Recruitment v0.1</span></div></div>';
     h += '<nav><div style="padding:40px 18px;text-align:center;font-size:12px;color:#5a6180">暂无招聘模块权限<br><br>请联系管理员开通</div></nav>';
-    h += '<div class="user-info"><div class="avatar">'+getUser().charAt(0).toUpperCase()+'</div><div>'+getUser()+'<span class="role-badge" style="background:#fff;border:1px solid var(--c-draft);color:var(--c-draft)">无权限</span></div><a class="logout" href="login.html" onclick="localStorage.clear();sessionStorage.clear()">退出</a></div>';
+    h += '<div class="user-info"><div class="avatar">'+getUser().charAt(0).toUpperCase()+'</div><div>'+getUser()+'<span class="role-badge" style="background:#fff;border:1px solid var(--c-draft);color:var(--c-draft)">无权限</span></div><a class="logout" href="/login" onclick="localStorage.clear();sessionStorage.clear()">退出</a></div>';
   } else {
     h += '<div class="logo"><div class="logo-icon">HR</div><div class="logo-text">智能招聘系统<span>Recruitment v0.1</span></div></div>';
     h += '<nav>';
@@ -102,7 +102,7 @@ function renderSidebar(activeId){
     h += '</nav>';
     var badgeClass = ROLE_CLASS[role]||'';
     var badgeLabel = ROLE_LABELS[role]||role;
-    h += '<div class="user-info"><div class="avatar">'+getUser().charAt(0).toUpperCase()+'</div><div>'+getUser()+'<span class="role-badge '+badgeClass+'">'+badgeLabel+'</span></div><a class="logout" href="login.html" onclick="localStorage.clear();sessionStorage.clear()">退出</a></div>';
+    h += '<div class="user-info"><div class="avatar">'+getUser().charAt(0).toUpperCase()+'</div><div>'+getUser()+'<span class="role-badge '+badgeClass+'">'+badgeLabel+'</span></div><a class="logout" href="/login" onclick="localStorage.clear();sessionStorage.clear()">退出</a></div>';
   }
 
   document.getElementById('sidebar').innerHTML = h;
@@ -733,7 +733,8 @@ function openInternalContactModal(name, manager){
 
 // ========== 登录保护 ==========
 (function(){
-  if(location.pathname.indexOf('login.html')===-1 && !localStorage.getItem('hr_role')){
-    location.href = 'login.html';
+  if(location.pathname.indexOf('/login')===-1 && !localStorage.getItem('hr_role')){
+    if(window.__legacyNavigate){ window.__legacyNavigate('/login'); }
+    else { location.href = '/login'; }
   }
 })();
