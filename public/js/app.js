@@ -743,22 +743,80 @@ function openInternalContactModal(name, manager){
   }
 })();
 
-// Enterprise command palette.
+// Enterprise shell and command palette.
 (function(){
   if(location.pathname.indexOf('/login') !== -1) return;
   var commands = [
-    {label:'招聘看板', hint:'查看漏斗、KPI 与风险提醒', href:'/recruit-dashboard'},
-    {label:'需求管理', hint:'筛选、创建和审批招聘需求', href:'/recruit-demand'},
-    {label:'需求详情', hint:'查看岗位候选人、批量操作与匹配记录', href:'/recruit-demand-detail'},
-    {label:'人才库', hint:'检索候选人、联系记录与人才标签', href:'/recruit-talent'},
-    {label:'面试计划', hint:'安排面试、查看日程和评价状态', href:'/recruit-interview'},
-    {label:'招聘辅助中心', hint:'候选人沟通辅助、简历摘要与效率分析', href:'/recruit-ai'},
-    {label:'基础配置', hint:'维护部门、流程、通知和系统规则', href:'/recruit-config'}
+    {id:'recruit-dashboard', label:'招聘看板', hint:'查看漏斗、KPI 与风险提醒', href:'/recruit-dashboard'},
+    {id:'recruit-demand', label:'需求管理', hint:'筛选、创建和审批招聘需求', href:'/recruit-demand'},
+    {id:'recruit-demand-detail', label:'需求详情', hint:'查看岗位候选人、批量操作与匹配记录', href:'/recruit-demand-detail', parent:'recruit-demand'},
+    {id:'recruit-talent', label:'人才库', hint:'检索候选人、联系记录与人才标签', href:'/recruit-talent'},
+    {id:'recruit-interview', label:'面试计划', hint:'安排面试、查看日程和评价状态', href:'/recruit-interview'},
+    {id:'recruit-ai', label:'招聘辅助中心', hint:'候选人沟通辅助、简历摘要与效率分析', href:'/recruit-ai'},
+    {id:'recruit-config', label:'基础配置', hint:'维护部门、流程、通知和系统规则', href:'/recruit-config'}
   ];
 
   function go(href){
     if(window.__legacyNavigate) window.__legacyNavigate(href);
     else location.href = href;
+  }
+
+  function currentRouteId(){
+    return location.pathname.replace(/^\//,'') || 'recruit-dashboard';
+  }
+
+  function allowedCommands(){
+    var visibleIds = getVisibleMenus(getRole()).map(function(item){ return item.id; });
+    return commands.filter(function(item){
+      return visibleIds.indexOf(item.id) !== -1 || (item.parent && visibleIds.indexOf(item.parent) !== -1);
+    });
+  }
+
+  function ensureTopbarActions(){
+    var topbar = document.querySelector('.topbar');
+    if(!topbar) return null;
+    topbar.setAttribute('role','banner');
+    var spacer = topbar.querySelector('.spacer');
+    if(!spacer) return null;
+    var actions = topbar.querySelector('.topbar-actions');
+    if(!actions){
+      actions = document.createElement('div');
+      actions.className = 'topbar-actions';
+      spacer.parentNode.insertBefore(actions, spacer.nextSibling);
+      var node = actions.nextSibling;
+      while(node){
+        var next = node.nextSibling;
+        actions.appendChild(node);
+        node = next;
+      }
+    }
+    return actions;
+  }
+
+  function enhanceWorkbenchShell(){
+    document.body.classList.add('enterprise-workbench');
+    document.body.setAttribute('data-route', currentRouteId());
+
+    var content = document.querySelector('.content');
+    if(content) content.classList.add('workbench-ready');
+
+    var main = document.querySelector('.content-body');
+    if(main){
+      main.setAttribute('role','main');
+      main.setAttribute('tabindex','-1');
+    }
+
+    var sidebar = document.getElementById('sidebar');
+    if(sidebar){
+      sidebar.setAttribute('role','navigation');
+      sidebar.setAttribute('aria-label','招聘模块导航');
+      Array.prototype.forEach.call(sidebar.querySelectorAll('a'), function(link){
+        if(link.classList.contains('active')) link.setAttribute('aria-current','page');
+        if(!link.getAttribute('title')) link.setAttribute('title', link.textContent.trim());
+      });
+    }
+
+    ensureTopbarActions();
   }
 
   function closePalette(){
@@ -782,10 +840,11 @@ function openInternalContactModal(name, manager){
     var results = document.getElementById('commandResults');
     function draw(){
       var q = input.value.trim().toLowerCase();
-      var items = commands.filter(function(item){
+      var source = allowedCommands();
+      var items = source.filter(function(item){
         return !q || item.label.toLowerCase().indexOf(q) !== -1 || item.hint.toLowerCase().indexOf(q) !== -1;
       });
-      results.innerHTML = (items.length ? items : commands).map(function(item){
+      results.innerHTML = (items.length ? items : source).map(function(item){
         return '<button class="command-result" data-href="'+item.href+'"><strong>'+item.label+'</strong><span>'+item.hint+'</span></button>';
       }).join('');
       Array.prototype.forEach.call(results.querySelectorAll('.command-result'), function(btn){
@@ -805,15 +864,18 @@ function openInternalContactModal(name, manager){
   }
 
   function installCommandTrigger(){
-    var topbar = document.querySelector('.topbar .spacer');
-    if(topbar && !document.getElementById('commandTrigger')){
+    enhanceWorkbenchShell();
+    var actions = ensureTopbarActions();
+    if(actions && !document.getElementById('commandTrigger')){
       var btn = document.createElement('button');
       btn.id = 'commandTrigger';
       btn.type = 'button';
       btn.className = 'command-trigger';
+      btn.setAttribute('aria-label','打开快速跳转');
+      btn.setAttribute('title','快速跳转');
       btn.innerHTML = '<span>快速跳转</span><kbd>Ctrl K</kbd>';
       btn.onclick = renderPalette;
-      topbar.parentNode.insertBefore(btn, topbar.nextSibling);
+      actions.insertBefore(btn, actions.firstChild);
     }
   }
 
@@ -827,4 +889,5 @@ function openInternalContactModal(name, manager){
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installCommandTrigger);
   else installCommandTrigger();
   setTimeout(installCommandTrigger, 100);
+  window.__enhanceWorkbenchShell = installCommandTrigger;
 })();

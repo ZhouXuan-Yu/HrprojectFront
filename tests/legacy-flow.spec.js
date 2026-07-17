@@ -101,6 +101,19 @@ test('command palette supports keyboard navigation', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '人才库' })).toBeVisible();
 });
 
+test('global workbench shell exposes topbar actions and current navigation state', async ({ page }) => {
+  await page.goto('/recruit-dashboard');
+  await expect(page.locator('body')).toHaveAttribute('data-route', 'recruit-dashboard');
+  await expect(page.locator('.content')).toHaveClass(/workbench-ready/);
+  await expect(page.locator('.topbar-actions')).toBeVisible();
+  await expect(page.locator('#sidebar')).toHaveAttribute('role', 'navigation');
+  await expect(page.locator('.nav-flyout-item.active')).toHaveAttribute('aria-current', 'page');
+
+  await page.locator('#commandTrigger').click();
+  await expect(page.locator('#commandPalette')).toBeVisible();
+  await expect(page.locator('#commandInput')).toBeFocused();
+});
+
 test('demand list supports filtering and create modal', async ({ page }) => {
   await page.goto('/recruit-demand');
   await page.locator('#demandSearch').fill('运营总监');

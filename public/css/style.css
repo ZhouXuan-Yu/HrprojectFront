@@ -480,6 +480,9 @@ button{letter-spacing:0}
   box-shadow:none;
   padding:0;
 }
+.nav-flyout a[aria-current="page"]{
+  font-weight:750;
+}
 .nav-flyout-item{
   height:40px;
   margin:3px 0;
@@ -514,7 +517,13 @@ button{letter-spacing:0}
 }
 .user-info .logout{color:#FCA5A5}
 
-.content{background:transparent}
+.content{
+  min-width:0;
+  background:transparent;
+}
+.content.workbench-ready{
+  isolation:isolate;
+}
 .topbar{
   height:56px;
   padding:0 24px;
@@ -522,6 +531,22 @@ button{letter-spacing:0}
   backdrop-filter:blur(16px);
   border-bottom:1px solid var(--e-border);
   gap:12px;
+  min-width:0;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.topbar::-webkit-scrollbar{display:none}
+.topbar .spacer{
+  min-width:12px;
+}
+.topbar-actions{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:10px;
+  min-width:0;
+  flex:0 0 auto;
 }
 .topbar h1{
   font-size:24px;
@@ -556,6 +581,8 @@ button{letter-spacing:0}
   max-width:none;
   width:100%;
   padding:24px 24px 40px;
+  min-width:0;
+  container-type:inline-size;
 }
 
 .metric-row{
@@ -808,6 +835,7 @@ tr:hover td{background:#F7FAFF}
 
 .command-trigger{
   min-height:34px;
+  flex:0 0 auto;
   display:inline-flex;
   align-items:center;
   gap:10px;
@@ -932,12 +960,37 @@ tr:hover td{background:#F7FAFF}
   body{display:block}
   .legacy-page{display:block!important}
   .sidebar{position:relative;width:100%;min-height:auto}
+  .logo{min-height:64px}
   .logo-text,.nav-main-label,.user-info>div:not(.avatar),.user-info .logout{display:block}
-  .nav-flyout{display:flex;overflow:auto;gap:8px}
+  .nav-main-menu{margin:0 12px 10px}
+  .nav-flyout{
+    display:flex;
+    overflow:auto;
+    gap:8px;
+    padding-bottom:4px;
+    scrollbar-width:none;
+  }
+  .nav-flyout::-webkit-scrollbar{display:none}
   .nav-flyout-item{font-size:13px;min-width:max-content;padding:0 12px}
   .content-body{padding:16px}
-  .topbar{height:auto;min-height:56px;padding:10px 16px}
+  .topbar{
+    height:auto;
+    min-height:56px;
+    padding:10px 16px;
+    align-items:flex-start;
+  }
   .topbar h1{font-size:20px}
+  .topbar .spacer{display:none}
+  .topbar-actions{
+    width:100%;
+    margin-left:0;
+    justify-content:flex-start;
+    overflow:auto;
+    padding-bottom:2px;
+    scrollbar-width:none;
+  }
+  .topbar-actions::-webkit-scrollbar{display:none}
+  .command-trigger span{display:none}
   .metric-row{grid-template-columns:1fr}
   .grid-2,.grid-6-4,.grid-4-6{grid-template-columns:1fr}
   .card{overflow-x:auto}

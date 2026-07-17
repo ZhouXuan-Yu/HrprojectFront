@@ -101,6 +101,9 @@ async function loadLegacyPage() {
     await nextTick();
     runInlineScripts(scripts);
     normalizeLegacyLinks(host.value);
+    if (typeof window.__enhanceWorkbenchShell === 'function') {
+      window.__enhanceWorkbenchShell();
+    }
   } catch (error) {
     host.value.innerHTML = '';
     errorMessage.value = error instanceof Error ? error.message : '未知错误';

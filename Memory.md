@@ -9,7 +9,7 @@
 - 目录：`D:\WorkProject\HrProject\hr-web\frontend`
 - 阶段：原型保真迁移 + 企业级 UI 优化
 - 技术栈：Vue 3 + Vite + Vue Router + Playwright
-- Git 当前最新提交：`d95d91d feat: create original enterprise radar login`
+- Git 当前最新提交：以 `git log -1 --oneline` 为准。
 
 ## 已完成
 
@@ -142,3 +142,24 @@
   - 报告：`test-results/phase1-token-console-report.json`
 
 下一步进入 Phase 2：全局框架重构复审，重点检查侧边栏、顶部栏、页面标题区、命令入口和工作台布局是否还有遗留不一致。
+
+## 2026-07-17 Phase 2 全局框架重构复审与深化
+
+- 已完成 Phase 2：全局框架重构复审与深化。
+- 本次代码补齐：
+  - `public/js/app.js` 新增企业工作台外壳增强：路由标记、主内容语义、侧栏导航语义、当前页状态。
+  - 顶栏控件统一归入 `topbar-actions`，命令入口支持按钮点击和 `Ctrl/Cmd + K`。
+  - 命令面板按当前角色权限过滤可访问页面。
+  - `LegacyPage.vue` 在 legacy 页面脚本执行后重新安装外壳，解决旧页面注入时序问题。
+  - `style.css` 优化顶栏动作区、移动端横向导航、内容区容器边界和窄屏防溢出。
+  - `tests/legacy-flow.spec.js` 新增全局工作台外壳回归测试。
+- 阶段验证：
+  - `npm run build`：通过
+  - `npm test`：通过，22/22
+  - Phase 2 截图巡检：16 张
+  - Console error：0
+  - 移动端横向溢出：0
+  - 外壳缺项：0
+  - 报告：`test-results/phase2-shell-console-report.json`
+
+下一步进入 Phase 3：核心组件升级，重点检查表格、筛选区、KPI、弹窗/抽屉和空/加载/错误状态是否一致。
