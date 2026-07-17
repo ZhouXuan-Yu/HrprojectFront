@@ -32,6 +32,21 @@ test('login background responds to mouse movement', async ({ page }) => {
   await page.mouse.move(1200, 180);
   await expect.poll(async () => stage.evaluate((el) => getComputedStyle(el).getPropertyValue('--mx').trim())).not.toBe('50%');
   await expect.poll(async () => stage.evaluate((el) => getComputedStyle(el).getPropertyValue('--my').trim())).not.toBe('50%');
+  await expect.poll(async () => stage.evaluate((el) => getComputedStyle(el).getPropertyValue('--pupil-x').trim())).not.toBe('0px');
+});
+
+test('login owl reacts to username and password fields', async ({ page }) => {
+  await page.goto('/login');
+  const stage = page.locator('#loginStage');
+
+  await page.locator('#username').focus();
+  await expect(stage).toHaveClass(/username-mode/);
+
+  await page.locator('#password').focus();
+  await expect(stage).toHaveClass(/password-mode/);
+
+  await page.locator('#password').blur();
+  await expect(stage).not.toHaveClass(/password-mode/);
 });
 
 for (const [path, heading] of pages) {
