@@ -17,261 +17,251 @@
   --tilt-y:0deg;
   width:100%;
   min-height:100vh;
-  position:relative;
-  overflow:hidden;
   display:grid;
-  grid-template-columns:minmax(360px,1fr) minmax(360px,440px);
-  align-items:center;
-  gap:56px;
-  padding:52px clamp(24px,6vw,88px);
-  background:#0B0C0A;
-  color:#F8FAFC;
-  font-family:"IBM Plex Mono","JetBrains Mono",Consolas,"Microsoft YaHei",monospace;
-  isolation:isolate;
+  grid-template-columns:minmax(520px,1.05fr) minmax(420px,.95fr);
+  overflow:hidden;
+  background:#F6F8FB;
+  color:#172033;
+  font-family:Inter,"PingFang SC","Microsoft YaHei",Arial,sans-serif;
 }
-.login-stage::before{
-  content:"";
-  position:absolute;
-  inset:-20%;
+.brand-panel{
+  position:relative;
+  min-height:100vh;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  padding:48px clamp(32px,5vw,72px);
   background:
-    radial-gradient(circle at var(--mx) var(--my), rgba(0,230,118,.18), transparent 0 18%, transparent 40%),
-    linear-gradient(135deg,#0B0C0A 0%,#10140F 48%,#000000 100%);
-  z-index:-4;
+    radial-gradient(circle at var(--mx) var(--my), rgba(79,110,247,.28), transparent 0 18%, transparent 40%),
+    linear-gradient(135deg,#5B6475 0%,#8C95A6 52%,#C9D2E3 100%);
+  color:#FFFFFF;
 }
-.login-stage::after{
+.brand-panel::before{
   content:"";
   position:absolute;
   inset:0;
   background-image:
-    linear-gradient(rgba(0,230,118,.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,230,118,.10) 1px, transparent 1px);
-  background-size:52px 52px;
+    linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
+  background-size:28px 28px;
   background-position:
-    calc((var(--mx) - 50%) * .035) calc((var(--my) - 50%) * .035);
-  opacity:.42;
-  z-index:-3;
+    calc((var(--mx) - 50%) * .04) calc((var(--my) - 50%) * .04);
+  opacity:.75;
 }
-.login-scan{
+.brand-panel::after{
+  content:"";
   position:absolute;
-  inset:0;
-  pointer-events:none;
-  z-index:-2;
-  background:linear-gradient(90deg,transparent,rgba(0,230,118,.12),transparent);
-  transform:translateX(-55%);
-  animation:login-scan 7s linear infinite both;
+  width:520px;
+  height:520px;
+  right:-160px;
+  bottom:-150px;
+  border-radius:50%;
+  background:rgba(255,255,255,.18);
+  filter:blur(20px);
 }
-@keyframes login-scan{
-  from{transform:translateX(-60%)}
-  to{transform:translateX(160%)}
+.brand-top,.brand-copy,.brand-footer,.character-scene{
+  position:relative;
+  z-index:1;
 }
-.login-orbit{
-  position:absolute;
-  inset:0;
-  pointer-events:none;
-  z-index:-1;
+.brand-top{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  font-weight:800;
+  font-size:16px;
 }
-.login-orbit span{
-  position:absolute;
-  width:9px;
-  height:9px;
-  border:1px solid rgba(0,230,118,.86);
-  background:#0B0C0A;
-  transform:translate(calc((var(--mx) - 50%) * var(--dx)), calc((var(--my) - 50%) * var(--dy))) rotate(45deg);
-  animation:login-node 4.8s ease-in-out infinite both;
+.brand-mark{
+  width:36px;
+  height:36px;
+  border-radius:8px;
+  display:grid;
+  place-items:center;
+  background:rgba(255,255,255,.16);
+  border:1px solid rgba(255,255,255,.25);
+  backdrop-filter:blur(8px);
 }
-.login-orbit span:nth-child(1){left:10%;top:18%;--dx:.05;--dy:.02}
-.login-orbit span:nth-child(2){left:32%;top:76%;--dx:-.035;--dy:.05;animation-delay:-1s}
-.login-orbit span:nth-child(3){left:60%;top:13%;--dx:.025;--dy:-.04;animation-delay:-2.2s}
-.login-orbit span:nth-child(4){left:84%;top:72%;--dx:-.05;--dy:-.025;animation-delay:-3s}
-@keyframes login-node{
-  0%,100%{opacity:.34;scale:.85}
-  50%{opacity:1;scale:1.22}
+.brand-copy{
+  max-width:620px;
 }
-.login-copy{
-  max-width:720px;
-  transform:perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
-  transition:transform .12s ease-out;
-}
-.login-kicker{
-  width:max-content;
-  max-width:100%;
-  border:1px solid rgba(0,230,118,.72);
-  color:#00E676;
-  padding:8px 12px;
-  font-size:12px;
-  font-weight:700;
-  letter-spacing:0;
-  background:rgba(0,230,118,.06);
-  margin-bottom:22px;
-}
-.login-copy h1{
+.brand-copy h1{
   margin:0;
-  font-size:clamp(44px,7vw,90px);
-  line-height:.96;
-  font-weight:900;
+  font-size:clamp(42px,5.4vw,76px);
+  line-height:1;
   letter-spacing:0;
+  font-weight:900;
 }
-.login-copy p{
-  margin:24px 0 0;
-  max-width:590px;
-  color:#AAB5C8;
+.brand-copy p{
+  margin:22px 0 0;
+  max-width:520px;
+  color:rgba(255,255,255,.82);
   font-size:15px;
   line-height:1.9;
 }
-.watcher-panel{
-  width:min(520px,100%);
-  margin-top:34px;
-  border:1px solid rgba(0,230,118,.28);
-  background:rgba(0,0,0,.32);
-  padding:22px;
+.character-scene{
+  height:380px;
+  width:min(620px,100%);
+  margin:28px auto 0;
+  transform:perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+  transition:transform .12s ease-out;
 }
-.owl-wrap{
+.character{
+  position:absolute;
+  bottom:0;
+  border-radius:16px 16px 0 0;
+  transition:height .45s ease,transform .45s ease,border-radius .45s ease;
+  box-shadow:0 28px 80px rgba(23,32,51,.18);
+}
+.character.tall{
+  left:80px;
+  width:170px;
+  height:330px;
+  background:#4F6EF7;
+  z-index:1;
+}
+.character.dark{
+  left:245px;
+  width:126px;
+  height:260px;
+  background:#1E293B;
+  z-index:2;
+}
+.character.front{
+  left:0;
+  width:252px;
+  height:172px;
+  border-radius:126px 126px 0 0;
+  background:#F3A475;
+  z-index:4;
+}
+.character.gold{
+  left:360px;
+  width:150px;
+  height:210px;
+  border-radius:75px 75px 0 0;
+  background:#E7D66B;
+  z-index:3;
+}
+.face{
+  position:absolute;
   display:flex;
-  align-items:center;
-  gap:22px;
+  gap:24px;
+  transition:left .28s ease,top .28s ease,transform .28s ease;
 }
-.owl-card{
-  width:190px;
-  height:190px;
-  flex:0 0 190px;
+.character.tall .face{left:48px;top:42px}
+.character.dark .face{left:28px;top:34px;gap:20px}
+.character.front .face{left:88px;top:78px}
+.character.gold .face{left:54px;top:46px;gap:18px}
+.eye{
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:#FFFFFF;
   display:grid;
   place-items:center;
-  border:1px solid rgba(0,230,118,.38);
-  background:#070806;
-  transform:translate(calc((var(--mx) - 50%) * .035), calc((var(--my) - 50%) * .02));
-  transition:transform .14s ease-out;
+  overflow:hidden;
+  transition:height .16s ease,transform .16s ease;
 }
-.watch-owl{
-  width:160px;
-  height:160px;
-  overflow:visible;
+.character.dark .eye{width:16px;height:16px}
+.character.front .eye,.character.gold .eye{
+  width:13px;
+  height:13px;
+  background:#172033;
 }
-.owl-body{fill:#11160F;stroke:#00E676;stroke-width:2}
-.owl-face{fill:rgba(0,230,118,.12);stroke:#00E676;stroke-width:2}
-.owl-beak{fill:#FFB800}
-.owl-eye{fill:#FFFFFF;stroke:#0B0C0A;stroke-width:2}
-.owl-pupil{
-  fill:#0B0C0A;
-  transform-box:fill-box;
-  transform-origin:center;
+.pupil{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#172033;
   transform:translate(var(--pupil-x),var(--pupil-y));
-  transition:transform .12s ease-out, opacity .16s ease;
+  transition:transform .08s ease-out,opacity .12s ease;
 }
-.owl-lid{
-  fill:#151A14;
-  transform-box:fill-box;
-  transform-origin:center;
+.character.dark .pupil{width:6px;height:6px}
+.character.front .pupil,.character.gold .pupil{
+  width:12px;
+  height:12px;
+  background:#172033;
+}
+.mouth{
+  position:absolute;
+  left:48px;
+  top:92px;
+  width:54px;
+  height:4px;
+  border-radius:999px;
+  background:#172033;
+  transition:transform .24s ease,width .24s ease;
+}
+.login-stage.username-mode .character.tall{
+  height:350px;
+  transform:translateX(20px) skewX(-4deg);
+}
+.login-stage.username-mode .character.dark{
+  transform:translateX(12px) skewX(4deg);
+}
+.login-stage.password-mode .character.tall{
+  height:365px;
+  transform:translateX(42px) skewX(-10deg);
+}
+.login-stage.password-mode .character.dark{
+  transform:translateX(20px) skewX(8deg);
+}
+.login-stage.password-mode .eye{
+  height:3px;
+}
+.login-stage.password-mode .pupil{
   opacity:0;
-  transform:scaleY(.05);
-  transition:opacity .18s ease,transform .18s ease;
 }
-.owl-cover{
-  fill:#11160F;
-  stroke:#00E676;
-  stroke-width:2;
-  opacity:0;
-  transform-box:fill-box;
-  transform-origin:center;
-  transform:translateY(16px) scale(.7);
-  transition:opacity .2s ease,transform .22s cubic-bezier(.2,.8,.2,1);
+.login-stage.password-mode .character.front .face,
+.login-stage.password-mode .character.gold .face{
+  top:72px;
 }
-.owl-wing{
-  fill:#151A14;
-  stroke:#00E676;
-  stroke-width:2;
-  transform-box:fill-box;
-  transform-origin:center;
-  transition:transform .22s cubic-bezier(.2,.8,.2,1);
+.login-stage.password-mode .mouth{
+  width:38px;
+  transform:translateX(10px) rotate(-4deg);
 }
-.owl-wing.left{transform:translate(-28px,38px) rotate(-22deg)}
-.owl-wing.right{transform:translate(28px,38px) rotate(22deg)}
-.owl-brow{
-  stroke:#00E676;
-  stroke-width:4;
-  stroke-linecap:square;
-  transition:transform .18s ease;
-}
-.login-stage.username-mode .owl-pupil{
-  transform:translate(0px,5px);
-}
-.login-stage.password-mode .owl-pupil{opacity:.18}
-.login-stage.password-mode .owl-lid{
-  opacity:1;
-  transform:scaleY(1);
-}
-.login-stage.password-mode .owl-cover{
-  opacity:1;
-  transform:translateY(0) scale(1);
-}
-.login-stage.password-mode .owl-wing.left{transform:translate(-6px,1px) rotate(16deg)}
-.login-stage.password-mode .owl-wing.right{transform:translate(6px,1px) rotate(-16deg)}
-.login-stage.password-mode .owl-brow.left{transform:translateY(-4px) rotate(8deg)}
-.login-stage.password-mode .owl-brow.right{transform:translateY(-4px) rotate(-8deg)}
-.owl-status{
-  min-width:0;
-}
-.owl-status b{
-  display:block;
-  color:#FFFFFF;
-  font-size:18px;
-  line-height:1.45;
-}
-.owl-status span{
-  display:block;
-  margin-top:8px;
-  color:#8C95A6;
+.brand-footer{
+  display:flex;
+  gap:24px;
+  color:rgba(255,255,255,.7);
   font-size:12px;
-  line-height:1.8;
 }
-.login-signal{
+.login-side{
+  min-height:100vh;
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:10px;
-  margin-top:18px;
-}
-.login-signal div{
-  border:1px solid rgba(148,163,184,.22);
-  background:rgba(11,12,10,.6);
-  padding:12px;
-}
-.login-signal b{
-  display:block;
-  color:#FFFFFF;
-  font-size:17px;
-  font-variant-numeric:tabular-nums;
-}
-.login-signal span{
-  display:block;
-  margin-top:5px;
-  color:#7E8A9F;
-  font-size:11px;
+  place-items:center;
+  padding:42px clamp(24px,5vw,72px);
+  background:#FFFFFF;
 }
 .login-box{
   width:100%;
-  border:1px solid rgba(0,230,118,.28);
-  background:rgba(0,0,0,.54);
-  padding:30px;
-  backdrop-filter:blur(14px);
-  transform:perspective(900px) rotateX(calc(var(--tilt-x) * -1)) rotateY(calc(var(--tilt-y) * -1));
-  transition:transform .12s ease-out,border-color .2s ease;
+  max-width:430px;
 }
-.login-box:hover{border-color:rgba(0,230,118,.62)}
+.mobile-brand{
+  display:none;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  margin-bottom:34px;
+  font-weight:800;
+}
 .login-box h2{
   margin:0;
-  font-size:24px;
+  font-size:30px;
   line-height:1.2;
-  font-weight:900;
   letter-spacing:0;
+  font-weight:900;
+  color:#172033;
 }
 .login-box .sub{
-  margin:8px 0 24px;
+  margin:8px 0 30px;
   color:#8C95A6;
-  font-size:13px;
+  font-size:14px;
 }
 .role-label{
   display:block;
   margin-bottom:10px;
-  color:#E2E8F0;
+  color:#172033;
   font-size:13px;
   font-weight:700;
 }
@@ -279,193 +269,238 @@
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
   gap:10px;
-  margin-bottom:20px;
+  margin-bottom:22px;
 }
 .role-card{
-  min-height:86px;
+  min-height:78px;
+  border:1px solid #E1E6EF;
+  border-radius:8px;
+  background:#FFFFFF;
+  color:#172033;
+  cursor:pointer;
   display:flex;
   flex-direction:column;
   justify-content:center;
-  gap:6px;
-  padding:12px 10px;
-  border:1px solid rgba(148,163,184,.24);
-  background:rgba(11,12,10,.62);
-  color:#E5EAF4;
-  cursor:pointer;
-  transition:transform .18s ease,border-color .18s ease,background .18s ease;
+  gap:5px;
+  padding:10px 8px;
+  transition:transform .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease;
 }
 .role-card:hover{
-  transform:translateY(-2px);
-  border-color:rgba(0,230,118,.72);
+  transform:translateY(-1px);
+  border-color:#4F6EF7;
 }
 .role-card.sel{
-  border-color:#00E676;
-  background:rgba(0,230,118,.10);
+  border-color:#4F6EF7;
+  background:#F5F8FF;
+  box-shadow:0 0 0 3px rgba(79,110,247,.1);
 }
 .role-card .icon{
-  display:block;
   font-size:20px;
   font-weight:900;
-  color:#FFFFFF;
 }
 .role-card .role-name{
   font-size:13px;
   font-weight:800;
 }
 .role-card .role-note{
+  color:#8C95A6;
   font-size:11px;
   line-height:1.35;
-  color:#8390A4;
 }
-.login-box .form-group{margin-bottom:16px}
-.login-box label{
+.form-group{
+  margin-bottom:17px;
+}
+.form-group label{
   display:block;
   margin-bottom:7px;
-  color:#CBD5E1;
+  color:#172033;
   font-size:13px;
   font-weight:700;
 }
-.login-box input{
+.form-group input{
   width:100%;
-  height:44px;
-  border:1px solid rgba(148,163,184,.34);
-  background:#0B0C0A;
-  color:#F8FAFC;
-  padding:0 13px;
+  height:48px;
+  border:1px solid #E1E6EF;
+  border-radius:999px;
+  background:#FFFFFF;
+  color:#172033;
+  padding:0 16px;
   font-size:14px;
-  font-family:inherit;
   outline:none;
-  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease;
+  transition:border-color .16s ease,box-shadow .16s ease;
 }
-.login-box input::placeholder{color:#64748B}
-.login-box input:focus{
-  border-color:#00E676;
-  box-shadow:0 0 0 3px rgba(0,230,118,.14);
-  background:#000000;
+.form-group input::placeholder{color:#A7B0C1}
+.form-group input:focus{
+  border-color:#4F6EF7;
+  box-shadow:0 0 0 3px rgba(79,110,247,.12);
 }
+.login-options{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin:2px 0 22px;
+  color:#5B6475;
+  font-size:13px;
+}
+.login-options label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.login-options input{
+  width:15px;
+  height:15px;
+  accent-color:#4F6EF7;
+}
+.login-options a{
+  color:#4F6EF7;
+  text-decoration:none;
+  font-weight:700;
+}
+.login-options a:hover{text-decoration:underline}
 .btn-login{
   width:100%;
-  height:46px;
-  border:1px solid #00E676;
-  color:#0B0C0A;
-  background:#00E676;
+  height:48px;
+  border:0;
+  border-radius:999px;
+  color:#FFFFFF;
+  background:#4F6EF7;
   font-size:14px;
   font-weight:900;
-  font-family:inherit;
   cursor:pointer;
-  transition:transform .18s ease,filter .18s ease,background .18s ease;
+  transition:transform .16s ease,background .16s ease,box-shadow .16s ease;
+  box-shadow:0 14px 28px rgba(79,110,247,.22);
 }
 .btn-login:hover{
   transform:translateY(-1px);
-  filter:brightness(1.05);
+  background:#3D54D4;
+  box-shadow:0 18px 34px rgba(79,110,247,.28);
 }
 .login-foot{
-  margin-top:14px;
+  margin-top:16px;
   text-align:center;
-  color:#7E8A9F;
+  color:#8C95A6;
   font-size:12px;
 }
-@media(max-width:960px){
+@media(max-width:980px){
   .login-stage{
     grid-template-columns:1fr;
-    gap:28px;
-    padding:34px 20px;
   }
-  .login-copy h1{font-size:42px}
-  .login-copy p{font-size:14px}
-  .watcher-panel{width:100%}
+  .brand-panel{
+    display:none;
+  }
+  .login-side{
+    padding:32px 20px;
+  }
+  .mobile-brand{
+    display:flex;
+  }
 }
-@media(max-width:560px){
-  .login-box,.watcher-panel{padding:20px}
-  .roles{grid-template-columns:1fr}
-  .role-card{min-height:68px}
-  .owl-wrap{align-items:flex-start;flex-direction:column}
-  .owl-card{width:170px;height:170px;flex-basis:170px}
-  .watch-owl{width:145px;height:145px}
-  .login-signal{grid-template-columns:1fr}
+@media(max-width:520px){
+  .roles{
+    grid-template-columns:1fr;
+  }
+  .role-card{
+    min-height:64px;
+  }
+  .login-options{
+    align-items:flex-start;
+    flex-direction:column;
+  }
 }
 @media(prefers-reduced-motion:reduce){
-  .login-scan,.login-orbit span{animation:none}
-  .login-copy,.login-box,.role-card,.btn-login,.owl-card,.owl-pupil,.owl-wing,.owl-lid,.owl-brow{transition:none;transform:none!important}
+  .brand-panel::before,.character-scene,.character,.face,.eye,.pupil,.role-card,.btn-login{
+    transition:none!important;
+    transform:none!important;
+  }
 }
 </style>
 
 <section class="login-stage" id="loginStage">
-  <div class="login-scan" aria-hidden="true"></div>
-  <div class="login-orbit" aria-hidden="true">
-    <span></span><span></span><span></span><span></span>
-  </div>
-
-  <div class="login-copy">
-    <div class="login-kicker">Recruitment Workbench</div>
-    <h1>智能招聘系统</h1>
-    <p>统一进入招聘看板、需求管理、人才库、面试计划和基础配置。登录后将根据演示角色展示对应菜单权限。</p>
-
-    <div class="watcher-panel">
-      <div class="owl-wrap">
-        <div class="owl-card" aria-hidden="true">
-          <svg class="watch-owl" viewBox="0 0 180 180" role="img" aria-label="招聘助手">
-            <path class="owl-body" d="M30 132 C24 96 28 54 58 37 L52 18 L82 31 C87 29 93 29 98 31 L128 18 L122 37 C152 54 156 96 150 132 C136 158 112 166 90 166 C68 166 44 158 30 132 Z"/>
-            <path class="owl-face" d="M47 82 C47 55 67 42 90 63 C113 42 133 55 133 82 C133 110 111 122 90 103 C69 122 47 110 47 82 Z"/>
-            <path class="owl-wing left" d="M34 90 C8 102 8 140 45 142 C50 122 50 104 34 90 Z"/>
-            <path class="owl-wing right" d="M146 90 C172 102 172 140 135 142 C130 122 130 104 146 90 Z"/>
-            <circle class="owl-face" cx="72" cy="78" r="24"/>
-            <circle class="owl-face" cx="108" cy="78" r="24"/>
-            <circle class="owl-eye" cx="72" cy="76" r="18"/>
-            <circle class="owl-eye" cx="108" cy="76" r="18"/>
-            <circle class="owl-pupil" cx="72" cy="76" r="7"/>
-            <circle class="owl-pupil" cx="108" cy="76" r="7"/>
-            <ellipse class="owl-lid" cx="72" cy="76" rx="18" ry="18"/>
-            <ellipse class="owl-lid" cx="108" cy="76" rx="18" ry="18"/>
-            <path class="owl-cover left" d="M48 60 C60 48 84 49 94 67 C82 86 58 86 48 70 Z"/>
-            <path class="owl-cover right" d="M132 60 C120 48 96 49 86 67 C98 86 122 86 132 70 Z"/>
-            <line class="owl-brow left" x1="56" y1="54" x2="83" y2="61"/>
-            <line class="owl-brow right" x1="124" y1="54" x2="97" y2="61"/>
-            <path class="owl-beak" d="M90 86 L80 102 L100 102 Z"/>
-            <path class="owl-body" d="M73 128 C83 136 97 136 107 128" fill="none"/>
-          </svg>
-        </div>
-        <div class="owl-status">
-          <b>AI 筛选助手会跟随你的操作</b>
-          <span>移动鼠标时它会观察光标；填写账号时它会看向输入框；输入密码时它会自动遮眼。</span>
-        </div>
-      </div>
-      <div class="login-signal" aria-label="系统概览">
-        <div><b>6</b><span>演示角色权限</span></div>
-        <div><b>7</b><span>招聘业务页面</span></div>
-        <div><b>AI</b><span>匹配与外呼能力</span></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="login-box">
-    <h2>登录</h2>
-    <div class="sub">选择演示角色后进入系统</div>
-
-    <span class="role-label">演示角色</span>
-    <div class="roles">
-      <button type="button" class="role-card sel" data-role="admin" onclick="selRole(this)">
-        <span class="icon">A</span>
-        <span class="role-name">管理员</span>
-        <span class="role-note">全部功能与系统配置</span>
-      </button>
-      <button type="button" class="role-card" data-role="hr" onclick="selRole(this)">
-        <span class="icon">HR</span>
-        <span class="role-name">HR 专员</span>
-        <span class="role-note">招聘全流程操作</span>
-      </button>
-      <button type="button" class="role-card" data-role="interviewer" onclick="selRole(this)">
-        <span class="icon">I</span>
-        <span class="role-name">面试官</span>
-        <span class="role-note">面试评价与查看</span>
-      </button>
+  <aside class="brand-panel" aria-hidden="true">
+    <div class="brand-top">
+      <div class="brand-mark">HR</div>
+      <span>智能招聘系统</span>
     </div>
 
-    <div class="form-group"><label for="username">账号</label><input type="text" id="username" value="admin" placeholder="输入账号" autocomplete="username"></div>
-    <div class="form-group"><label for="password">密码</label><input type="password" id="password" value="123456" placeholder="输入密码" autocomplete="current-password"></div>
-    <button class="btn-login" onclick="login()">登录</button>
-    <div class="login-foot">原型演示，点击登录即可进入</div>
-  </div>
+    <div class="brand-copy">
+      <h1>欢迎回来</h1>
+      <p>进入招聘看板、需求管理、人才库与面试计划。系统将根据演示角色展示对应菜单权限。</p>
+
+      <div class="character-scene">
+        <div class="character tall">
+          <div class="face">
+            <div class="eye"><div class="pupil"></div></div>
+            <div class="eye"><div class="pupil"></div></div>
+          </div>
+        </div>
+        <div class="character dark">
+          <div class="face">
+            <div class="eye"><div class="pupil"></div></div>
+            <div class="eye"><div class="pupil"></div></div>
+          </div>
+        </div>
+        <div class="character front">
+          <div class="face">
+            <div class="eye"><div class="pupil"></div></div>
+            <div class="eye"><div class="pupil"></div></div>
+          </div>
+        </div>
+        <div class="character gold">
+          <div class="face">
+            <div class="eye"><div class="pupil"></div></div>
+            <div class="eye"><div class="pupil"></div></div>
+          </div>
+          <div class="mouth"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="brand-footer">
+      <span>招聘管理</span>
+      <span>人才库</span>
+      <span>面试计划</span>
+    </div>
+  </aside>
+
+  <main class="login-side">
+    <div class="login-box">
+      <div class="mobile-brand"><div class="brand-mark">HR</div><span>智能招聘系统</span></div>
+      <h2>登录</h2>
+      <div class="sub">选择演示角色后进入系统</div>
+
+      <span class="role-label">演示角色</span>
+      <div class="roles">
+        <button type="button" class="role-card sel" data-role="admin" onclick="selRole(this)">
+          <span class="icon">A</span>
+          <span class="role-name">管理员</span>
+          <span class="role-note">全部功能与系统配置</span>
+        </button>
+        <button type="button" class="role-card" data-role="hr" onclick="selRole(this)">
+          <span class="icon">HR</span>
+          <span class="role-name">HR 专员</span>
+          <span class="role-note">招聘全流程操作</span>
+        </button>
+        <button type="button" class="role-card" data-role="interviewer" onclick="selRole(this)">
+          <span class="icon">I</span>
+          <span class="role-name">面试官</span>
+          <span class="role-note">面试评价与查看</span>
+        </button>
+      </div>
+
+      <div class="form-group"><label for="username">账号</label><input type="text" id="username" value="admin" placeholder="输入账号" autocomplete="username"></div>
+      <div class="form-group"><label for="password">密码</label><input type="password" id="password" value="123456" placeholder="输入密码" autocomplete="current-password"></div>
+
+      <div class="login-options">
+        <label><input type="checkbox" id="remember"> 30 天内记住我</label>
+        <a href="#" onclick="return false">忘记密码？</a>
+      </div>
+
+      <button class="btn-login" onclick="login()">登录</button>
+      <div class="login-foot">原型演示，点击登录即可进入</div>
+    </div>
+  </main>
 </section>
 
 <script>
@@ -485,6 +520,7 @@ function login(){
   var userInput = document.getElementById('username');
   var passInput = document.getElementById('password');
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!stage) return;
 
   function setMode(mode){
     stage.classList.remove('username-mode','password-mode');
@@ -494,18 +530,17 @@ function login(){
     var rect = stage.getBoundingClientRect();
     var x = ((event.clientX - rect.left) / rect.width) * 100;
     var y = ((event.clientY - rect.top) / rect.height) * 100;
-    var pupilX = Math.max(-6, Math.min(6, (x - 50) / 6));
-    var pupilY = Math.max(-5, Math.min(5, (y - 43) / 8));
+    var pupilX = Math.max(-5, Math.min(5, (x - 50) / 8));
+    var pupilY = Math.max(-4, Math.min(4, (y - 42) / 10));
 
     stage.style.setProperty('--mx', x.toFixed(2) + '%');
     stage.style.setProperty('--my', y.toFixed(2) + '%');
     stage.style.setProperty('--pupil-x', pupilX.toFixed(2) + 'px');
     stage.style.setProperty('--pupil-y', pupilY.toFixed(2) + 'px');
-    stage.style.setProperty('--tilt-y', ((x - 50) / 28).toFixed(2) + 'deg');
-    stage.style.setProperty('--tilt-x', ((50 - y) / 36).toFixed(2) + 'deg');
+    stage.style.setProperty('--tilt-y', ((x - 50) / 42).toFixed(2) + 'deg');
+    stage.style.setProperty('--tilt-x', ((50 - y) / 56).toFixed(2) + 'deg');
   }
 
-  if(!stage) return;
   userInput.addEventListener('focus', function(){ setMode('username'); });
   userInput.addEventListener('blur', function(){ setMode(''); });
   passInput.addEventListener('focus', function(){ setMode('password'); });
