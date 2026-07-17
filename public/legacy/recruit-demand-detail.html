@@ -118,12 +118,34 @@
           <option value="available">可联系</option>
           <option value="interviewing">面试中</option>
         </select>
-        <span class="filter-label">入库时长</span>
+        <span class="filter-label">匹配时效</span>
         <select id="filterAge" onchange="applyFilter()">
           <option value="all">不限</option>
           <option value="30">30 天内</option>
           <option value="90">90 天内</option>
           <option value="999">90 天以上</option>
+        </select>
+        <span class="filter-label">学历</span>
+        <select id="filterEdu" onchange="applyFilter()">
+          <option value="all">全部</option>
+          <option value="大专">大专</option>
+          <option value="本科">本科</option>
+          <option value="硕士">硕士</option>
+          <option value="博士">博士</option>
+        </select>
+        <span class="filter-label">年限</span>
+        <select id="filterYears" onchange="applyFilter()">
+          <option value="all">全部</option>
+          <option value="fresh">应届</option>
+          <option value="1-3">1-3 年</option>
+          <option value="3-5">3-5 年</option>
+          <option value="5+">5 年以上</option>
+        </select>
+        <span class="filter-label">画像分</span>
+        <select id="filterProfile" onchange="applyFilter()">
+          <option value="0">不限</option>
+          <option value="80">≥ 80 分</option>
+          <option value="60">≥ 60 分</option>
         </select>
         <input type="text" id="filterKeyword" placeholder="姓名 / 技能..." style="width:110px" oninput="applyFilter()">
         <span class="spacer"></span>
@@ -143,7 +165,11 @@
       <span>已选择 <span class="count" id="batchCount">0</span> 位候选人</span>
       <div style="display:flex;gap:8px">
         <button class="btn btn-outline btn-sm" onclick="batchContact()">批量联系</button>
+        <button class="btn btn-outline btn-sm" onclick="addToDemand()">批量加入需求</button>
+        <button class="btn btn-outline btn-sm" onclick="batchMoveDemand()">批量移出需求</button>
         <button class="btn btn-primary btn-sm" onclick="batchSchedule()">批量约面</button>
+        <button class="btn btn-outline btn-sm" onclick="batchMarkUnsuitable()">标记不合适</button>
+        <button class="btn btn-outline btn-sm" onclick="batchExport()">导出</button>
         <button class="btn btn-ghost btn-sm" onclick="clearSelection()">清除选择</button>
       </div>
     </div>
@@ -179,6 +205,13 @@ var ALL_CANDIDATES = [
 function getMatchColor(s){ if(s>=80) return 'var(--c-done)'; if(s>=60) return 'var(--c-warn)'; return 'var(--c-draft)'; }
 function getProfileColor(s){ if(s>=80) return 'score-high'; if(s>=60) return 'score-mid'; return 'score-low'; }
 function ageDaysLabel(d){ if(d>=365){ return Math.floor(d/365)+'年'; } return d+'天'; }
+var CANDIDATE_META = {
+  '张三':{edu:'本科', years:'5+'}, '孙九':{edu:'本科', years:'5+'}, '刘八':{edu:'大专', years:'1-3'},
+  '王五':{edu:'硕士', years:'3-5'}, '李四':{edu:'硕士', years:'3-5'}, '吴六':{edu:'本科', years:'5+'},
+  '赵十':{edu:'本科', years:'3-5'}, '周明':{edu:'本科', years:'5+'}, '陈二':{edu:'本科', years:'1-3'},
+  '钱七':{edu:'本科', years:'fresh'}, '孙八':{edu:'硕士', years:'5+'}, '郑七':{edu:'大专', years:'3-5'},
+  '王工':{edu:'硕士', years:'3-5'}, '钱工':{edu:'硕士', years:'5+'}, '赵工':{edu:'硕士', years:'1-3'}
+};
 
 var checkedSet = {};
 
@@ -244,14 +277,21 @@ function applyFilter(){
   var score = parseInt(document.getElementById('filterScore').value)||0;
   var status = document.getElementById('filterStatus').value;
   var age = parseInt(document.getElementById('filterAge').value)||9999;
+  var edu = document.getElementById('filterEdu').value;
+  var years = document.getElementById('filterYears').value;
+  var profile = parseInt(document.getElementById('filterProfile').value)||0;
   var kw = document.getElementById('filterKeyword').value.toLowerCase();
   var filtered = ALL_CANDIDATES.filter(function(c){
+    var meta = CANDIDATE_META[c.name] || {edu:'本科', years:'3-5'};
     if(src!=='all' && c.source!==src) return false;
     if(match==='matched' && !c.matchScore) return false;
     if(match==='unmatched' && c.matchScore) return false;
     if(score>0 && (!c.matchScore || c.matchScore<score)) return false;
+    if(profile>0 && c.profileScore<profile) return false;
     if(status!=='all' && c.status!==status) return false;
     if(age<9999 && c.ageDays>age) return false;
+    if(edu!=='all' && meta.edu!==edu) return false;
+    if(years!=='all' && meta.years!==years) return false;
     if(kw && c.name.indexOf(kw)<0) return false;
     return true;
   });
@@ -315,13 +355,31 @@ function addToDemand(){
 function batchContact(){
   var names = Object.keys(checkedSet);
   if(names.length===0){ alert('请先勾选候选人'); return; }
-  alert('批量联系 '+names.length+' 人，将依次发起 AI 外呼');
+  alert('批量联系 '+names.length+' 人\n\n请选择实际联系方式：电话 / 邮件 / 飞书。AI 仅辅助生成联系话术，不代替人工拨号。\n\n'+names.join('、'));
 }
 
 function batchSchedule(){
   var names = Object.keys(checkedSet);
   if(names.length===0){ alert('请先勾选候选人'); return; }
   alert('批量约面 '+names.length+' 人\n\n'+names.join('、')+'\n\n将弹出面试安排弹窗，统一设置面试官和时间');
+}
+
+function batchMoveDemand(){
+  var names = Object.keys(checkedSet);
+  if(names.length===0){ alert('请先勾选候选人'); return; }
+  alert('已准备将 '+names.length+' 人移出当前需求或转入其他岗位\n\n'+names.join('、'));
+}
+
+function batchMarkUnsuitable(){
+  var names = Object.keys(checkedSet);
+  if(names.length===0){ alert('请先勾选候选人'); return; }
+  alert('已标记不合适并要求填写原因：学历不符 / 年限不足 / 技能不匹配 / 暂无意向\n\n'+names.join('、'));
+}
+
+function batchExport(){
+  var names = Object.keys(checkedSet);
+  if(names.length===0){ alert('请先勾选候选人'); return; }
+  alert('已生成候选人信息导出任务：'+names.join('、')+'\n\n内容包含画像分、匹配分、来源、状态和备注。');
 }
 
 // init — 按匹配分排序

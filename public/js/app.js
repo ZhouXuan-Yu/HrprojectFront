@@ -59,12 +59,20 @@ function matchStaleHint(daysAgo){
 
 var ROLE_LABELS = {
   'no_recruit':'无权限员工','employee':'基层员工','dept_head':'部门负责人',
-  'temp_interviewer':'临时面试官','hr':'HR 专员','admin':'管理员'
+  'interviewer':'面试官','temp_interviewer':'临时面试官','hr':'HR 专员','admin':'管理员'
 };
 var ROLE_CLASS = {
   'admin':'role-admin','hr':'role-hr','interviewer':'role-interviewer',
   'temp_interviewer':'role-interviewer','employee':'role-hr','dept_head':'role-admin'
 };
+var HR_DEPARTMENTS = ['技术部','产品部','运营部','数据部','财务部','人力资源部'];
+function renderDepartmentOptions(selected, includeAll){
+  var opts = includeAll ? '<option value="all">全公司</option>' : '';
+  HR_DEPARTMENTS.forEach(function(d){
+    opts += '<option value="'+d+'"'+(d===selected?' selected':'')+'>'+d+'</option>';
+  });
+  return opts;
+}
 
 // ========== 角色 & 用户 ==========
 function getRole(){
@@ -236,10 +244,6 @@ function openGlobalScheduleModal(candidate, position, dept){
   overlay.style.display = 'flex';
   overlay.onclick = function(e){ if(e.target===overlay) closeGlobalScheduleModal(); };
 
-  var deptOpts = ['技术部','产品部','数据部','运营部'].map(function(d){
-    return '<option value="'+d+'"'+(d===dept?' selected':'')+'>'+d+'</option>';
-  }).join('');
-
   var html = '<div class="modal-box" style="width:620px;max-height:90vh;overflow-y:auto">';
   html += '<h3>📅 安排面试</h3>';
   html += '<div class="form-row" style="margin-bottom:10px">';
@@ -251,12 +255,14 @@ function openGlobalScheduleModal(candidate, position, dept){
   // 联系确认
   html += '<div style="margin-bottom:12px;padding:12px 14px;background:#FFFBF5;border-radius:8px;border:1px solid #FEE9CC">';
   html += '<div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--c-text)">📞 候选人联系确认</div>';
-  html += '<div style="display:flex;gap:16px;font-size:13px">';
+  html += '<div style="display:flex;gap:14px;font-size:13px;flex-wrap:wrap">';
   html += '<label style="cursor:pointer"><input type="radio" name="gsContact" value="none" checked onchange="toggleGsContact()"> 未联系</label>';
   html += '<label style="cursor:pointer"><input type="radio" name="gsContact" value="phone" onchange="toggleGsContact()"> 📱 已电话联系</label>';
-  html += '<label style="cursor:pointer"><input type="radio" name="gsContact" value="ai" onchange="toggleGsContact()"> 🤖 已AI外呼联系</label>';
+  html += '<label style="cursor:pointer"><input type="radio" name="gsContact" value="mail" onchange="toggleGsContact()"> 📧 已邮件确认</label>';
+  html += '<label style="cursor:pointer"><input type="radio" name="gsContact" value="feishu" onchange="toggleGsContact()"> 💬 已飞书确认</label>';
+  html += '<label style="cursor:pointer"><input type="radio" name="gsContact" value="manager" onchange="toggleGsContact()"> 👔 内部已沟通上级</label>';
   html += '</div>';
-  html += '<div id="gsContactWarn" style="margin-top:8px;font-size:12px;color:var(--c-warn);font-weight:600">⚠️ 尚未联系候选人，建议先电话或AI外呼确认意向</div>';
+  html += '<div id="gsContactWarn" style="margin-top:8px;font-size:12px;color:var(--c-warn);font-weight:600">⚠️ 尚未确认候选人意向，请先通过电话、邮件或飞书完成联系；内部员工需先沟通直属上级。</div>';
   html += '</div>';
 
   // 轮次配置
@@ -300,9 +306,7 @@ function addGlobalRound(name, deptFilter){
   var rid = 'gsr_'+globalRoundCounter;
   var container = document.getElementById('gsRoundContainer');
   if(!container) return;
-  var deptOpts = ['技术部','产品部','数据部','运营部'].map(function(d){
-    return '<option value="'+d+'"'+(d===deptFilter?' selected':'')+'>'+d+'</option>';
-  }).join('');
+  var deptOpts = renderDepartmentOptions(deptFilter, false);
   var ivOpts = MOCK_INTERVIEWERS.map(function(i){
     return '<option value="'+i.id+'|'+i.name+'|'+i.dept+'">'+i.name+' · '+i.id+' · '+i.dept+'</option>';
   }).join('');
@@ -651,35 +655,35 @@ function submitRematch(demandId){
 }
 
 // ========== 统一操作按钮生成器（全局强制） ==========
-// 每个候选人行固定 3 个操作位：查看 | AI外呼 | 约面
+// 每个候选人行固定 3 个操作位：查看 | 联系 | 约面
 // state: 'interviewing'|'screening'|'contacted'|'no_intent'|'disqualified'|'archived'
 function renderActionButtons(candidateName, state, position, dept, failReason){
   var view  = '<button class="btn btn-outline btn-sm" onclick="openCandidateDrawer(mockCandidate(\''+candidateName+'\'))">查看</button>';
   var call  = '';
   var meet  = '';
   switch(state){
-    case 'screening': // 待筛选 → AI外呼可用，约面不可用
-      call = '<button class="btn btn-primary btn-sm" onclick="alert(\'🤖 启动 AI 外呼联系 '+candidateName+'\')">AI外呼</button>';
+    case 'screening': // 待筛选 → 先联系确认，约面不可用
+      call = '<button class="btn btn-primary btn-sm" onclick="openContactModal(\''+candidateName+'\')">联系</button>';
       meet = '<button class="btn btn-ghost btn-sm">约面</button>';
       break;
-    case 'contacted': // 已外呼确认 → 约面可用
-      call = '<span class="btn btn-text btn-sm" style="color:var(--c-done);font-weight:700">✓ 已外呼</span>';
+    case 'contacted': // 已联系确认 → 约面可用
+      call = '<span class="btn btn-text btn-sm" style="color:var(--c-done);font-weight:700">✓ 已联系</span>';
       meet = '<button class="btn btn-primary btn-sm" onclick="openGlobalScheduleModal(\''+candidateName+'\',\''+(position||'')+'\',\''+(dept||'')+'\')">约面</button>';
       break;
     case 'interviewing': // 面试中 → 都不可用
-      call = '<button class="btn btn-ghost btn-sm">AI外呼</button>';
+      call = '<button class="btn btn-ghost btn-sm">联系</button>';
       meet = '<button class="btn btn-ghost btn-sm">约面</button>';
       break;
     case 'no_intent': // 无意向
-      call = '<button class="btn btn-ghost btn-sm">AI外呼</button>';
+      call = '<button class="btn btn-ghost btn-sm">联系</button>';
       meet = '<button class="btn btn-ghost btn-sm">约面 <span style="font-size:10px;color:var(--c-sub)">婉拒</span></button>';
       break;
     case 'disqualified': // 条件不符
-      call = '<button class="btn btn-ghost btn-sm">AI外呼</button>';
+      call = '<button class="btn btn-ghost btn-sm">联系</button>';
       meet = '<button class="btn btn-ghost btn-sm">约面 <span style="font-size:10px;color:var(--c-sub)">'+(failReason||'不符')+'</span></button>';
       break;
     default:
-      call = '<button class="btn btn-ghost btn-sm">AI外呼</button>';
+      call = '<button class="btn btn-ghost btn-sm">联系</button>';
       meet = '<button class="btn btn-ghost btn-sm">约面</button>';
   }
   return view + ' ' + call + ' ' + meet;
@@ -697,7 +701,7 @@ function openContactModal(name){
   var html = '<div class="modal-box" style="width:400px"><h3>📞 联系 '+name+'</h3>';
   html += '<div style="font-size:13px;color:var(--c-sub);margin-bottom:16px">选择联系方式，记录联系结果</div>';
   html += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">';
-  html += '<button class="btn btn-primary" style="justify-content:flex-start;padding:12px 16px" onclick="alert(\'🤖 已启动 AI 外呼联系 '+name+'\n\\n系统将自动拨打电话并记录结果\');closeContactModal()">🤖 AI外呼</button>';
+  html += '<button class="btn btn-primary" style="justify-content:flex-start;padding:12px 16px" onclick="alert(\'已生成联系话术草稿：\\n\\n您好，我是招聘团队。看到您与当前岗位较匹配，想和您确认近期机会意向与可面试时间。\\n\\n请通过电话、邮件或飞书人工确认后再约面。\');closeContactModal()">AI 辅助话术</button>';
   html += '<button class="btn btn-outline" style="justify-content:flex-start;padding:12px 16px" onclick="alert(\'📱 已记录：电话联系 '+name+'\');closeContactModal()">📱 电话联系</button>';
   html += '<button class="btn btn-outline" style="justify-content:flex-start;padding:12px 16px" onclick="alert(\'📧 已记录：邮件联系 '+name+'\');closeContactModal()">📧 邮件联系</button>';
   html += '<button class="btn btn-outline" style="justify-content:flex-start;padding:12px 16px" onclick="alert(\'💬 已记录：飞书消息联系 '+name+'\');closeContactModal()">💬 飞书消息</button>';

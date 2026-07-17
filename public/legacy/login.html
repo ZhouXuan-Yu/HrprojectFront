@@ -595,10 +595,30 @@
           <span class="role-name">HR 专员</span>
           <span class="role-note">招聘全流程操作</span>
         </button>
+        <button type="button" class="role-card" data-role="dept_head" onclick="selRole(this)">
+          <span class="icon">D</span>
+          <span class="role-name">部门负责人</span>
+          <span class="role-note">本部门需求审批</span>
+        </button>
+        <button type="button" class="role-card" data-role="employee" onclick="selRole(this)">
+          <span class="icon">E</span>
+          <span class="role-name">基层员工</span>
+          <span class="role-note">提交与查看本人需求</span>
+        </button>
         <button type="button" class="role-card" data-role="interviewer" onclick="selRole(this)">
           <span class="icon">I</span>
           <span class="role-name">面试官</span>
           <span class="role-note">面试评价与查看</span>
+        </button>
+        <button type="button" class="role-card" data-role="temp_interviewer" onclick="selRole(this)">
+          <span class="icon">T</span>
+          <span class="role-name">临时面试官</span>
+          <span class="role-note">仅本次分配场次</span>
+        </button>
+        <button type="button" class="role-card" data-role="no_recruit" onclick="selRole(this)">
+          <span class="icon">N</span>
+          <span class="role-name">无招聘权限</span>
+          <span class="role-note">侧边栏隐藏</span>
         </button>
       </div>
 
@@ -624,7 +644,13 @@ function selRole(el){
   selectedRole = el.dataset.role;
 }
 function login(){
-  localStorage.setItem('hr_role', selectedRole);
+  sessionStorage.removeItem('hr_temp_interviewer');
+  if(selectedRole === 'temp_interviewer'){
+    localStorage.setItem('hr_role', 'interviewer');
+    sessionStorage.setItem('hr_temp_interviewer', 'true');
+  } else {
+    localStorage.setItem('hr_role', selectedRole);
+  }
   localStorage.setItem('hr_user', document.getElementById('username').value || '用户');
   location.href = 'recruit-dashboard.html';
 }

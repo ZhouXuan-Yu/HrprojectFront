@@ -8,7 +8,7 @@
   <div class="content-body">
 
     <div class="permission-bar">
-      本页面仅<b>系统管理员</b>可见 · 集中所有<b>用户主动发起</b>的 AI 能力 · 流程自动触发的 AI（简历解析/自动匹配/AI外呼）已嵌入各业务页面
+      本页面仅<b>系统管理员</b>可见 · 集中所有<b>用户主动发起</b>的 AI 能力 · 流程自动触发的 AI（简历解析/自动匹配/联系话术辅助）已嵌入各业务页面
     </div>
 
     <!-- ===== 5 Tab（按招聘流程排序：JD→搜人→匹配→面试→报表） ===== -->
@@ -18,6 +18,7 @@
       <div class="tab" data-tab="match">③ 智能人岗匹配</div>
       <div class="tab" data-tab="interview">④ AI 面试辅助</div>
       <div class="tab" data-tab="report">⑤ 招聘深度报表</div>
+      <div class="tab" data-tab="chat">⑥ 候选人沟通智能体</div>
     </div>
 
     <!-- ① JD 智能生成 -->
@@ -119,6 +120,26 @@
       </div>
     </div>
 
+    <!-- ⑥ 候选人沟通智能体 -->
+    <div class="tab-panel" id="panel-chat">
+      <div class="phase-card" style="margin-bottom:20px">
+        <div style="position:relative">
+          <span class="phase-badge" style="position:absolute;top:-8px;right:-8px">需新增候选人沟通工作流</span>
+          <h3>候选人沟通智能体</h3>
+        </div>
+        <div style="font-size:13px;color:var(--c-sub);margin:8px 0 14px;line-height:1.8">
+          面向已经表达意向的候选人，AI 负责生成沟通提纲、补全信息问题和简历收集清单。实际沟通仍通过电话、邮件或飞书由 HR 完成，并由系统记录结果。
+        </div>
+        <ul>
+          <li><b>意向确认提纲</b>：根据岗位和候选人履历，生成电话/邮件/飞书沟通话术。</li>
+          <li><b>信息补全</b>：自动列出缺失字段，如期望薪资、到岗时间、城市偏好、证书、项目链接。</li>
+          <li><b>简历收集</b>：生成简历补传链接说明，提醒候选人上传最新版 PDF/DOCX。</li>
+          <li><b>沟通摘要</b>：HR 记录沟通结果后，AI 总结候选人意向、风险点和下一步建议。</li>
+          <li><b>边界</b>：不自动拨号，不冒充 HR 做实时电话沟通，只做辅助生成和记录整理。</li>
+        </ul>
+      </div>
+    </div>
+
     <!-- ===== 嵌入其他页面的 AI 能力 ===== -->
     <div style="margin-top:32px">
       <div class="section-label" style="font-size:14px;margin-bottom:12px">已嵌入各业务页面的 AI 能力（流程自动触发，不在此页面操作）</div>
@@ -142,10 +163,10 @@
               <td><span class="st st-done">一期开发</span></td>
             </tr>
             <tr>
-              <td>AI 外呼确认意向</td>
+              <td>AI 辅助联系话术</td>
               <td>需求详情 / 面试计划弹窗</td>
-              <td>约面前点击「AI外呼联系」</td>
-              <td>需新增外呼工作流</td>
+              <td>约面前生成电话/邮件/飞书联系话术，人工确认意向后记录结果</td>
+              <td>需新增候选人沟通工作流</td>
               <td><span class="st st-warn">二期</span></td>
             </tr>
             <tr>
@@ -198,7 +219,7 @@
     <!-- ===== 调用架构说明 ===== -->
     <div class="permission-bar" style="margin-top:20px">
       <b>API 调用规则</b>：所有 AI 能力统一走 <b>后端代理转发</b>（前端 → Flask 后端 → Dify），前端不直连 Dify。<br>
-      <b>三个 Dify 工作流底座</b>：① 简历画像解析 &nbsp; ② 人岗匹配打分 &nbsp; ③ 面试问题生成 &nbsp; + 未来新增外呼 / JD生成 / Offer / 入职<br>
+      <b>三个 Dify 工作流底座</b>：① 简历画像解析 &nbsp; ② 人岗匹配打分 &nbsp; ③ 面试问题生成 &nbsp; + 未来新增候选人沟通 / JD生成 / Offer / 入职<br>
       <b>数据存储</b>：解析结果 → <code>t_hr_resume</code> · 匹配分 → <code>t_hr_resume_match</code> · 画像标签 → <code>t_hr_candidate</code> + <code>t_hr_candidate_tag_rel</code><br>
       <b>远期智能体</b>：可直接对话指令完成 Offer 发送、入职包推送、会议创建等操作，无需逐页点击
     </div>

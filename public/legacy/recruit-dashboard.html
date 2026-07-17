@@ -23,7 +23,7 @@
       <option value="month">本月</option><option value="week">本周</option><option value="today">今日</option>
     </select>
     <select id="deptScope" class="role-hr-admin" onchange="refreshDashboard()">
-      <option value="all">全公司</option><option value="tech">技术部</option><option value="product">产品部</option>
+      <option value="all">全公司</option>
     </select>
     <div style="position:relative">
       <button class="bell-btn" onclick="toggleAlerts()" id="alertBtn" title="风险预警">
@@ -93,6 +93,7 @@
 <script src="js/app.js"></script>
 <script>
 renderSidebar('recruit-dashboard');
+document.getElementById('deptScope').innerHTML = renderDepartmentOptions(null, true);
 function toggleCollapse(toggle,bodyId){toggle.classList.toggle('open');document.getElementById(bodyId).classList.toggle('show')}
 function refreshDashboard(){}
 function toggleAlerts(){var dd=document.getElementById('alertDropdown');dd.style.display=dd.style.display==='none'?'block':'none'}

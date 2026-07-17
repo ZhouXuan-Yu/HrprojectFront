@@ -3,7 +3,7 @@
 <main class="content">
   <header class="topbar"><h1>需求管理</h1><div class="breadcrumb"><a href="recruit-dashboard.html">招聘管理</a> / 需求管理</div>
     <div class="spacer"></div>
-    <button class="btn btn-primary btn-sm" onclick="alert('【新建需求】\n\n选择部门/岗位/HC/紧急度/薪资 → 提交审批')">+ 新建需求</button>
+    <button class="btn btn-primary btn-sm" onclick="openDemandModal()">+ 新建需求</button>
   </header>
   <div class="content-body">
 
@@ -12,11 +12,11 @@
     </div>
 
     <div class="filter-bar">
-      <input type="text" placeholder="搜索需求编号 / 部门 / 岗位...">
-      <select><option>全部状态</option><option>草稿</option><option>审批中</option><option>招聘中</option><option>已关闭</option></select>
-      <select><option>全部紧急度</option><option>非常紧急</option><option>紧急</option><option>普通</option></select>
+      <input type="text" id="demandSearch" placeholder="搜索需求编号 / 部门 / 岗位..." oninput="applyDemandFilters()">
+      <select id="demandStatus" onchange="applyDemandFilters()"><option value="all">全部状态</option><option value="draft">草稿</option><option value="approval">审批中</option><option value="open">招聘中</option><option value="closed">已关闭</option></select>
+      <select id="demandUrgency" onchange="applyDemandFilters()"><option value="all">全部紧急度</option><option value="very">非常紧急</option><option value="high">紧急</option><option value="normal">普通</option></select>
       <span style="flex:1"></span>
-      <span style="font-size:11px;color:var(--c-sub)">共 5 条需求</span>
+      <span style="font-size:11px;color:var(--c-sub)" id="demandFilterCount">共 6 条需求</span>
     </div>
 
     <div class="table-wrap">
@@ -28,7 +28,7 @@
         <tbody>
 
           <!-- 审批中 DM2026070006 -->
-          <tr>
+          <tr data-status="approval" data-urgency="very" data-search="DM2026070006 运营总监 运营部 陈总">
             <td><b>DM2026070006</b></td>
             <td>运营总监</td><td>运营部</td><td>1</td>
             <td><span class="st st-reject">非常紧急</span></td><td>陈总</td>
@@ -42,13 +42,13 @@
             <td><span class="st st-warn">审批中</span></td>
             <td style="white-space:nowrap">
               <button class="btn btn-outline btn-sm" onclick="location.href='recruit-demand-detail.html'">查看详情</button>
-              <button class="btn btn-primary btn-sm">同意</button>
-              <button class="btn btn-text-danger btn-sm">驳回</button>
+              <button class="btn btn-primary btn-sm" onclick="approveDemand('DM2026070006')">同意</button>
+              <button class="btn btn-ghost btn-sm" onclick="moreDemandOps('DM2026070006')">更多</button>
             </td>
           </tr>
 
           <!-- 审批中 DM2026070004 -->
-          <tr>
+          <tr data-status="approval" data-urgency="normal" data-search="DM2026070004 产品经理 产品部 周博">
             <td><b>DM2026070004</b></td>
             <td>产品经理</td><td>产品部</td><td>1</td>
             <td><span class="st st-draft">普通</span></td><td>周博</td>
@@ -62,13 +62,13 @@
             <td><span class="st st-warn">审批中</span></td>
             <td style="white-space:nowrap">
               <button class="btn btn-outline btn-sm" onclick="location.href='recruit-demand-detail.html'">查看详情</button>
-              <button class="btn btn-primary btn-sm">同意</button>
-              <button class="btn btn-text-danger btn-sm">驳回</button>
+              <button class="btn btn-primary btn-sm" onclick="approveDemand('DM2026070004')">同意</button>
+              <button class="btn btn-ghost btn-sm" onclick="moreDemandOps('DM2026070004')">更多</button>
             </td>
           </tr>
 
           <!-- 招聘中 DM2026070005 -->
-          <tr>
+          <tr data-status="open" data-urgency="high" data-search="DM2026070005 高级Java工程师 技术部 刘博">
             <td><b>DM2026070005</b></td>
             <td><a href="recruit-demand-detail.html" style="font-weight:600;color:var(--c-primary)">高级Java工程师</a></td>
             <td>技术部</td><td>2</td>
@@ -94,7 +94,7 @@
           </tr>
 
           <!-- 招聘中 DM2026070003 -->
-          <tr>
+          <tr data-status="open" data-urgency="very" data-search="DM2026070003 运营总监 运营部 陈总">
             <td><b>DM2026070003</b></td>
             <td><a href="recruit-demand-detail.html" style="font-weight:600;color:var(--c-primary)">运营总监</a></td>
             <td>运营部</td><td>1</td>
@@ -120,7 +120,7 @@
           </tr>
 
           <!-- 已关闭 DM2026070002 -->
-          <tr>
+          <tr data-status="closed" data-urgency="high" data-search="DM2026070002 前端工程师 技术部 刘博">
             <td><b>DM2026070002</b></td>
             <td>前端工程师</td><td>技术部</td><td>3</td>
             <td><span class="st st-warn">紧急</span></td><td>刘博</td>
@@ -136,7 +136,7 @@
           </tr>
 
           <!-- 草稿 DM2026070001 -->
-          <tr style="opacity:0.6">
+          <tr style="opacity:0.6" data-status="draft" data-urgency="normal" data-search="DM2026070001 数据分析师 数据部 陈博">
             <td><b>DM2026070001</b></td>
             <td>数据分析师</td><td>数据部</td><td>1</td>
             <td><span class="st st-draft">普通</span></td><td>陈博</td>
@@ -144,20 +144,81 @@
             <td><span class="st st-draft">草稿</span></td>
             <td style="white-space:nowrap">
               <button class="btn btn-outline btn-sm">查看详情</button>
-              <button class="btn btn-outline btn-sm">编辑</button>
-              <button class="btn btn-text-danger btn-sm">删除</button>
+              <button class="btn btn-outline btn-sm" onclick="openDemandModal('DM2026070001')">编辑</button>
+              <button class="btn btn-ghost btn-sm" onclick="moreDemandOps('DM2026070001')">更多</button>
             </td>
           </tr>
 
         </tbody>
       </table>
-      <div class="table-count">共 5 条需求 · 2 条审批中 · 2 条招聘中 · 1 条已关闭 · 1 条草稿</div>
+      <div class="table-count">共 6 条需求 · 2 条审批中 · 2 条招聘中 · 1 条已关闭 · 1 条草稿</div>
     </div>
 
   </div>
 </main>
+<div class="modal-overlay" id="demandModal" style="display:none" onclick="if(event.target===this)closeDemandModal()">
+  <div class="modal-box" style="width:560px">
+    <h3 id="demandModalTitle">新建招聘需求</h3>
+    <div class="form-row">
+      <div class="form-group"><label>部门 *</label><select id="newDemandDept"></select></div>
+      <div class="form-group"><label>岗位 *</label><input type="text" id="newDemandPosition" placeholder="例如：高级Java工程师"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>HC 人数 *</label><input type="number" id="newDemandHc" value="1" min="1"></div>
+      <div class="form-group"><label>紧急度</label><select id="newDemandUrgency"><option>普通</option><option>紧急</option><option>非常紧急</option></select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>薪资范围</label><input type="text" id="newDemandSalary" placeholder="15K-25K"></div>
+      <div class="form-group"><label>期望到岗</label><input type="date" id="newDemandDate"></div>
+    </div>
+    <div class="form-group"><label>岗位说明</label><textarea id="newDemandDesc" style="width:100%;min-height:78px;padding:10px;border:1px solid var(--c-border);border-radius:6px;font-size:13px;box-sizing:border-box" placeholder="说明核心职责、必备技能和补充要求"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeDemandModal()">取消</button>
+      <button class="btn btn-outline btn-sm" onclick="saveDemandDraft()">保存草稿</button>
+      <button class="btn btn-primary btn-sm" onclick="submitDemandApproval()">提交审批</button>
+    </div>
+  </div>
+</div>
 <script src="js/app.js"></script>
 <script>renderSidebar('recruit-demand');
+document.getElementById('newDemandDept').innerHTML = renderDepartmentOptions('技术部', false);
+function openDemandModal(id){
+  document.getElementById('demandModalTitle').textContent = id ? '编辑招聘需求 · '+id : '新建招聘需求';
+  if(id){
+    document.getElementById('newDemandPosition').value = '数据分析师';
+    document.getElementById('newDemandDept').value = '数据部';
+    document.getElementById('newDemandHc').value = 1;
+    document.getElementById('newDemandUrgency').value = '普通';
+  }
+  document.getElementById('demandModal').style.display='flex';
+}
+function closeDemandModal(){ document.getElementById('demandModal').style.display='none'; }
+function saveDemandDraft(){ alert('草稿已保存，可在需求列表继续编辑。'); closeDemandModal(); }
+function submitDemandApproval(){
+  var dept = document.getElementById('newDemandDept').value;
+  var pos = document.getElementById('newDemandPosition').value.trim();
+  if(!dept || !pos){ alert('请填写部门和岗位'); return; }
+  alert('已提交审批\n\n部门：'+dept+'\n岗位：'+pos+'\n流程：部门负责人 → HR → 财务总监');
+  closeDemandModal();
+}
+function approveDemand(id){ alert(id+' 已同意，流转到下一审批节点。'); }
+function moreDemandOps(id){ alert(id+' 更多操作：驳回 / 删除 / 复制需求 / 查看审批记录'); }
+function applyDemandFilters(){
+  var kw = (document.getElementById('demandSearch').value||'').toLowerCase();
+  var st = document.getElementById('demandStatus').value;
+  var urg = document.getElementById('demandUrgency').value;
+  var rows = document.querySelectorAll('tbody tr[data-status]');
+  var visible = 0;
+  rows.forEach(function(row){
+    var ok = true;
+    if(st !== 'all' && row.dataset.status !== st) ok = false;
+    if(urg !== 'all' && row.dataset.urgency !== urg) ok = false;
+    if(kw && row.dataset.search.toLowerCase().indexOf(kw) < 0) ok = false;
+    row.style.display = ok ? '' : 'none';
+    if(ok) visible++;
+  });
+  document.getElementById('demandFilterCount').textContent = '共 '+visible+' 条需求';
+}
 (function(){
   document.querySelectorAll('.linked-cnt').forEach(function(el){
     var demandId = el.dataset.demand;

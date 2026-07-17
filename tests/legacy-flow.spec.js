@@ -49,6 +49,33 @@ test('login radar module reacts to username and password fields', async ({ page 
   await expect(stage).not.toHaveClass(/password-mode/);
 });
 
+test('login exposes full role set and trims menu by permission', async ({ page }) => {
+  await page.goto('/login');
+  await expect(page.getByText('部门负责人')).toBeVisible();
+  await expect(page.getByText('基层员工')).toBeVisible();
+  await expect(page.getByText('临时面试官')).toBeVisible();
+  await expect(page.getByText('无招聘权限')).toBeVisible();
+
+  await page.goto('/recruit-dashboard');
+  await expect(page.locator('#sidebar')).toBeVisible();
+  await page.evaluate(() => {
+    localStorage.setItem('hr_role', 'dept_head');
+    localStorage.setItem('hr_user', '部门负责人');
+    window.renderSidebar('recruit-dashboard');
+  });
+  await expect(page.locator('#sidebar').getByText('需求管理')).toBeVisible();
+  await expect(page.locator('#sidebar').getByText('人才库')).toHaveCount(0);
+
+  await page.goto('/recruit-dashboard');
+  await expect(page.locator('#sidebar')).toBeVisible();
+  await page.evaluate(() => {
+    localStorage.setItem('hr_role', 'no_recruit');
+    localStorage.setItem('hr_user', '无权限员工');
+    window.renderSidebar('recruit-dashboard');
+  });
+  await expect(page.getByText('暂无招聘模块权限')).toBeVisible();
+});
+
 for (const [path, heading] of pages) {
   test(`${heading} renders under Vue router`, async ({ page }) => {
     await page.goto(path);
@@ -62,6 +89,73 @@ test('sidebar navigation stays inside Vue routes', async ({ page }) => {
   await page.getByRole('link', { name: /需求管理/ }).click();
   await expect(page).toHaveURL(/\/recruit-demand$/);
   await expect(page.getByRole('heading', { name: '需求管理' })).toBeVisible();
+});
+
+test('demand list supports filtering and create modal', async ({ page }) => {
+  await page.goto('/recruit-demand');
+  await page.locator('#demandSearch').fill('运营总监');
+  await expect(page.locator('#demandFilterCount')).toContainText('共 2 条需求');
+  await page.locator('#demandStatus').selectOption('approval');
+  await expect(page.locator('#demandFilterCount')).toContainText('共 1 条需求');
+
+  await page.getByRole('button', { name: '+ 新建需求' }).click();
+  await expect(page.locator('#demandModal')).toBeVisible();
+  await page.locator('#newDemandPosition').fill('测试岗位');
+  let demandMessage = '';
+  page.once('dialog', async (dialog) => {
+    demandMessage = dialog.message();
+    await dialog.accept();
+  });
+  await page.getByRole('button', { name: '提交审批' }).click();
+  expect(demandMessage).toContain('已提交审批');
+});
+
+test('demand detail enhanced filters and batch actions are available', async ({ page }) => {
+  await page.goto('/recruit-demand-detail');
+  await page.locator('#filterEdu').selectOption('大专');
+  await expect(page.locator('#filterCount')).toContainText('共 2 人');
+  await page.locator('.row-check').first().check();
+  await expect(page.getByRole('button', { name: '批量加入需求' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '批量移出需求' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '标记不合适' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '导出' })).toBeVisible();
+});
+
+test('talent library filters and contact flow avoid unrealistic outbound calling', async ({ page }) => {
+  await page.goto('/recruit-talent');
+  await page.locator('#extSkill').selectOption('K8s');
+  await expect(page.locator('#extCount')).toContainText('共 1 人');
+  await page.locator('.ext-check').first().check();
+  let contactMessage = '';
+  page.once('dialog', async (dialog) => {
+    contactMessage = dialog.message();
+    await dialog.accept();
+  });
+  await page.getByRole('button', { name: '批量联系' }).click();
+  expect(contactMessage).toContain('电话 / 邮件 / 飞书');
+  expect(contactMessage).not.toMatch(/外呼|自动拨打/);
+});
+
+test('interview plan covers full six-state workflow and calendar', async ({ page }) => {
+  await page.goto('/recruit-interview');
+  await expect(page.getByText('待入职').first()).toBeVisible();
+  await expect(page.getByText('已入职').first()).toBeVisible();
+  await page.getByRole('button', { name: /日程/ }).click();
+  await expect(page.locator('#calendarViewModal')).toBeVisible();
+});
+
+test('AI center includes candidate communication agent and no outbound-call copy', async ({ page }) => {
+  await page.goto('/recruit-ai');
+  await page.getByText('⑥ 候选人沟通智能体').click();
+  await expect(page.getByRole('heading', { name: '候选人沟通智能体' })).toBeVisible();
+  await expect(page.locator('body')).not.toContainText(/外呼|自动拨打/);
+});
+
+test('all main pages avoid AI outbound-call wording', async ({ page }) => {
+  for (const [path] of pages) {
+    await page.goto(path);
+    await expect(page.locator('body')).not.toContainText(/外呼|自动拨打/);
+  }
 });
 
 test('candidate drawer and schedule modal still work', async ({ page }) => {

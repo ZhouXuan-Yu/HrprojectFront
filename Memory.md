@@ -40,6 +40,10 @@
 
 - 用户明确要求登录页必须是“专属于本项目”的原创设计，避免版权风险。
 - 参考仓库只能作为交互原理参考，不能复刻视觉。
+- 前端功能梳理文档已作为本轮功能补齐依据。
+- “AI 外呼联系”不符合实际业务，已统一改为 AI 辅助联系话术；实际联系方式保留电话、邮件、飞书和内部直属上级沟通。
+- 登录页需要覆盖 6 类角色，并额外支持临时面试官演示。
+- 看板、需求、人才库、面试、AI 中心都需要能被实际操作和 E2E 覆盖。
 - 当前四个长期文档需要补齐并长期维护：
   - `Claude.md`
   - `Memory.md`
@@ -52,9 +56,16 @@
 最近一次验证：
 
 - `npm run build`：通过
-- `npm test`：通过，13/13
+- `npm test`：通过，20/20
 - 桌面截图：`test-results/login-original-radar-final.png`
 - 移动截图：`test-results/login-original-radar-mobile.png`
+- 本轮全流程截图：
+  - `test-results/full-flow-login.png`
+  - `test-results/full-flow-demand.png`
+  - `test-results/full-flow-demand-detail.png`
+  - `test-results/full-flow-talent.png`
+  - `test-results/full-flow-interview.png`
+  - `test-results/full-flow-ai.png`
 
 ## 未跟踪文件说明
 
@@ -81,8 +92,8 @@
 
 | 计数 | 内容 | 状态 |
 |---|---|---|
-| 1/3 | 补齐四个长期文档 | 当前轮 |
-| 2/3 | 待记录 | 未开始 |
+| 1/3 | 补齐四个长期文档 | 已完成 |
+| 2/3 | 按《前端功能梳理.md》补齐前端功能并去除 AI 外呼口径 | 当前轮 |
 | 3/3 | 待记录并触发文档更新 | 未开始 |
 
 触发规则：每完成 3 轮实际修改，更新本文件；如产生复盘或稳定知识，同步更新 `Learning.md` / `Wiki.md` / `Claude.md`。
