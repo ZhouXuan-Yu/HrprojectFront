@@ -120,3 +120,11 @@
 - 视觉巡检：16 张截图，0 console error，0 移动端横向溢出。
 - 当前 UI 方向：HeroUIPro 无渐变专业工作台，包含模块胶囊导航、页面摘要 KPI、招聘项目总览、阶段转化、待处理事项、岗位风险、渠道效率、近期面试和高密表格。
 - 当前禁止项：不得使用 `gradient`；不得出现“AI 外呼”“自动拨打”“智能风险预警”等 AI 味或不可验证能力表达。
+## 2026-07-18 当前工作口径补充：招聘看板材质化经营台
+
+- 做后台 UI 时先看 `D:\WorkProject\HeroUIPro\herouipro-v3\template`，但当前项目是 Vue shell + legacy HTML/CSS/JS，不能机械搬 React 组件；优先抽取 toolbar、KPI、chart、table、action queue、density control 等成熟结构。
+- 招聘看板不是营销页。第一性原理是帮助 HR 快速判断：招聘总体健康度、哪个岗位卡住、谁负责、下一步做什么、能跳到哪个业务页面处理。
+- 当前可用材质系统：半透明白色表面、`backdrop-filter: blur(12px)`、细边框、轻阴影、hover scale `1.02`、click scale `.97`、focus ring。不要使用 `gradient` 作为视觉质感来源。
+- 动效只能辅助理解。`IntersectionObserver` 类滚动显现必须有自动落稳兜底，避免截图、低速设备或减少动画设置下内容不可见。
+- 禁止“AI 外呼 / 自动拨打 / AI 智能自动化”表达。招聘辅助只写为候选人沟通辅助、话术草稿、人工发送、简历摘要、效率分析。
+- 当前质量基线：`npm run build` 通过，`npm test` 25/25 通过，材质化看板巡检报告为 `test-results/phase-dashboard-material-final-report.json`。

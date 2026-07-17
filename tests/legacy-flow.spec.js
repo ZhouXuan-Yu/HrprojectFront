@@ -137,6 +137,12 @@ test('dashboard collapse panels toggle with mouse and keyboard', async ({ page }
 
 test('dashboard exposes executive recruiting overview and linked work queues', async ({ page }) => {
   await page.goto('/recruit-dashboard');
+  await expect(page.locator('.hero-command-toolbar')).toBeVisible();
+  await expect(page.getByText('招聘经营看板')).toBeVisible();
+  await expect(page.locator('.hero-signal-grid')).toBeVisible();
+  await expect(page.getByText('招聘瓶颈地图')).toBeVisible();
+  await expect(page.getByText('负责人负载')).toBeVisible();
+  await expect(page.getByText('下一动作队列')).toBeVisible();
   await expect(page.locator('.hero-workbench-grid')).toBeVisible();
   await expect(page.getByText('待处理事项')).toBeVisible();
   await expect(page.getByText('岗位风险')).toBeVisible();

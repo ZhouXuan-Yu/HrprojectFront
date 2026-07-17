@@ -227,3 +227,27 @@
   - 巡检报告：`test-results/phase-dashboard-command-final-report.json`
 
 下一步：Phase 4 中优先把旧“招聘全漏斗”明细区组件化，移动端避免下方漏斗文字挤压。
+## 2026-07-18 招聘看板材质化经营台深化
+
+- 用户再次反馈招聘看板不够美观，要求参考官网级产品表达、HeroUIPro 模板和 Kinetic Typography / Glassmorphism 2.0 / Micro-Delight 等趋势，但仍保留此前“禁止渐变、拒绝 AI 味”的项目约束。
+- 已调研并参考：
+  - Apple Vision Pro 官网：滚动叙事和空间层次只抽象为节奏感，不把后台做成营销页。
+  - Stripe Dashboard 文档：后台核心应服务搜索、资源管理、团队协作和监控。
+  - Supabase 官网：企业级表达要清晰、克制、可规模化。
+  - Muzli 2026 Dashboard：玻璃态和软光感必须转译为业务材质层，而不是装饰光效。
+- 已检查 `D:\WorkProject\HeroUIPro\herouipro-v3\template`，重点参考 `template-dashboard` / `template-finances` 的 toolbar、KPI strip、主图表、侧栏判断卡和数据表组织方式。当前项目是 Vue shell + legacy HTML，不直接搬 React 组件，改为复用组件结构与信息密度。
+- 本轮落地：
+  - `public/js/app.js` 新增 `ensureHeroDashboardMaterial()`，为招聘看板增加经营工具条、经营信号卡、瓶颈地图、负责人负载、下一动作队列。
+  - 旧的“招聘全漏斗 / 部门招聘进度 / 渠道效果统计”被标记为 `明细层`，主视觉让位给经营判断台。
+  - 新增 `enhanceKineticTypography()` 与 `enhanceScrollReveal()`，支持轻量动态标题和滚动/入场显现；同时设置自动落稳，避免截图或低速设备出现内容长期透明。
+  - `public/css/style.css` 增加无渐变材质系统：半透明表面、12px blur、细边框、focus ring、hover scale、click scale、图表色板与响应式布局。
+  - `tests/legacy-flow.spec.js` 扩展招聘看板断言，覆盖 toolbar、signal grid、瓶颈地图、负责人负载、下一动作队列。
+- 验证结果：
+  - `node --check public/js/app.js`：通过
+  - `npm run build`：通过
+  - `npm test`：通过，25/25
+  - Playwright 巡检：16 个桌面/移动端页面，0 console error，0 page error，0 禁用词，0 横向溢出
+  - 巡检报告：`test-results/phase-dashboard-material-final-report.json`
+  - 关键截图：`test-results/phase-dashboard-material-dashboard-desktop.png`、`test-results/phase-dashboard-material-dashboard-mobile.png`
+
+下一步建议：进入 Phase 4 页面逐个业务重构时，优先处理需求详情、人才库、面试计划，把当前招聘看板的“经营判断台”信息架构扩展到对象详情页和高密度列表页。

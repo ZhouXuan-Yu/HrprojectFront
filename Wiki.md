@@ -274,3 +274,27 @@ D:\WorkProject\HeroUIPro\herouipro-v3
 - 不复制第三方品牌、文案、素材、截图布局细节或项目无关业务元素。
 - 当前项目视觉必须围绕“智能招聘系统/招聘管理工作台”重新表达。
 - 当前项目不再使用 `gradient` 作为视觉质感来源；如后续确需恢复，必须先获得用户明确同意。
+## 17. 招聘看板经营台信息架构
+
+招聘看板是当前系统的核心展示页，不再只是漏斗和若干统计卡片。稳定信息架构如下：
+
+- 顶部：`hero-command-toolbar`，展示“招聘经营看板”、当前视图切换和跨模块入口。
+- 经营信号：`hero-signal-grid`，展示综合健康度、待审批需求、可推进候选人、面试待闭环、沟通辅助任务。
+- KPI 层：沿用 `kpiRow`，用于保留角色和周期相关的关键指标。
+- 主数据层：`hero-analytics-grid`，展示招聘项目总览趋势和阶段转化。
+- 工作台层：`hero-workbench-grid`，展示待处理事项、岗位风险、渠道效率、近期面试，并全部联动到需求、人才库、面试、招聘辅助中心。
+- 决策层：`hero-decision-grid`，展示招聘瓶颈地图、负责人负载、下一动作队列。
+- 明细层：旧的招聘全漏斗、部门招聘进度、渠道效果统计保留，但统一标记为 `明细层`，不再承担首屏主视觉。
+
+设计口径：
+- 后台页面不做 Cinematic Scrollytelling 的大叙事，只吸收“节奏与层次”的原则。
+- Kinetic Typography 只用于标题轻微响应，不能造成文字错位或阅读障碍。
+- Glassmorphism 2.0 在本项目中定义为：`rgba` 表面、`12px` blur、细边框、轻阴影、清晰层级；不使用渐变。
+- Micro-Delight 只用于 hover、active、focus-visible、轻量入场，必须支持 `prefers-reduced-motion`。
+- 招聘联系相关能力继续保持“候选人沟通辅助 / 话术草稿 / 人工发送 / 效率分析”口径，禁止写成自动外呼或自动拨打。
+
+当前质量基线：
+- `npm run build` 通过。
+- `npm test` 通过，25/25。
+- 看板材质化巡检报告：`test-results/phase-dashboard-material-final-report.json`。
+- 当前巡检覆盖桌面/移动端 16 个页面：0 console error、0 page error、0 禁用词、0 页面级横向溢出。

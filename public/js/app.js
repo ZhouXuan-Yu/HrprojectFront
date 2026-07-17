@@ -1146,6 +1146,153 @@ function openInternalContactModal(name, manager){
     panel.insertAdjacentElement('afterend', command);
   }
 
+  function ensureHeroDashboardMaterial(){
+    if(currentRouteId() !== 'recruit-dashboard') return;
+    var body = document.querySelector('.content-body');
+    var kpiRow = document.getElementById('kpiRow');
+    if(!body || !kpiRow) return;
+
+    if(!body.querySelector('.hero-command-toolbar')){
+      var toolbar = document.createElement('section');
+      toolbar.className = 'hero-command-toolbar scroll-reveal';
+      toolbar.setAttribute('aria-label','招聘经营看板工具条');
+      toolbar.innerHTML =
+        '<div class="hero-command-title"><span>Recruiting Command</span><strong>招聘经营看板</strong><em>从岗位、候选人、面试、渠道到风险处置的一屏总览</em></div>' +
+        '<div class="hero-command-actions" role="group" aria-label="看板视图切换">' +
+          '<button class="active" type="button">总览</button>' +
+          '<button type="button">风险</button>' +
+          '<button type="button">渠道</button>' +
+          '<button type="button">本月</button>' +
+        '</div>' +
+        '<div class="hero-command-links">' +
+          '<a href="/recruit-demand">需求审批</a>' +
+          '<a href="/recruit-talent">人才资产</a>' +
+          '<a href="/recruit-interview">面试日程</a>' +
+          '<a href="/recruit-ai">沟通辅助</a>' +
+        '</div>';
+      body.insertBefore(toolbar, kpiRow);
+    }
+
+    if(!body.querySelector('.hero-signal-grid')){
+      var signals = document.createElement('section');
+      signals.className = 'hero-signal-grid scroll-reveal';
+      signals.setAttribute('aria-label','招聘经营信号');
+      signals.innerHTML =
+        '<article class="hero-signal-card hero-signal-card--primary">' +
+          '<div><span class="hero-overline">Pipeline Health</span><strong>82</strong><em>综合健康度</em></div>' +
+          '<p>技术部转化稳定，运营总监岗位连续 20 天无有效简历，需要负责人介入。</p>' +
+          '<a href="/recruit-demand-detail">查看关键岗位</a>' +
+        '</article>' +
+        '<a class="hero-signal-card" href="/recruit-demand"><span>待审批需求</span><strong>2</strong><em>影响 3 个部门编制</em></a>' +
+        '<a class="hero-signal-card" href="/recruit-talent"><span>可推进候选人</span><strong>89</strong><em>筛选通过，待分配</em></a>' +
+        '<a class="hero-signal-card" href="/recruit-interview"><span>面试待闭环</span><strong>5</strong><em>评价未回收</em></a>' +
+        '<a class="hero-signal-card" href="/recruit-ai"><span>沟通辅助任务</span><strong>8</strong><em>话术草稿待确认</em></a>';
+      kpiRow.insertAdjacentElement('beforebegin', signals);
+    }
+
+    var workbench = body.querySelector('.hero-workbench-grid');
+    if(workbench && !body.querySelector('.hero-decision-grid')){
+      var decision = document.createElement('section');
+      decision.className = 'hero-decision-grid scroll-reveal';
+      decision.setAttribute('aria-label','招聘瓶颈与下一动作');
+      decision.innerHTML =
+        '<article class="hero-board-card hero-board-card--wide">' +
+          '<div class="hero-card-head"><div><strong>招聘瓶颈地图</strong><span>按岗位进度、负责人和下一步动作联动</span></div><a class="hero-text-link" href="/recruit-demand">打开需求管理</a></div>' +
+          '<div class="hero-bottleneck-list">' +
+            '<a href="/recruit-demand-detail"><span><i class="hero-dot danger"></i>运营总监</span><b>无有效简历 20 天</b><em>陈思 · 需要补渠道</em></a>' +
+            '<a href="/recruit-interview"><span><i class="hero-dot warn"></i>前端工程师</span><b>3 位候选人待安排</b><em>刘博 · 本周完成一面</em></a>' +
+            '<a href="/recruit-talent"><span><i class="hero-dot ok"></i>数据分析师</span><b>2/2 已完成</b><em>陈博 · 准备归档</em></a>' +
+          '</div>' +
+        '</article>' +
+        '<article class="hero-board-card">' +
+          '<div class="hero-card-head"><div><strong>负责人负载</strong><span>避免招聘动作堆在单点</span></div></div>' +
+          '<div class="hero-owner-stack">' +
+            '<a href="/recruit-demand"><span>刘博</span><b>4</b><em style="width:86%"></em></a>' +
+            '<a href="/recruit-demand"><span>陈思</span><b>3</b><em style="width:64%"></em></a>' +
+            '<a href="/recruit-demand"><span>王然</span><b>2</b><em style="width:42%"></em></a>' +
+            '<a href="/recruit-demand"><span>陈博</span><b>1</b><em style="width:24%"></em></a>' +
+          '</div>' +
+        '</article>' +
+        '<article class="hero-board-card">' +
+          '<div class="hero-card-head"><div><strong>下一动作队列</strong><span>今天应优先处理</span></div></div>' +
+          '<ol class="hero-next-list">' +
+            '<li><a href="/recruit-demand">审批产品经理需求</a><span>09:30 前</span></li>' +
+            '<li><a href="/recruit-interview">回收 5 条面试评价</a><span>今日</span></li>' +
+            '<li><a href="/recruit-talent">复核内推候选人标签</a><span>本周</span></li>' +
+            '<li><a href="/recruit-ai">确认候选人沟通话术</a><span>人工发送</span></li>' +
+          '</ol>' +
+        '</article>';
+      workbench.insertAdjacentElement('afterend', decision);
+    }
+
+    refineDashboardLegacyCards();
+  }
+
+  function refineDashboardLegacyCards(){
+    if(currentRouteId() !== 'recruit-dashboard') return;
+    var funnelCard = document.querySelector('.viz-funnel') && document.querySelector('.viz-funnel').closest('.card');
+    var deptCard = document.getElementById('bodyDept') && document.getElementById('bodyDept').closest('.card');
+    var channelCard = document.getElementById('bodyChannel') && document.getElementById('bodyChannel').closest('.card');
+    [funnelCard, deptCard, channelCard].forEach(function(card){
+      if(!card || card.dataset.legacyRefined === 'true') return;
+      card.dataset.legacyRefined = 'true';
+      card.classList.add('hero-legacy-refined','scroll-reveal');
+      var title = card.querySelector('.card-title,.collapse-toggle');
+      if(title && !title.querySelector('.hero-detail-badge')){
+        var badge = document.createElement('span');
+        badge.className = 'hero-detail-badge';
+        badge.textContent = '明细层';
+        title.appendChild(badge);
+      }
+    });
+    if(funnelCard) funnelCard.classList.add('hero-funnel-detail');
+    if(deptCard) deptCard.classList.add('hero-dept-detail');
+    if(channelCard) channelCard.classList.add('hero-channel-detail');
+  }
+
+  function enhanceKineticTypography(){
+    var title = document.querySelector('.topbar h1');
+    if(!title || title.dataset.kineticReady === 'true') return;
+    title.dataset.kineticReady = 'true';
+    title.classList.add('kinetic-title');
+    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    window.addEventListener('mousemove', function(e){
+      var x = ((e.clientX / Math.max(window.innerWidth, 1)) - .5).toFixed(3);
+      var y = ((e.clientY / Math.max(window.innerHeight, 1)) - .5).toFixed(3);
+      title.style.setProperty('--kinetic-x', x);
+      title.style.setProperty('--kinetic-y', y);
+      title.style.setProperty('--kinetic-weight', Math.round(760 + Math.abs(Number(x)) * 120));
+    }, { passive:true });
+  }
+
+  function enhanceScrollReveal(){
+    var nodes = document.querySelectorAll('.scroll-reveal,.hero-chart-card,.hero-board-card,.hero-signal-card,.metric-card,.component-viz-card');
+    if(!nodes.length) return;
+    if(!window.IntersectionObserver){
+      Array.prototype.forEach.call(nodes, function(node){ node.classList.add('is-revealed'); });
+      return;
+    }
+    if(!window.__heroRevealObserver){
+      window.__heroRevealObserver = new IntersectionObserver(function(entries){
+        entries.forEach(function(entry){
+          if(entry.isIntersecting){
+            entry.target.classList.add('is-revealed');
+            window.__heroRevealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold:.08 });
+    }
+    Array.prototype.forEach.call(nodes, function(node, index){
+      if(node.dataset.revealReady === 'true') return;
+      node.dataset.revealReady = 'true';
+      node.style.setProperty('--reveal-index', index % 8);
+      window.__heroRevealObserver.observe(node);
+      setTimeout(function(){
+        node.classList.add('is-revealed');
+      }, 180 + (index % 8) * 35);
+    });
+  }
+
   function ensureHeroPageSummary(){
     var route = currentRouteId();
     if(route === 'recruit-dashboard' || route === 'login') return;
@@ -1283,7 +1430,10 @@ function openInternalContactModal(name, manager){
     enhanceEmptyStates();
     enhanceVisualizationCards();
     ensureHeroDashboardAnalytics();
+    ensureHeroDashboardMaterial();
     enhanceCollapses();
+    enhanceKineticTypography();
+    enhanceScrollReveal();
   }
 
   var componentTimer = null;
