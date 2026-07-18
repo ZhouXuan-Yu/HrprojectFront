@@ -263,7 +263,7 @@ function initThree() {
   wrap.appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0xf4f7fc, 10, 18);
+  scene.fog = null; // DEBUG: disable fog
   camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 50);
   camera.position.set(0, 0.55, 8.2);
   camera.lookAt(0, -0.05, 0);
@@ -457,10 +457,8 @@ function updateScene(now) {
     d.mat.opacity = (isSel ? 0.95 : 0.8) * rv;
   });
   if (cone) {
-    const rv = cone.reveal;
-    const s = 0.55 + 0.45 * rv;
-    cone.mesh.scale.set(s, 1, s);
-    cone.mat.opacity = 0.55 * rv;
+    cone.mesh.scale.set(1, 1, 1); // DEBUG: no reveal scale
+    cone.mat.opacity = 1;
   }
   if (shell) {
     const rv = shell.reveal;
