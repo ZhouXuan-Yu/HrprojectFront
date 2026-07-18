@@ -438,8 +438,8 @@ const searchStatus = computed(() => searchLoading.value ? 'submitted' : (searchE
 async function searchResume() {
   if (!searchQuery.value.trim()) return;
   searchError.value = ''; searchLoading.value = true; searchAttempted.value = true;
-  try { const r = await runResumeSearch({ query: searchQuery.value, limit: 10 }); searchResults.value = r.results || []; }
-  catch (e) { searchError.value = e.message || '搜索失败，请重试'; }
+  try { const r = await runResumeSearch({ query: searchQuery.value, limit: 10 }); searchResults.value = r.results || []; showToast('找到 ' + searchResults.value.length + ' 位候选人'); }
+  catch (e) { searchError.value = e.message || '搜索失败，请重试'; showToast(searchError.value); }
   finally { searchLoading.value = false; }
 }
 function viewResume(id) { alert('[sample] 查看简历: ' + id); }
@@ -453,8 +453,8 @@ const matchError = ref('');
 async function runMatch() {
   if (!matchForm.candidateId || !matchForm.demandId) return;
   matchError.value = ''; matchLoading.value = true;
-  try { matchResult.value = await apiRunMatch({ candidate_id: matchForm.candidateId, demand_id: matchForm.demandId }); }
-  catch (e) { matchError.value = e.message || '匹配失败，请重试'; }
+  try { matchResult.value = await apiRunMatch({ candidate_id: matchForm.candidateId, demand_id: matchForm.demandId }); showToast('匹配完成'); }
+  catch (e) { matchError.value = e.message || '匹配失败，请重试'; showToast(matchError.value); }
   finally { matchLoading.value = false; }
 }
 
@@ -469,8 +469,8 @@ const expandedHints = ref({});
 async function generateQuestions() {
   if (!interviewForm.candidateId || !interviewForm.demandId) return;
   interviewError.value = ''; interviewLoading.value = true;
-  try { const r = await runInterviewQuestions({ candidate_id: interviewForm.candidateId, demand_id: interviewForm.demandId, round: interviewForm.round }); interviewQuestions.value = r.questions || []; expandedHints.value = {}; }
-  catch (e) { interviewError.value = e.message || '生成失败，请重试'; }
+  try { const r = await runInterviewQuestions({ candidate_id: interviewForm.candidateId, demand_id: interviewForm.demandId, round: interviewForm.round }); interviewQuestions.value = r.questions || []; expandedHints.value = {}; showToast('生成 ' + interviewQuestions.value.length + ' 个问题'); }
+  catch (e) { interviewError.value = e.message || '生成失败，请重试'; showToast(interviewError.value); }
   finally { interviewLoading.value = false; }
 }
 function toggleHint(i) { expandedHints.value = { ...expandedHints.value, [i]: !expandedHints.value[i] }; }
@@ -487,8 +487,8 @@ const reportError = ref('');
 
 async function generateReport() {
   reportError.value = ''; reportLoading.value = true;
-  try { reportResult.value = await runReportAnalysis({ type: reportForm.type, params: {} }); }
-  catch (e) { reportError.value = e.message || '报告生成失败，请重试'; }
+  try { reportResult.value = await runReportAnalysis({ type: reportForm.type, params: {} }); showToast('分析报告生成完成'); }
+  catch (e) { reportError.value = e.message || '报告生成失败，请重试'; showToast(reportError.value); }
   finally { reportLoading.value = false; }
 }
 
@@ -505,8 +505,8 @@ const chatError = ref('');
 async function generateDraft() {
   if (!chatForm.candidateId || !chatForm.channel || !chatForm.purpose) return;
   chatError.value = ''; chatLoading.value = true;
-  try { const c = candidates.find(x => x.id === chatForm.candidateId); chatResult.value = await runCommunicationDraft({ candidate_name: c?.name || '', channel: chatForm.channel, purpose: chatForm.purpose, context: chatForm.context }); }
-  catch (e) { chatError.value = e.message || '话术生成失败，请重试'; }
+  try { const c = candidates.find(x => x.id === chatForm.candidateId); chatResult.value = await runCommunicationDraft({ candidate_name: c?.name || '', channel: chatForm.channel, purpose: chatForm.purpose, context: chatForm.context }); showToast('话术生成完成'); }
+  catch (e) { chatError.value = e.message || '话术生成失败，请重试'; showToast(chatError.value); }
   finally { chatLoading.value = false; }
 }
 
