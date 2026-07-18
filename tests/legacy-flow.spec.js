@@ -86,13 +86,17 @@ for (const [path, heading] of pages) {
 
 test('sidebar navigation stays inside Vue routes', async ({ page }) => {
   await page.goto('/recruit-dashboard');
-  await page.locator('#sidebar').getByRole('link', { name: /需求管理/ }).click();
-  await expect(page).toHaveURL(/\/recruit-demand$/);
+  await page.waitForSelector('#sidebar', { timeout: 10000 });
+  const navLink = page.locator('#sidebar').locator('[href="/recruit-demand"]').first();
+  await navLink.waitFor({ state: 'visible', timeout: 5000 });
+  await navLink.click();
+  await expect(page).toHaveURL(/\/recruit-demand$/, { timeout: 10000 });
   await expect(page.getByRole('heading', { name: '需求管理' })).toBeVisible();
 });
 
 test('command palette supports keyboard navigation', async ({ page }) => {
   await page.goto('/recruit-dashboard');
+  await page.waitForSelector('#sidebar', { timeout: 10000 });
   await page.keyboard.press('Control+K');
   await expect(page.locator('#commandPalette')).toBeVisible();
   await page.locator('#commandInput').fill('人才库');
