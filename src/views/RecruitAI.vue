@@ -394,6 +394,7 @@ import {
   runJdGenerate, runResumeSearch, runMatch as apiRunMatch,
   runInterviewQuestions, runCommunicationDraft, runReportAnalysis,
 } from '../api/ai.js';
+import { useStreaming } from '../composables/useStreaming.js';
 
 // --- Shared ---
 const tabs = AI_TABS;
