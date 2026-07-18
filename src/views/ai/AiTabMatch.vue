@@ -179,4 +179,22 @@ async function runMatch() {
 
 /* Focus visible */
 input:focus-visible, select:focus-visible { outline:2px solid var(--c-primary);outline-offset:1px }
+
+/* ===== Mobile (≤768px) ===== */
+@media (max-width: 768px) {
+  [data-slot="ai-match-score-row"] {
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+  }
+  [data-slot="ai-match-big-score"] {
+    min-width: auto;
+  }
+  [data-slot="ai-match-score-num"] {
+    font-size: 36px;
+  }
+  [data-slot="ai-match-breakdown"] {
+    width: 100%;
+  }
+}
 </style>

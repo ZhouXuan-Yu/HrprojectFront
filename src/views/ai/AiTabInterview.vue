@@ -107,4 +107,11 @@ function toggleHint(i) { expandedHints.value = { ...expandedHints.value, [i]: !e
 
 /* Focus visible */
 input:focus-visible, select:focus-visible { outline:2px solid var(--c-primary);outline-offset:1px }
+
+/* ===== Mobile (≤768px) ===== */
+@media (max-width: 768px) {
+  [data-slot="ai-question-text"] { font-size: 13px; }
+  [data-slot="ai-question-item"] { padding: 10px 0; }
+  [data-slot="ai-question-hint"] { font-size: 11px; padding: 8px 10px; }
+}
 </style>

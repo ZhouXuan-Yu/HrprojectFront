@@ -45,8 +45,10 @@ import AiChatMessage from '../../components/ai/AiChatMessage.vue';
 import AiSkeleton from '../../components/ai/AiSkeleton.vue';
 import AiDisclaimer from '../../components/ai/AiDisclaimer.vue';
 import { runCommunicationDraft } from '../../api/ai.js';
+import { useClipboard } from '../../composables/useClipboard.js';
 
 const showToast = inject('showToast');
+const { copy, copied } = useClipboard();
 const candidates = inject('aiCandidates');
 
 const purposes = [

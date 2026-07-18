@@ -104,8 +104,10 @@ import StatusBadge from '../../components/StatusBadge.vue';
 import { MOCK_DEPARTMENTS } from '../../data/ai.js';
 import { runJdGenerate } from '../../api/ai.js';
 import { useStreaming } from '../../composables/useStreaming.js';
+import { useClipboard } from '../../composables/useClipboard.js';
 
 const showToast = inject('showToast');
+const { copy, copied } = useClipboard();
 
 const levels = ['初级', '中级', '高级', '资深', '专家'];
 const qualLabels = { education: '学历', experience: '经验', industry: '行业', soft: '软技能' };
