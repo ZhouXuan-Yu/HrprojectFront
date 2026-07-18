@@ -2688,3 +2688,11 @@ body.hero-pro-workbench select:focus-visible{
     transition:none!important;
   }
 }
+
+/* ===== 移动端布局修正（FunnelHero 改造时补充） =====
+   ≤768px 时侧边栏已改为 width:100% 的横向条，但 .legacy-page-shell 仍是 flex 横排，
+   导致 .content 被挤压到视口右侧（宽度≈0）。此处让外壳纵向堆叠，恢复既有 CSS 意图。 */
+@media(max-width:768px){
+  .legacy-page-shell{display:block!important}
+  .legacy-page-shell .content{width:100%}
+}
