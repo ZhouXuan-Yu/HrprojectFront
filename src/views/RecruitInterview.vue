@@ -220,7 +220,7 @@ function renderActions(item) {
     case 'scheduled':
       return resumeBtn + ' <button class="btn btn-text-danger btn-sm" onclick="window.alert(\'取消面试：' + item.name + '\')">取消</button>';
     case 'evaluating':
-      return resumeBtn + ' <button class="btn btn-primary btn-sm" onclick="window.alert(\'【面试评价】\\n填写对' + item.name + '的评价\\n[通过→待录用] [不通过→回流]\')">填评价</button>';
+      return resumeBtn + ' <button class="btn btn-primary btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:evaluate\',{detail:\'' + item.name + '\'}))">填评价</button>';
     case 'offer':
       return resumeBtn + ' <button class="btn btn-outline btn-sm" onclick="window.alert(\'审批进度：\\n✓ 部门负责人 已通过\\n✓ HR 已通过\\n○ 财务总监 待审批\')">审批中</button> <button class="btn btn-success btn-sm" onclick="window.alert(\'发送Offer给' + item.name + '\')">发Offer</button>';
     case 'onboard':
