@@ -134,22 +134,6 @@ import { fetchDemandDetail, fetchDemandCandidates, linkCandidateToDemand } from 
 const info = ref(DEMAND_INFO);
 const candidates = ref([...ALL_CANDIDATES]);
 
-async function loadDemandDetail() {
-  try {
-    const res = await fetchDemandDetail();
-    if (res) info.value = res;
-  } catch (e) {
-    console.warn('[RecruitDemandDetail] fetchDemandDetail failed, using mock data:', e);
-  }
-
-  try {
-    const res = await fetchDemandCandidates();
-    if (res) candidates.value = res;
-  } catch (e) {
-    console.warn('[RecruitDemandDetail] fetchDemandCandidates failed, using mock data:', e);
-  }
-}
-
 const checkedSet = reactive({});
 const checkedCount = computed(() => Object.keys(checkedSet).filter(k => checkedSet[k]).length);
 
@@ -160,7 +144,9 @@ const filters = reactive({
 
 const filteredCandidates = computed(() => {
   let list = candidates.value.filter(c => {
-    const meta = CANDIDATE_META[c.name] || { edu: '本科', years: '3-5' };
+    const meta = CANDIDATE_META[c.name] || {};
+    const edu = c.edu || meta.edu || '本科';
+    const years = c.years || meta.years || '3-5';
     if (filters.source !== 'all' && c.source !== filters.source) return false;
     if (filters.match === 'matched' && !c.matchScore) return false;
     if (filters.match === 'unmatched' && c.matchScore) return false;

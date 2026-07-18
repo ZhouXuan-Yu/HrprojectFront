@@ -96,11 +96,18 @@
             <!-- Sparkline -->
             <div class="insight-chart-block">
               <div class="block-label">近 7 天趋势</div>
-              <svg viewBox="0 0 180 48" class="insight-spark-lg">
-                <polyline :points="sparkPath(sel.spark, 180, 44, 4)" fill="none" :stroke="selAccent" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <polygon :points="sparkFillPath(sel.spark, 180, 44, 4)" :fill="selAccent" opacity="0.08"/>
-                <text v-if="sel.spark" :x="4" :y="12" fill="var(--c-sub)" font-size="8">{{ Math.max(...sel.spark) }}</text>
-                <text v-if="sel.spark" :x="4" :y="43" fill="var(--c-sub)" font-size="8">{{ Math.min(...sel.spark) }}</text>
+              <svg viewBox="0 0 180 52" class="insight-spark-lg">
+                <defs>
+                  <linearGradient id="funnelSparkGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" :stop-color="selAccent" stop-opacity="0.22" />
+                    <stop offset="100%" :stop-color="selAccent" stop-opacity="0.02" />
+                  </linearGradient>
+                </defs>
+                <line v-for="gy in [12, 22, 32]" :key="'gl' + gy" x1="6" x2="174" :y1="gy" :y2="gy" class="spark-grid-line" />
+                <path :d="sparkAreaPath(sel.spark, 180, 40, 6)" fill="url(#funnelSparkGrad)" />
+                <path :d="sparkLinePath(sel.spark, 180, 40, 6)" fill="none" :stroke="selAccent" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                <text v-if="sel.spark" :x="6" :y="10" fill="var(--c-sub)" font-size="8">{{ Math.max(...sel.spark) }}</text>
+                <text v-if="sel.spark" :x="6" :y="49" fill="var(--c-sub)" font-size="8">{{ Math.min(...sel.spark) }}</text>
               </svg>
             </div>
             <!-- Conversion chain -->
@@ -195,25 +202,43 @@ function chainHeight(i) {
   const maxCount = Math.max(...FUNNEL_STEPS.map((s) => s.count));
   return Math.round((FUNNEL_STEPS[i].count / maxCount) * 100);
 }
-function sparkPath(spark, w, h, pad) {
-  w = w || 140; h = h || 28; pad = pad || 2;
-  if (!spark || !spark.length) return pad + ',' + (h / 2) + ' ' + (w - pad) + ',' + (h / 2);
+// HeroUI-style area sparkline: smooth monotone curve + vertical gradient fill
+function sparkPts(spark, w, h, pad) {
+  w = w || 180; h = h || 40; pad = pad || 6;
+  if (!spark || !spark.length) return [[pad, h / 2], [w - pad, h / 2]];
   const maxV = Math.max(...spark);
   const minV = Math.min(...spark);
   const range = maxV - minV || 1;
   return spark.map((v, i) => {
     const x = pad + (i / (spark.length - 1)) * (w - pad * 2);
     const y = pad + (1 - (v - minV) / range) * (h - pad * 2);
-    return `${parseFloat(x.toFixed(1))},${parseFloat(y.toFixed(1))}`;
-  }).join(' ');
+    return [x, y];
+  });
 }
-function sparkFillPath(spark, w, h, pad) {
-  w = w || 140; h = h || 28; pad = pad || 2;
-  if (!spark || !spark.length) return pad + ',' + h + ' ' + (w - pad) + ',' + h + ' ' + (w - pad) + ',' + (h + 2) + ' ' + pad + ',' + (h + 2);
-  const pts = sparkPath(spark, w, h, pad).split(' ').map((p) => p.split(',').map(Number));
-  const last = pts[pts.length - 1];
+function smoothPath(pts) {
+  if (!pts.length) return '';
+  let d = `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] || p2;
+    const c1x = (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1);
+    const c1y = (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1);
+    const c2x = (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1);
+    const c2y = (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1);
+    d += ` C ${c1x},${c1y} ${c2x},${c2y} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+function sparkLinePath(spark, w, h, pad) {
+  return smoothPath(sparkPts(spark, w, h, pad));
+}
+function sparkAreaPath(spark, w, h, pad) {
+  const pts = sparkPts(spark, w, h, pad);
   const first = pts[0];
-  return `${first[0]},${h} ${pts.map((p) => `${p[0]},${p[1]}`).join(' ')} ${last[0]},${h}`;
+  const last = pts[pts.length - 1];
+  return `${smoothPath(pts)} L ${last[0].toFixed(1)},${h} L ${first[0].toFixed(1)},${h} Z`;
 }
 function healthLabel(h) {
   const map = { good: '健康', watch: '关注', risk: '风险' };
@@ -893,7 +918,8 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.insight-spark-lg { width: 100%; height: 48px; display: block; }
+.insight-spark-lg { width: 100%; height: 52px; display: block; }
+.spark-grid-line { stroke: rgba(79, 110, 247, 0.14); stroke-width: 1; }
 
 /* Conversion chain bars */
 .insight-chain {

@@ -398,7 +398,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue';
+import { ref, reactive, computed, watch, onBeforeUnmount, onMounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import BossIntegration from '../components/BossIntegration.vue';
@@ -432,6 +432,40 @@ function showToast(text) {
   toast.timer = setTimeout(() => { toast.show = false; }, 2000);
 }
 onBeforeUnmount(() => { clearTimeout(toast.timer); });
+
+// --- Load real data from backend on mount ---
+async function loadBackendData() {
+  try {
+    const [demandRes, talentRes] = await Promise.all([
+      fetchDemands({ page: 1, pageSize: 50 }),
+      fetchTalent({ tab: 'external', page: 1, pageSize: 50 }),
+    ]);
+    if (demandRes.data?.data) {
+      const dl = demandRes.data.data;
+      demands.value = dl.map(d => ({
+        id: d.id || d.demand_id,
+        name: d.position || d.position_id || d.position_name,
+        dept: d.dept || d.department || '—',
+        status: d.status || d.demand_status || '—',
+      }));
+    }
+    if (talentRes.data) {
+      const tl = talentRes.data;
+      candidates.value = tl.map(c => ({
+        id: c.id,
+        name: c.name || c.candidate_name,
+        title: c.position_hint || c.last_position || '候选人',
+        dept: c.dept || c.department || '—',
+        company: c.company || c.source_channel || '—',
+        years: c.workYears || c.work_years,
+        edu: c.edu || c.edu_level,
+      }));
+    }
+  } catch (e) {
+    console.warn('[RecruitAI] Backend data load failed, keeping mock:', e.message);
+  }
+}
+onMounted(loadBackendData);
 
 // --- Tab 1: JD ---
 const levels = ['初级', '中级', '高级', '资深', '专家'];
@@ -624,7 +658,7 @@ const chatError = ref('');
 async function generateDraft() {
   if (!chatForm.candidateId || !chatForm.channel || !chatForm.purpose) return;
   chatError.value = ''; chatLoading.value = true;
-  try { const c = candidates.find(x => x.id === chatForm.candidateId); chatResult.value = await runCommunicationDraft({ candidate_name: c?.name || '', channel: chatForm.channel, purpose: chatForm.purpose, context: chatForm.context }); showToast('话术生成完成'); }
+  try { const c = candidates.value.find(x => x.id === chatForm.candidateId); chatResult.value = await runCommunicationDraft({ candidate_name: c?.name || '', channel: chatForm.channel, purpose: chatForm.purpose, context: chatForm.context }); showToast('话术生成完成'); }
   catch (e) { chatError.value = e.message || '话术生成失败，请重试'; showToast(chatError.value); }
   finally { chatLoading.value = false; }
 }
