@@ -115,7 +115,7 @@
       </div>
       <div class="table-wrap">
         <table><thead><tr><th style="width:34px"><input type="checkbox" id="checkAllInt" @change="toggleAllInt"></th><th>工号</th><th>姓名</th><th>综合评估</th><th>部门</th><th>岗位</th><th>工龄</th><th>绩效</th><th>最近匹配</th><th>技能标签</th><th>可调岗</th><th>备注</th><th>操作</th></tr></thead><tbody>
-          <tr v-for="e in INT_DATA" :key="e.id">
+          <tr v-for="e in INT_DATA_SOURCE" :key="e.id">
             <td><input type="checkbox" class="int-check" v-model="checkedInt[e.id]" @change="onCheckInt"></td>
             <td>{{ e.id }}</td>
             <td><a href="javascript:void(0)" style="font-weight:600;color:var(--c-primary)" @click="openEmployeeDrawer(e.name)">{{ e.name }}</a></td>
@@ -368,10 +368,10 @@ function saveNote() {
   if (!currentNoteId.value) return;
   const text = noteText.value.trim();
   if (currentNoteType.value === 'ext') {
-    const c = EXT_DATA.find(x => x.id === currentNoteId.value);
+    const c = EXT_DATA_SOURCE.value.find(x => x.id === currentNoteId.value);
     if (c) c.note = text;
   } else {
-    const e = INT_DATA.find(x => x.id === currentNoteId.value);
+    const e = INT_DATA_SOURCE.value.find(x => x.id === currentNoteId.value);
     if (e) e.note = text;
   }
   closeNoteModal();
@@ -391,7 +391,7 @@ function runMatch() {
 // Batch
 function addToDemand(demandId, demandName) {
   const checkedIds = Object.keys(checkedExt).filter(k => checkedExt[k]);
-  const names = checkedIds.map(id => { const c = EXT_DATA.find(x => x.id === id); return c ? c.name : ''; }).filter(Boolean);
+  const names = checkedIds.map(id => { const c = EXT_DATA_SOURCE.value.find(x => x.id === id); return c ? c.name : ''; }).filter(Boolean);
   if (names.length === 0) { alert('请先勾选候选人'); return; }
   const key = 'demand_' + demandId + '_linked';
   const linked = (() => { try { return JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return []; } })();
@@ -403,7 +403,7 @@ function addToDemand(demandId, demandName) {
 }
 function batchContact() {
   const checkedIds = Object.keys(checkedExt).filter(k => checkedExt[k]);
-  const names = checkedIds.map(id => { const c = EXT_DATA.find(x => x.id === id); return c ? c.name : ''; }).filter(Boolean);
+  const names = checkedIds.map(id => { const c = EXT_DATA_SOURCE.value.find(x => x.id === id); return c ? c.name : ''; }).filter(Boolean);
   if (names.length === 0) { doAlert('请先勾选候选人'); return; }
   doAlert('批量联系 ' + names.length + ' 人\n\n请选择实际联系方式：电话 / 邮件 / 飞书。系统仅辅助生成联系话术，不代替人工拨号。\n\n' + names.join('、'));
 }
