@@ -242,7 +242,8 @@ let ptrX = 0;
 let ptrY = 0;
 let destroyed = false;
 
-const DISC_RADII = [1.6, 1.32, 1.04, 0.78, 0.54];
+// Linear taper so the CylinderGeometry silhouette passes exactly through each ring
+const DISC_RADII = [1.6, 1.335, 1.07, 0.805, 0.54];
 const DISC_Y = [1.55, 0.78, 0.0, -0.78, -1.55];
 const HELIX_N = 150;
 const HELIX_TURNS = 3;
@@ -280,22 +281,25 @@ function initThree() {
   scene.add(coneGroup);
 
   // ---- Single glass cone surface, vertex-colored per stage ----
-  // Profile points bottom → top so the lathe surface passes through every ring radius.
-  const profilePts = [];
-  for (let i = DISC_RADII.length - 1; i >= 0; i--) {
-    profilePts.push(new THREE.Vector2(DISC_RADII[i], DISC_Y[i] - 1.4));
-  }
-  const coneGeo = new THREE.LatheGeometry(profilePts, 96);
+  // One continuous open cone; height segments line up with the ring planes.
+  const CONE_TOP_Y = DISC_Y[0] - 1.4;
+  const CONE_BOTTOM_Y = DISC_Y[DISC_Y.length - 1] - 1.4;
+  const CONE_HEIGHT = CONE_TOP_Y - CONE_BOTTOM_Y;
+  const RADIAL_SEGS = 96;
+  const HEIGHT_SEGS = DISC_RADII.length - 1;
+  const coneGeo = new THREE.CylinderGeometry(
+    DISC_RADII[0], DISC_RADII[DISC_RADII.length - 1], CONE_HEIGHT, RADIAL_SEGS, HEIGHT_SEGS, true
+  );
   {
-    // LatheGeometry lays out vertices as (segments+1) × profilePoints;
-    // color each vertex by the stage row it belongs to.
+    // CylinderGeometry torso vertices are row-major (row 0 = top);
+    // color each row by its stage so bands read as distinct layers.
     const pos = coneGeo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
     const tmp = new THREE.Color();
-    const P = profilePts.length;
+    const rowLen = RADIAL_SEGS + 1;
     for (let v = 0; v < pos.count; v++) {
-      const j = v % P; // 0 = bottom stage, P-1 = top stage
-      tmp.setHex(STAGE_HEX[P - 1 - j]);
+      const row = Math.min(HEIGHT_SEGS, Math.floor(v / rowLen));
+      tmp.setHex(STAGE_HEX[row]);
       colors[v * 3] = tmp.r;
       colors[v * 3 + 1] = tmp.g;
       colors[v * 3 + 2] = tmp.b;
@@ -303,17 +307,18 @@ function initThree() {
     coneGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   }
   const coneMat = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.0,
+    color: 0xff0000,
     side: THREE.DoubleSide,
-    depthWrite: false,
   });
   const coneMesh = new THREE.Mesh(coneGeo, coneMat);
+  coneMesh.position.y = (CONE_TOP_Y + CONE_BOTTOM_Y) / 2;
   coneMesh.renderOrder = 0;
   coneGroup.add(coneMesh);
   cone = { mesh: coneMesh, mat: coneMat, reveal: 0 };
+  coneGeo.computeBoundingBox();
+  console.log('[funnel-debug] cone bbY', coneGeo.boundingBox.min.y.toFixed(2), coneGeo.boundingBox.max.y.toFixed(2),
+    'meshY', coneMesh.position.y.toFixed(2), 'verts', coneGeo.attributes.position.count,
+    'CONE_TOP_Y', CONE_TOP_Y.toFixed(2), 'CONE_BOTTOM_Y', CONE_BOTTOM_Y.toFixed(2));
 
   // Outer glass shell for layered depth (very subtle)
   const shellMat = new THREE.MeshPhysicalMaterial({
@@ -331,10 +336,10 @@ function initThree() {
     depthWrite: false,
   });
   const shellMesh = new THREE.Mesh(coneGeo, shellMat);
+  shellMesh.position.y = (CONE_TOP_Y + CONE_BOTTOM_Y) / 2;
   shellMesh.scale.set(1.03, 1.0, 1.03);
   shellMesh.renderOrder = 1;
-  coneGroup.add(shellMesh);
-  shell = { mesh: shellMesh, mat: shellMat, reveal: 0 };
+  shell = { mesh: shellMesh, mat: shellMat, reveal: 0 }; // not added to scene (debug)
 
   // 5 thin outline rings sitting exactly on the cone silhouette
   const RING_TUBE = 0.028;
