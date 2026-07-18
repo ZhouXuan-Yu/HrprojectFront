@@ -4,14 +4,16 @@
 
 ## 1. 项目身份
 
-你是「智能招聘系统」前端项目的协作 agent。当前目标不是重做一个新系统，而是在保留既有功能、页面和业务口径的前提下，把原型逐步工程化、Vue 化、可测试化，并保持企业级视觉质量。
+你是「智能招聘系统」前端项目的协作 agent。当前目标是在保留既有功能、页面和业务口径的前提下，把原型逐步工程化、Vue 化、可测试化，并保持企业级视觉质量。
 
 当前项目位置：
 
 - 工作目录：`D:\WorkProject\HrProject\hr-web\frontend`
-- 技术栈：Vue 3 + Vite + Vue Router + Playwright
-- 现状：已有 Vue shell 包装 legacy 页面，业务页面仍在 `public/legacy/`
-- 登录页：已改为原创「人才雷达中控台」动效登录页
+- 技术栈：Vue 3 + Vite + Vue Router + Playwright + Three.js
+- 现状：**9 个页面已全部 Vue 3 SFC 化**，路由为纯 Vue Router
+- 后端：Python Flask (`backend/`)，含 DeepSeek API 集成 + boss-cli 集成
+- AI 层：6 个工作流端点（`/api/ai/run/*`），由 DeepSeek 驱动，本地 `ai_engine.py` 规则引擎为 fallback
+- 登录页：原创「人才雷达中控台」动效登录页
 - Git：本地仓库已建立，重要节点已提交
 
 ## 2. 工作方式
@@ -97,10 +99,12 @@
 ## 6. 当前验收基线
 
 - `npm run build` 应通过。
-- `npm test` 应通过，当前基线为 23 个 Playwright 用例。
+- `npm test` 应通过，当前基线为 **33** 个 Playwright 用例。
 - 登录页可访问：`/login`。
 - 登录后进入：`/recruit-dashboard`。
 - 关键页面：看板、需求、需求详情、人才库、面试计划、招聘辅助中心、基础配置。
+- AI 工作流：6 个端点由 DeepSeek 驱动，`src/api/ai.js` 封装，前端 fallback 到 mock 数据。
+- boss-cli：`/api/boss/*` 10 个端点已注册，`BossIntegration.vue` 嵌入 RecruitAI。
 
 ## 7. UI v6 Agent 执行要求
 
@@ -116,10 +120,12 @@
 - 使用 `npm run preview` 验证生产包前，必须先重新 `npm run build`。
 
 当前验收基线：
-- Playwright：25/25 通过。
+- Playwright：**33/33** 通过。
 - 视觉巡检：16 张截图，0 console error，0 移动端横向溢出。
 - 当前 UI 方向：HeroUIPro 无渐变专业工作台，包含模块胶囊导航、页面摘要 KPI、招聘项目总览、阶段转化、待处理事项、岗位风险、渠道效率、近期面试和高密表格。
-- 当前禁止项：不得使用 `gradient`；不得出现“AI 外呼”“自动拨打”“智能风险预警”等 AI 味或不可验证能力表达。
+- 当前禁止项：不得使用 `gradient`；不得出现”AI 外呼””自动拨打””智能风险预警”等 AI 味或不可验证能力表达。
+- AI 集成：DeepSeek API 5 个工作流全部通过实际验证，前端 RecruitAI 6 tab 已激活。
+- boss-cli：`@joohw/boss-cli@0.6.6`，后端 10 个端点可用。
 ## 2026-07-18 当前工作口径补充：招聘看板材质化经营台
 
 - 做后台 UI 时先看 `D:\WorkProject\HeroUIPro\herouipro-v3\template`，但当前项目是 Vue shell + legacy HTML/CSS/JS，不能机械搬 React 组件；优先抽取 toolbar、KPI、chart、table、action queue、density control 等成熟结构。

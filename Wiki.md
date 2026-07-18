@@ -324,4 +324,40 @@ D:\WorkProject\HeroUIPro\herouipro-v3
 验收口径：
 - 非看板主页面必须存在 `.hero-page-command` 和 `.hero-page-workspace`。
 - 页面级工作台不能替代原业务功能；原筛选、表格、弹窗、抽屉必须继续可用。
-- 仍然禁止 `gradient` 和“AI 外呼 / 自动拨打”等不实能力表达。
+- 仍然禁止 `gradient` 和”AI 外呼 / 自动拨打”等不实能力表达。
+
+## 19. AI & LLM 集成口径
+
+### DeepSeek API
+
+- **提供商**：DeepSeek（`api.deepseek.com`），兼容 OpenAI SDK
+- **模型**：`deepseek-chat`
+- **调用规则**：全部由 Flask 后端代理转发，**前端绝不直连 LLM API**
+- **6 个工作流端点**（`POST /api/ai/run/<workflow>`）：
+  | 工作流 | 端点 | 说明 |
+  |--------|------|------|
+  | JD 草稿生成 | `jd-generate` | 结构化 JD（职责/技能/任职资格） |
+  | 语义简历搜索 | `resume-search` | 自然语言→结构化搜索条件 |
+  | 人岗匹配 | `match` | 候选人×岗位打分+理由 |
+  | 面试问题生成 | `interview-questions` | 按轮次动态生成面试题 |
+  | 沟通话术 | `communication-draft` | 电话/邮件/飞书话术草稿 |
+  | 分析报告 | `report-analysis` | 招聘数据 AI 分析 |
+- **降级策略**：API 不可用时自动 fallback 到本地 `ai_engine.py` 规则引擎
+- **免责声明**：所有 AI 生成内容必须显示”此内容由AI生成，请人工审核确认后使用”
+- **现有本地引擎**：`backend/app/services/ai_engine.py`（基于正则的简历解析/匹配/面试题），保留作为 fallback
+
+### boss-cli (BOSS 直聘浏览器自动化)
+
+- **CLI 版本**：`@joohw/boss-cli@0.6.6`
+- **后端封装**：`backend/app/services/boss_cli_service.py`（subprocess 调用）
+- **API 端点**：`/api/boss/*`（10 个端点：status/positions/search/chat/action/greet/preview）
+- **重要限制**：BOSS 平台**无官方聊天 API**，不存在自动 AI 对话；所有沟通必须由 HR 人工在会话中完成
+- **前端组件**：`src/components/BossIntegration.vue`，嵌入 RecruitAI 页面
+
+### 当前质量基线
+
+- `npm run build`：通过
+- `npm test`：**33/33** 通过
+- DeepSeek 5 工作流：全部通过实际 API 验证
+- boss-cli：`is_available: True`
+- `/api/ai/capabilities`：全部 9 项能力标记为 `done`

@@ -382,7 +382,61 @@
 - `app.js` enhancers 保留作为通用组件增强层（命令面板、表格排序/密度/列显隐、折叠面板、移动端壳）
 - `style.css` 保留作为全局 CSS 系统
 - 看板已 3D 化（KPI 透视倾斜 + 漏斗浮起入场）
-- 基础已打牢，可进入模块化开发或接口对接阶段
+- **DeepSeek API 已集成**：5 个 AI 工作流后端端点上线（JD 生成/简历搜索/人岗匹配/面试问题/沟通话术/分析报告）
+- **boss-cli 已集成**：后端 subprocess 封装 + 10 个 REST 端点（岗位同步/候选搜索/聊天/打招呼/简历预览）
+- **RecruitAI 页面已激活**：6 个 tab 从静态占位符变为全功能交互式工作台，不再标记"二期开发中"
+- **BossIntegration.vue**：BOSS 直聘集成组件已嵌入 RecruitAI 页面
+- 基础已打牢，进入接口对接 + AI 功能激活阶段
+
+## 2026-07-18 Phase 7：后端 AI 引擎升级 + boss-cli 集成 + RecruitAI 激活
+
+### DeepSeek API 集成
+
+- 新建 `backend/app/services/deepseek_client.py`：基于 OpenAI SDK 的 DeepSeek 客户端，兼容 `/chat/completions`，支持 `chat_completion()` 和 `chat_completion_json()`，3 次指数退避重试（2s/4s/8s），全量日志。
+- 更新 `backend/config.py`：新增 `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` / `DEEPSEEK_MODEL` 配置项，默认模型 `deepseek-chat`。
+- 重写 `backend/app/api/ai.py`：6 个端点全部改为调用 DeepSeek，失败时 fallback 到本地 `ai_engine.py` 规则引擎。所有 AI 响应附加 `disclaimer: "此内容由AI生成，请人工审核确认后使用"`。
+- API 契约 — 5 个工作流全部通过实际 DeepSeek 调用验证：
+  - `POST /api/ai/run/jd-generate` — 结构化 JD 生成（职责/必备技能/加分项/任职资格）
+  - `POST /api/ai/run/resume-search` — 自然语言→结构化搜索
+  - `POST /api/ai/run/match` — 人岗匹配打分+理由
+  - `POST /api/ai/run/interview-questions` — 按轮次生成面试问题
+  - `POST /api/ai/run/communication-draft` — 电话/邮件/飞书沟通话术
+  - `POST /api/ai/run/report-analysis` — 招聘数据 AI 分析报告
+- `/api/ai/capabilities` 已更新：全部 9 项能力标记为 `done`。
+- 更新 `requirements.txt`：新增 `openai>=1.0.0`。
+
+### boss-cli 集成
+
+- 安装 `@joohw/boss-cli@0.6.6`。
+- 新建 `backend/app/services/boss_cli_service.py`：subprocess 封装 `boss` CLI 全部 11 个命令，120s 超时，结构化 JSON 返回 + 完整日志。
+- 新建 `backend/app/api/boss.py`：10 个 REST 端点，注册为 `/api/boss/*` blueprint：
+  - `GET /api/boss/status`、`/positions`、`/positions/<name>`、`/chat/list`
+  - `POST /api/boss/candidates/search`、`/chat/open`、`/chat/send`、`/action`、`/resume/preview`、`/greet`
+- 更新 `backend/config.py`：新增 `BOSS_CLI_ENABLED` / `BOSS_CLI_TIMEOUT`。
+- 文档：`docs/BOSS_CLI_REFERENCE.md`（官方命令参考，含重要限制说明）。
+
+### 前端 RecruitAI 重建
+
+- 新建 `src/api/ai.js`：6 个 AI 工作流的 API 封装，失败自动降级 mock 数据。
+- 扩写 `src/data/ai.js`：新增 `MOCK_JD_RESULT` / `MOCK_SEARCH_RESULTS` / `MOCK_MATCH_RESULT` / `MOCK_INTERVIEW_QUESTIONS` / `MOCK_COMMUNICATION_DRAFT` / `MOCK_REPORT_RESULT` / `MOCK_CANDIDATES` / `MOCK_DEMANDS`。
+- 重写 `src/views/RecruitAI.vue`：6 个 tab 全部具备交互式表单 → 加载态（skeleton）→ 结果区 → 免责声明。移除"二期开发中"徽章。
+- 新建 `src/api/boss.js`：10 个 boss-cli 端点 API 封装。
+- 新建 `src/components/BossIntegration.vue`：4 个功能区（状态栏/岗位同步/候选搜索/聊天列表），含连接状态指示、搜索表单、结果表格、内联聊天面板、操作确认弹窗。所有交互遵循"无官方聊天 API，需人工沟通"口径。
+
+### 项目文档更新
+
+- `Claude.md`（根目录）：重建为项目级入口，新增快速导航表指向 6 个关键文档。
+- `Wiki.md` §2"当前技术架构"：更新为纯 Vue SFC 状态，测试基线 33/33，移除 legacy 描述。
+- 知识图谱重建：`D-WorkProject-HrProject-hr-web-frontend` moderate 模式重索引，节点 120→342（+185%），边 113→431（+282%），新增 45 个函数节点。
+
+### 验证结果
+
+- `npm run build`：通过
+- `npm test`：通过，**33/33**
+- `python -c "from app.services.deepseek_client import chat_completion"`：OK
+- `python -c "from app.services.boss_cli_service import is_available"`：True
+- 后端 DeepSeek：5 个工作流全部通过实际 API 验证（非 mock）
+- 后端 boss-cli：`/api/boss/status` → `{"available": true}`
 
 ## 2026-07-18 Phase 6D 需求管理 Vue 化
 

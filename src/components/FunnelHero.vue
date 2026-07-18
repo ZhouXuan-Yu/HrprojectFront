@@ -229,8 +229,7 @@ let coneGroup = null;
 let raycaster = null;
 let pointerNDC = null;
 let rings = []; // { mesh, mat, baseY, r, lift, reveal }
-let cone = null; // { mesh, mat, reveal } — single glass cone surface
-let shell = null; // { mesh, mat, reveal } — outer glass layer
+let bands = []; // { mesh, mat, reveal } — frustum fill bands between rings
 let helixStrands = []; // { geo, phase }
 let orbitLights = [];
 let rafId = 0;
@@ -263,7 +262,6 @@ function initThree() {
   wrap.appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
-  scene.fog = null; // DEBUG: disable fog
   camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 50);
   camera.position.set(0, 0.55, 8.2);
   camera.lookAt(0, -0.05, 0);
@@ -280,71 +278,42 @@ function initThree() {
   coneGroup = new THREE.Group();
   scene.add(coneGroup);
 
-  // ---- Single glass cone surface, vertex-colored per stage ----
-  // One continuous open cone; height segments line up with the ring planes.
-  const CONE_TOP_Y = DISC_Y[0] - 1.4;
-  const CONE_BOTTOM_Y = DISC_Y[DISC_Y.length - 1] - 1.4;
-  const CONE_HEIGHT = CONE_TOP_Y - CONE_BOTTOM_Y;
-  const RADIAL_SEGS = 96;
-  const HEIGHT_SEGS = DISC_RADII.length - 1;
-  const coneGeo = new THREE.CylinderGeometry(
-    DISC_RADII[0], DISC_RADII[DISC_RADII.length - 1], CONE_HEIGHT, RADIAL_SEGS, HEIGHT_SEGS, true
-  );
-  {
-    // CylinderGeometry torso vertices are row-major (row 0 = top);
-    // color each row by its stage so bands read as distinct layers.
-    const pos = coneGeo.attributes.position;
-    const colors = new Float32Array(pos.count * 3);
-    const tmp = new THREE.Color();
-    const rowLen = RADIAL_SEGS + 1;
-    for (let v = 0; v < pos.count; v++) {
-      const row = Math.min(HEIGHT_SEGS, Math.floor(v / rowLen));
-      tmp.setHex(STAGE_HEX[row]);
-      colors[v * 3] = tmp.r;
-      colors[v * 3 + 1] = tmp.g;
-      colors[v * 3 + 2] = tmp.b;
-    }
-    coneGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  // ---- Frustum fill bands: one solid glass band per stage gap ----
+  // Short open cylinders render reliably; together they form the cone body,
+  // each band a different stage color so the layers read distinctly.
+  for (let i = 0; i < DISC_RADII.length - 1; i++) {
+    const topR = DISC_RADII[i];
+    const bottomR = DISC_RADII[i + 1];
+    const topY = DISC_Y[i] - 1.4;
+    const bottomY = DISC_Y[i + 1] - 1.4;
+    const height = topY - bottomY;
+    const geo = new THREE.CylinderGeometry(topR, bottomR, height, 96, 1, true);
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: STAGE_HEX[i],
+      transparent: true,
+      opacity: 0.0,
+      roughness: 0.22,
+      metalness: 0.0,
+      clearcoat: 0.7,
+      clearcoatRoughness: 0.25,
+      transmission: 0.28,
+      thickness: 0.4,
+      ior: 1.45,
+      emissive: STAGE_HEX[i],
+      emissiveIntensity: 0.06,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y = (topY + bottomY) / 2;
+    mesh.scale.set(0.55, 1, 0.55);
+    mesh.userData.stage = i;
+    mesh.renderOrder = 0;
+    coneGroup.add(mesh);
+    bands.push({ mesh, mat, reveal: 0 });
   }
-  const coneMat = new THREE.MeshBasicMaterial({
-    color: 0xff0000,
-    side: THREE.DoubleSide,
-  });
-  const coneMesh = new THREE.Mesh(coneGeo, coneMat);
-  coneMesh.position.set(0, (CONE_TOP_Y + CONE_BOTTOM_Y) / 2, 0); // DEBUG: correct pos, no cull
-  coneMesh.frustumCulled = false;
-  coneMesh.renderOrder = 0;
-  coneGroup.add(coneMesh);
-  cone = { mesh: coneMesh, mat: coneMat, reveal: 0 };
 
-  coneGeo.computeBoundingBox();
-  console.log('[funnel-debug] cone bbY', coneGeo.boundingBox.min.y.toFixed(2), coneGeo.boundingBox.max.y.toFixed(2),
-    'meshY', coneMesh.position.y.toFixed(2), 'verts', coneGeo.attributes.position.count,
-    'CONE_TOP_Y', CONE_TOP_Y.toFixed(2), 'CONE_BOTTOM_Y', CONE_BOTTOM_Y.toFixed(2));
-
-  // Outer glass shell for layered depth (very subtle)
-  const shellMat = new THREE.MeshPhysicalMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.0,
-    roughness: 0.05,
-    metalness: 0.0,
-    clearcoat: 1,
-    clearcoatRoughness: 0.1,
-    transmission: 0.6,
-    thickness: 0.3,
-    ior: 1.5,
-    side: THREE.FrontSide,
-    depthWrite: false,
-  });
-  const shellMesh = new THREE.Mesh(coneGeo, shellMat);
-  shellMesh.position.y = (CONE_TOP_Y + CONE_BOTTOM_Y) / 2;
-  shellMesh.scale.set(1.03, 1.0, 1.03);
-  shellMesh.renderOrder = 1;
-  shell = { mesh: shellMesh, mat: shellMat, reveal: 0 }; // not added to scene (debug)
-
-  // 5 thin outline rings sitting exactly on the cone silhouette
-  const DEBUG_CONE_ONLY = true;
+  // ---- 5 thin outline rings: the exact boundary of each fill band ----
   const RING_TUBE = 0.028;
   DISC_RADII.forEach((r, i) => {
     const geo = new THREE.TorusGeometry(r, RING_TUBE, 16, 120);
@@ -370,11 +339,11 @@ function initThree() {
     mesh.userData.stage = i;
     mesh.renderOrder = 2;
 
-    if (!DEBUG_CONE_ONLY) coneGroup.add(mesh);
+    coneGroup.add(mesh);
     rings.push({ mesh, mat, baseY: DISC_Y[i], r, lift: 0, reveal: 0 });
   });
 
-  // Triple particle streams flowing along the funnel surface
+  // Triple particle streams orbiting OUTSIDE the cone, top → bottom
   const streamColors = [0x315efb, 0x36bffa, 0x6c63ff];
   for (let s = 0; s < 3; s++) {
     const geo = new THREE.BufferGeometry();
@@ -388,7 +357,7 @@ function initThree() {
       depthWrite: false,
       sizeAttenuation: true,
     });
-    if (!DEBUG_CONE_ONLY) coneGroup.add(new THREE.Points(geo, mat));
+    coneGroup.add(new THREE.Points(geo, mat));
     helixStrands.push({ geo, phase: s * (Math.PI * 2 / 3) });
   }
 
@@ -441,11 +410,11 @@ function updateScene(now) {
       const local = Math.min(1, Math.max(0, (el - order * 140) / 850));
       d.reveal = easeOutCubic(local);
     });
-    if (cone) {
-      const local = Math.min(1, Math.max(0, (el - 120) / 900));
-      cone.reveal = easeOutCubic(local);
-      if (shell) shell.reveal = cone.reveal;
-    }
+    bands.forEach((b, i) => {
+      const order = bands.length - 1 - i;
+      const local = Math.min(1, Math.max(0, (el - order * 140 - 60) / 850));
+      b.reveal = easeOutCubic(local);
+    });
   }
   rings.forEach((d, i) => {
     const isSel = i === selected.value;
@@ -456,16 +425,12 @@ function updateScene(now) {
     d.mesh.scale.setScalar(0.55 + 0.45 * rv);
     d.mat.opacity = (isSel ? 0.95 : 0.8) * rv;
   });
-  if (cone) {
-    cone.mesh.scale.set(1, 1, 1); // DEBUG: no reveal scale
-    cone.mat.opacity = 1;
-  }
-  if (shell) {
-    const rv = shell.reveal;
-    const s = 1.03 * (0.55 + 0.45 * rv);
-    shell.mesh.scale.set(s, 1, s);
-    shell.mat.opacity = 0.12 * rv;
-  }
+  bands.forEach((b) => {
+    const rv = b.reveal;
+    const s = 0.55 + 0.45 * rv;
+    b.mesh.scale.set(s, 1, s);
+    b.mat.opacity = 0.55 * rv;
+  });
 }
 
 const hudVec = new THREE.Vector3();
