@@ -243,7 +243,7 @@ let destroyed = false;
 
 const DISC_RADII = [1.6, 1.32, 1.04, 0.78, 0.54];
 const DISC_Y = [1.55, 0.78, 0.0, -0.78, -1.55];
-const HELIX_N = 180;
+const HELIX_N = 150;
 const HELIX_TURNS = 3;
 
 function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
@@ -345,22 +345,22 @@ function initThree() {
     discs.push({ mesh, mat, baseY: DISC_Y[i], r, lift: 0, reveal: 0 });
   });
 
-  // Multi-strand particle streams flowing along the funnel surface
-  const streamColors = [0x315efb, 0x36bffa, 0x6c63ff, 0x9bb5ff];
-  for (let s = 0; s < 4; s++) {
+  // Triple particle streams flowing along the funnel surface
+  const streamColors = [0x315efb, 0x36bffa, 0x6c63ff];
+  for (let s = 0; s < 3; s++) {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(HELIX_N * 3), 3));
     const mat = new THREE.PointsMaterial({
       color: streamColors[s],
-      size: 0.10,
+      size: 0.07,
       transparent: true,
-      opacity: 1.0,
+      opacity: 0.95,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
     });
     coneGroup.add(new THREE.Points(geo, mat));
-    helixStrands.push({ geo, phase: s * (Math.PI * 2 / 4) });
+    helixStrands.push({ geo, phase: s * (Math.PI * 2 / 3) });
   }
 
   raycaster = new THREE.Raycaster();
