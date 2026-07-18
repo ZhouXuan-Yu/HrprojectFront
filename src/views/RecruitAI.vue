@@ -412,10 +412,6 @@ function showToast(text) {
 }
 onBeforeUnmount(() => { clearTimeout(toast.timer); });
 
-// Watch: clear error on input change so deadlock is broken
-watch(() => jdForm.requirements, () => { if (jdError.value) jdError.value = ''; });
-watch(searchQuery, () => { if (searchError.value) { searchError.value = ''; searchAttempted.value = false; } });
-
 // --- Tab 1: JD ---
 const levels = ['初级', '中级', '高级', '资深', '专家'];
 const qualLabels = { education: '学历', experience: '经验', industry: '行业', soft: '软技能' };
@@ -424,6 +420,9 @@ const jdResult = ref(null);
 const jdLoading = ref(false);
 const jdError = ref('');
 const jdStatus = computed(() => jdLoading.value ? 'submitted' : (jdError.value ? 'error' : 'ready'));
+
+// Watch: clear error on input change (must be after declarations)
+watch(() => jdForm.requirements, () => { if (jdError.value) jdError.value = ''; });
 
 async function generateJd() {
   if (!jdForm.position || !jdForm.department) return;
@@ -440,6 +439,8 @@ const searchLoading = ref(false);
 const searchError = ref('');
 const searchAttempted = ref(false);
 const searchStatus = computed(() => searchLoading.value ? 'submitted' : (searchError.value ? 'error' : 'ready'));
+
+watch(searchQuery, () => { if (searchError.value) { searchError.value = ''; searchAttempted.value = false; } });
 
 async function searchResume() {
   if (!searchQuery.value.trim()) return;
@@ -632,6 +633,11 @@ function focusNextTab() {
 .num-cell { text-align:right;font-variant-numeric:tabular-nums;font-feature-settings:"tnum";font-weight:600 }
 .progress-bar { flex:1;height:8px;background:var(--c-border-light);border-radius:4px;overflow:hidden }
 .progress-fill { height:100%;background:var(--c-primary);border-radius:4px;transition:width .6s ease }
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill { transition: none; }
+  [data-slot="ai-toast"] { transition: none; }
+}
 
 /* Focus visible */
 input:focus-visible, select:focus-visible { outline:2px solid var(--c-primary);outline-offset:1px }
