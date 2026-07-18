@@ -311,10 +311,12 @@ function initThree() {
     side: THREE.DoubleSide,
   });
   const coneMesh = new THREE.Mesh(coneGeo, coneMat);
-  coneMesh.position.y = (CONE_TOP_Y + CONE_BOTTOM_Y) / 2;
+  coneMesh.position.set(0, (CONE_TOP_Y + CONE_BOTTOM_Y) / 2, 0); // DEBUG: correct pos, no cull
+  coneMesh.frustumCulled = false;
   coneMesh.renderOrder = 0;
   coneGroup.add(coneMesh);
   cone = { mesh: coneMesh, mat: coneMat, reveal: 0 };
+
   coneGeo.computeBoundingBox();
   console.log('[funnel-debug] cone bbY', coneGeo.boundingBox.min.y.toFixed(2), coneGeo.boundingBox.max.y.toFixed(2),
     'meshY', coneMesh.position.y.toFixed(2), 'verts', coneGeo.attributes.position.count,
@@ -342,6 +344,7 @@ function initThree() {
   shell = { mesh: shellMesh, mat: shellMat, reveal: 0 }; // not added to scene (debug)
 
   // 5 thin outline rings sitting exactly on the cone silhouette
+  const DEBUG_CONE_ONLY = true;
   const RING_TUBE = 0.028;
   DISC_RADII.forEach((r, i) => {
     const geo = new THREE.TorusGeometry(r, RING_TUBE, 16, 120);
@@ -367,7 +370,7 @@ function initThree() {
     mesh.userData.stage = i;
     mesh.renderOrder = 2;
 
-    coneGroup.add(mesh);
+    if (!DEBUG_CONE_ONLY) coneGroup.add(mesh);
     rings.push({ mesh, mat, baseY: DISC_Y[i], r, lift: 0, reveal: 0 });
   });
 
@@ -385,7 +388,7 @@ function initThree() {
       depthWrite: false,
       sizeAttenuation: true,
     });
-    coneGroup.add(new THREE.Points(geo, mat));
+    if (!DEBUG_CONE_ONLY) coneGroup.add(new THREE.Points(geo, mat));
     helixStrands.push({ geo, phase: s * (Math.PI * 2 / 3) });
   }
 

@@ -18,13 +18,15 @@
 
 | 层 | 当前状态 | 说明 |
 |---|---|---|
-| 前端框架 | Vue 3 + Vite | 已建立 Vue shell |
-| 路由 | Vue Router | legacy 页面通过路由承载 |
-| 原型页面 | `public/legacy/` | 当前主要业务页面仍在这里 |
-| 测试 | Playwright | 当前 13 个 E2E 用例 |
+| 前端框架 | Vue 3 + Vite | 纯 Vue SFC，无遗留外壳 |
+| 路由 | Vue Router | 9 条路由，全部指向 Vue 组件 |
+| 业务页面 | `src/views/` | 7 个业务页 + 1 个登录页，全部 Vue 3 SFC |
+| 组件 | `src/components/` | BaseAccordion / BaseModal / StatusBadge / FunnelHero |
+| 测试 | Playwright | 当前 33 个 E2E 用例，全部通过 |
 | 构建 | `npm run build` | Vite build |
 | 本地运行 | `npm run dev` | 默认 `127.0.0.1:5173` |
-| 代码图谱 | codebase-memory-mcp | 注意默认排除 `public/` |
+| 代码图谱 | codebase-memory-mcp | 索引了 `src/` 和文档；`public/` 被排除 |
+| 全局增强层 | `public/js/app.js` + `public/css/style.css` | 命令面板、表格排序/密度/列显隐、折叠面板、移动端壳 |
 
 ## 3. 主要页面
 
