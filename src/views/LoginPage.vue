@@ -72,6 +72,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { login as apiLogin } from '../api/auth.js';
 
 const router = useRouter();
 const loginStage = ref(null);

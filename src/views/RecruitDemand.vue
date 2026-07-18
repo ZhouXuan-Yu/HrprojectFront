@@ -169,7 +169,26 @@ function openEditModal(d){
 
 function closeModal(){ showModal.value = false; }
 function saveDraft(){ alert('已保存草稿'); closeModal(); }
-function submitApproval(){ alert('已提交审批'); closeModal(); }
+async function submitApproval(){
+  const payload = {
+    dept: form.dept,
+    position: form.position,
+    hc: form.hc,
+    urgency: form.urgency,
+    salary: form.salary,
+    date: form.date,
+    desc: form.desc,
+  };
+  try {
+    const res = await createDemand(payload);
+    const id = res?.id || '[sample] DM2026070010';
+    alert('已提交审批，需求编号：' + id);
+  } catch (e) {
+    console.warn('[RecruitDemand] createDemand failed, falling back to mock:', e);
+    alert('已提交审批（mock）');
+  }
+  closeModal();
+}
 
 function goDetail(){ router.push('/recruit-demand-detail'); }
 function approveDemand(id){ alert('审批通过：' + id); }
