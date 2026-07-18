@@ -3,8 +3,16 @@ const BASE = '/api';
 
 async function request(path, options = {}) {
   const url = `${BASE}${path}`;
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+
+  // Bearer token auth — set by login page on successful backend auth
+  const token = localStorage.getItem('hr_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const config = {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers,
     ...options,
   };
 

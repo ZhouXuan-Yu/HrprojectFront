@@ -138,7 +138,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { ALL_INTERVIEWS, STATUSES, STATUS_LABELS, STATUS_TYPE_MAP, ALERTS } from '../data/interview.js';
-import { fetchInterviews, fetchInterviewAlerts } from '../api/interview.js';
+import { fetchInterviews, fetchInterviewAlerts, createInterview, evaluateInterview } from '../api/interview.js';
 
 const showAlerts = ref(false);
 const showCalendar = ref(false);

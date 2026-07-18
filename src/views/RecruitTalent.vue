@@ -364,9 +364,18 @@ function openIntNote(id, name) {
   showNoteModal.value = true;
 }
 function closeNoteModal() { showNoteModal.value = false; currentNoteId.value = null; }
-function saveNote() {
+async function saveNote() {
   if (!currentNoteId.value) return;
   const text = noteText.value.trim();
+
+  // Try API first, fall back to local-only
+  try {
+    await updateTalentNote(currentNoteId.value, text);
+  } catch (e) {
+    console.warn('[RecruitTalent] updateTalentNote failed, using local fallback:', e);
+  }
+
+  // Always update the local data source
   if (currentNoteType.value === 'ext') {
     const c = EXT_DATA_SOURCE.value.find(x => x.id === currentNoteId.value);
     if (c) c.note = text;
