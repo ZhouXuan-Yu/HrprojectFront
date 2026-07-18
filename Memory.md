@@ -413,3 +413,23 @@
   - `npm test`：**33/33** 通过，0 console error
   - 桌面截图：`test-results/funnel-hero-desktop.png`
   - 移动端截图：`test-results/funnel-hero-mobile.png`
+
+## 2026-07-18 漏斗大屏迭代：沉浸式背景 + 双螺旋 + 右侧面板扩增
+
+- **沉浸式数据大屏背景**：CSS 网格点阵 + 3 个径向光晕 + 扫描线动画 + 40 个浮动粒子 + 12 个技术标签 (HR/JD/OKR/HC/KPI/ATS/CRM) 沿背景浮动
+- **双螺旋升级**：两根相位差 π 的螺旋线，glow 发光层 + core 实线层，16 个 SMIL 粒子沿螺旋运动
+- **SVG 装饰环**：锥体下方 3 个半透明同心椭圆增加科技感
+- **右侧洞察面板大幅扩增**：
+  - 阶段标题 22px (原 16px) + 大号健康/瓶颈徽章
+  - 3 个指标卡 (人数/转化率/占比)，22px 大字 + 卡片背景
+  - 环比箭头 + 平均停留 + 负责人三列信息行
+  - 大尺寸 sparkline (180×48, 原 140×28) + 最大值/最小值标注
+  - **全链路转化柱状图** (新增) — 5 阶段柱形，点击可切换选中阶段
+  - 洞察备注改为蓝色左边框卡片样式
+  - CTA 按钮 14px 加阴影
+- 卡片加整体蓝色渐变顶光 (`linear-gradient(165deg, #fff, #F0F4FF)`)
+- 所有颜色使用 CSS 变量，支持 `prefers-reduced-motion`
+- 验证：
+  - `npm run build`：通过
+  - `npm test`：**33/33** 通过，0 console error
+  - 桌面截图：`test-results/funnel-hero-v3-desktop.png`
