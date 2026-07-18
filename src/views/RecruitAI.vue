@@ -7,14 +7,20 @@
     <!-- 6 Tab navigation -->
     <div class="tabs" role="tablist" aria-label="招聘辅助功能">
       <button v-for="tab in tabs" :key="tab.id" class="tab"
+        :id="'tab-btn-' + tab.id"
         :class="{ active: activeTab === tab.id }"
+        :tabindex="activeTab === tab.id ? 0 : -1"
         :aria-selected="activeTab === tab.id ? 'true' : 'false'"
         role="tab" @click="activeTab = tab.id"
+        @keydown.left.prevent="focusPrevTab"
+        @keydown.right.prevent="focusNextTab"
+        @keydown.home.prevent="activeTab = tabs[0].id"
+        @keydown.end.prevent="activeTab = tabs[tabs.length - 1].id"
       >{{ tab.number }} {{ tab.title }}</button>
     </div>
 
     <!-- ============ Tab 1: JD 草稿生成 ============ -->
-    <div class="tab-panel" :class="{ active: activeTab === 'jd' }" role="tabpanel" aria-label="JD 草稿生成">
+    <div class="tab-panel" :class="{ active: activeTab === 'jd' }" role="tabpanel" aria-labelledby="tab-btn-jd" aria-label="JD 草稿生成">
       <div data-slot="ai-workspace">
         <!-- Conversation area -->
         <div data-slot="ai-conversation">
@@ -103,7 +109,7 @@
     </div>
 
     <!-- ============ Tab 2: 语义简历搜索 ============ -->
-    <div class="tab-panel" :class="{ active: activeTab === 'search' }" role="tabpanel" aria-label="语义简历搜索">
+    <div class="tab-panel" :class="{ active: activeTab === 'search' }" role="tabpanel" aria-labelledby="tab-btn-search" aria-label="语义简历搜索">
       <div data-slot="ai-workspace">
         <div data-slot="ai-conversation">
           <AiChatMessage role="ai" status="complete">
@@ -442,7 +448,7 @@ async function searchResume() {
   catch (e) { searchError.value = e.message || '搜索失败，请重试'; showToast(searchError.value); }
   finally { searchLoading.value = false; }
 }
-function viewResume(id) { alert('[sample] 查看简历: ' + id); }
+function viewResume(id) { showToast('查看简历: ' + id); }
 
 // --- Tab 3: Match ---
 const matchForm = reactive({ candidateId: '', demandId: '' });
@@ -512,6 +518,20 @@ async function generateDraft() {
 
 // --- Shared ---
 function statusLabel(s) { return { done: '一期开发', warn: '二期', draft: '远期' }[s] || s; }
+
+// --- Keyboard navigation for tabs ---
+function focusPrevTab() {
+  const idx = tabs.findIndex(t => t.id === activeTab.value);
+  const prev = tabs[idx > 0 ? idx - 1 : tabs.length - 1];
+  activeTab.value = prev.id;
+  document.getElementById('tab-btn-' + prev.id)?.focus();
+}
+function focusNextTab() {
+  const idx = tabs.findIndex(t => t.id === activeTab.value);
+  const next = tabs[idx < tabs.length - 1 ? idx + 1 : 0];
+  activeTab.value = next.id;
+  document.getElementById('tab-btn-' + next.id)?.focus();
+}
 </script>
 
 <style scoped>
