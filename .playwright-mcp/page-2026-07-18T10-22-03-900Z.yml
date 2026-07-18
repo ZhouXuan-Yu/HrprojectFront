@@ -1,0 +1,148 @@
+- generic [ref=f2e3]:
+  - navigation "招聘模块导航" [ref=f2e4]:
+    - generic [ref=f2e5]: HR
+    - navigation [ref=f2e7]:
+      - generic [ref=f2e9]:
+        - link "招聘看板" [ref=f2e10] [cursor=pointer]:
+          - /url: /recruit-dashboard
+        - link "需求管理" [ref=f2e11] [cursor=pointer]:
+          - /url: /recruit-demand
+        - link "人才库" [ref=f2e12] [cursor=pointer]:
+          - /url: /recruit-talent
+        - link "面试计划" [ref=f2e13] [cursor=pointer]:
+          - /url: /recruit-interview
+        - link "招聘辅助中心" [ref=f2e14] [cursor=pointer]:
+          - /url: /recruit-ai
+        - link "招聘基础配置" [ref=f2e15] [cursor=pointer]:
+          - /url: /recruit-config
+    - generic [ref=f2e16]: 测
+  - main [ref=f2e18]:
+    - banner [ref=f2e19]:
+      - heading "招聘看板" [level=1] [ref=f2e20]
+      - generic [ref=f2e21]:
+        - link "招聘管理" [ref=f2e22] [cursor=pointer]:
+          - /url: /recruit-dashboard
+        - text: / 招聘看板
+      - generic [ref=f2e23]:
+        - button "打开快速跳转" [ref=f2e24] [cursor=pointer]:
+          - generic [ref=f2e25]: 快速跳转
+          - generic [ref=f2e26]: Ctrl K
+        - generic [ref=f2e27]: 更新于 07-15 09:00
+        - combobox [ref=f2e28] [cursor=pointer]:
+          - option "本月" [selected]
+          - option "本周"
+          - option "今日"
+        - combobox [ref=f2e29] [cursor=pointer]:
+          - option "全公司" [selected]
+        - button "4" [ref=f2e31] [cursor=pointer]
+    - main [ref=f2e36]:
+      - navigation "招聘业务模块" [ref=f2e37]:
+        - link "招聘看板" [ref=f2e38] [cursor=pointer]:
+          - /url: /recruit-dashboard
+        - link "需求管理" [ref=f2e40] [cursor=pointer]:
+          - /url: /recruit-demand
+        - link "人才库" [ref=f2e42] [cursor=pointer]:
+          - /url: /recruit-talent
+        - link "面试计划" [ref=f2e44] [cursor=pointer]:
+          - /url: /recruit-interview
+        - link "招聘辅助中心" [ref=f2e46] [cursor=pointer]:
+          - /url: /recruit-ai
+        - link "招聘基础配置" [ref=f2e48] [cursor=pointer]:
+          - /url: /recruit-config
+      - generic [ref=f2e50]:
+        - group "全公司待面试，当前值 8" [ref=f2e51]:
+          - generic [ref=f2e55]:
+            - generic [ref=f2e56]: "8"
+            - generic [ref=f2e57]: 全公司待面试
+            - generic [ref=f2e58]: 当前筛选范围
+          - generic [ref=f2e59]: +2 昨日
+        - group "待评价，当前值 12" [ref=f2e60]:
+          - generic [ref=f2e65]:
+            - generic [ref=f2e66]: "12"
+            - generic [ref=f2e67]: 待评价
+            - generic [ref=f2e68]: 当前筛选范围
+          - generic [ref=f2e69]: +3 昨日
+        - group "在招岗位，当前值 8" [ref=f2e70]:
+          - generic [ref=f2e75]:
+            - generic [ref=f2e76]: "8"
+            - generic [ref=f2e77]: 在招岗位
+            - generic [ref=f2e78]: 当前筛选范围
+          - generic [ref=f2e79]: +1 昨日
+        - group "本月入职总量，当前值 5" [ref=f2e80]:
+          - generic [ref=f2e85]:
+            - generic [ref=f2e86]: "5"
+            - generic [ref=f2e87]: 本月入职总量
+            - generic [ref=f2e88]: 当前筛选范围
+          - generic [ref=f2e89]: 持平
+      - region "招聘全漏斗 本月 · 点击阶段查看详情总转化率 1.4%阶段转化" [ref=f2e90]:
+        - generic [ref=f2e91]:
+          - text: 招聘全漏斗
+          - generic [ref=f2e94]: 本月 · 点击阶段查看详情
+          - generic [ref=f2e95]: 总转化率 1.4%
+          - generic [ref=f2e96]: 阶段转化
+        - generic [ref=f2e97]:
+          - img [ref=f2e99]:
+            - generic [ref=f2e111] [cursor=pointer]:
+              - generic: "346"
+              - generic: 收简历
+            - generic [ref=f2e114] [cursor=pointer]:
+              - generic: "89"
+              - generic: 筛选通过
+            - generic [ref=f2e117] [cursor=pointer]:
+              - generic: "42"
+              - generic: 面试
+            - generic [ref=f2e120] [cursor=pointer]:
+              - generic: "8"
+              - generic: Offer
+            - generic [ref=f2e124] [cursor=pointer]:
+              - generic: "5"
+              - generic: 入职
+          - generic [ref=f2e128]:
+            - generic [ref=f2e129]:
+              - generic [ref=f2e131]: Offer
+              - generic [ref=f2e132]: 瓶颈
+            - generic [ref=f2e133]:
+              - generic [ref=f2e134]:
+                - generic [ref=f2e135]:
+                  - text: "8"
+                  - generic [ref=f2e136]: 人
+                - generic [ref=f2e137]: 占 2.3%
+              - generic [ref=f2e138]:
+                - generic [ref=f2e139]:
+                  - text: 19.0%
+                  - generic [ref=f2e140]: "-4.5%"
+                - generic [ref=f2e143]: 转化率 · WoW
+              - generic [ref=f2e144]:
+                - generic [ref=f2e145]: 2.1d
+                - generic [ref=f2e146]: 平均停留
+            - generic [ref=f2e147]: 过去 7 天趋势
+            - generic [ref=f2e152]: 面试→Offer 转化仅 19.0%，为当前最大瓶颈，建议复盘评估口径与决策时效。
+            - generic [ref=f2e153]: HR · 用人经理
+            - button "查看 Offer 详情 →" [ref=f2e157] [cursor=pointer]
+        - generic [ref=f2e158]:
+          - link "跳转到 收简历 详情" [ref=f2e159] [cursor=pointer]:
+            - text: 收简历
+            - generic [ref=f2e161]: "346"
+          - link "跳转到 筛选通过 详情" [ref=f2e162] [cursor=pointer]:
+            - text: 筛选通过
+            - generic [ref=f2e164]: "89"
+          - link "跳转到 面试 详情" [ref=f2e165] [cursor=pointer]:
+            - text: 面试
+            - generic [ref=f2e167]: "42"
+          - link "跳转到 Offer 详情" [ref=f2e168] [cursor=pointer]:
+            - text: Offer
+            - generic [ref=f2e170]: "8"
+          - link "跳转到 入职 详情" [ref=f2e171] [cursor=pointer]:
+            - text: 入职
+            - generic [ref=f2e173]: "5"
+      - region "部门招聘进度" [ref=f2e174]:
+        - button "部门招聘进度 技术部 3/5 · 产品部 1/3 · 运营部 0/2 · 数据部 2/2 当前周期" [ref=f2e175] [cursor=pointer]:
+          - generic [ref=f2e178]: 部门招聘进度
+          - generic [ref=f2e179]: 技术部 3/5 · 产品部 1/3 · 运营部 0/2 · 数据部 2/2
+          - generic [ref=f2e180]: 当前周期
+      - region "渠道效果统计" [ref=f2e181]:
+        - button "渠道效果统计 邮箱采集 120 · Boss 直聘 98 · 猎聘 65 · 内推 42 按渠道汇总" [ref=f2e182] [cursor=pointer]:
+          - generic [ref=f2e185]: 渠道效果统计
+          - generic [ref=f2e186]: 邮箱采集 120 · Boss 直聘 98 · 猎聘 65 · 内推 42
+          - generic [ref=f2e187]: 按渠道汇总
+        - text: ↕ ↕ ↕ ↕ ↕ ↕

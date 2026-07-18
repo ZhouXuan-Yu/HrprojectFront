@@ -36,29 +36,130 @@
     </div>
 
     <!-- Funnel -->
-    <div class="card dashboard-funnel-card" style="margin-bottom:12px">
+    <div class="card" style="margin-bottom:12px" data-viz-enhanced="funnel">
       <div class="card-title">
         <svg viewBox="0 0 24 24" style="width:18px;height:18px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
         招聘全漏斗
-        <span style="font-weight:400;font-size:11px;color:var(--c-sub);margin-left:8px">本月 · 点击跳转</span>
+        <span style="font-weight:400;font-size:11px;color:var(--c-sub);margin-left:8px">本月 · 点击阶段查看详情</span>
         <span style="font-weight:400;font-size:11px;color:var(--c-primary);margin-left:auto">总转化率 1.4%</span>
       </div>
-      <div class="funnel-viz" :class="{ 'funnel-entered': funnelAnimated }" style="max-width:720px;margin:0 auto">
-        <div v-for="(step, i) in FUNNEL_STEPS" :key="i"
-          class="funnel-step"
-          :class="{ 'funnel-hovered': funnelHover === i }"
-          :style="{ '--w': calcFunnelWidth(i), '--h': '52px', '--delay': (i * 80) + 'ms', '--accent': step.color || 'var(--c-primary)', '--opacity': step.opacity }"
-          @click="$router.push(step.link)"
-          @mouseenter="funnelHover = i" @mouseleave="funnelHover = -1">
-          <div class="funnel-step-content">
-            <span class="funnel-step-label">{{ step.label }}</span>
-            <span class="funnel-step-count"><b>{{ step.count }}</b></span>
-            <span class="funnel-step-pct">{{ step.pct }}</span>
+      <!-- Main: SVG viz (left) + Insight rail (right) -->
+      <div class="funnel-layout">
+        <!-- Left: SVG 2.5D Stacked Disc Cone + Helical Spiral -->
+        <div class="funnel-svg-wrap">
+          <svg viewBox="0 0 240 460" class="funnel-svg" :class="{ 'funnel-motion-ok': motionOK }">
+            <!-- Helix spiral guide line (behind discs) -->
+            <path :d="helixPath" class="funnel-helix"
+              fill="none" stroke="var(--c-primary)" stroke-width="1.2" stroke-linecap="round"
+              opacity="0.18"
+              stroke-dasharray="8 4"
+              :class="{ 'helix-flow': motionOK }" />
+            <!-- Animated particles along helix (motion only) -->
+            <template v-if="motionOK">
+              <circle r="2.5" fill="var(--c-primary)" opacity="0.55" v-for="p in 10" :key="'p'+p">
+                <animateMotion :dur="(3.5 + p * 0.6) + 's'" repeatCount="indefinite" rotate="auto">
+                  <mpath href="#funnelHelixPath" />
+                </animateMotion>
+              </circle>
+            </template>
+            <!-- Static particles (reduced-motion fallback) -->
+            <template v-else>
+              <circle v-for="(dp, pi) in staticParticles" :key="'sp'+pi"
+                :cx="dp.x" :cy="dp.y" r="2.5" fill="var(--c-primary)" opacity="0.4" />
+            </template>
+            <!-- 5 stacked isometric discs -->
+            <g v-for="(d, i) in discs" :key="'d'+i"
+              class="funnel-disc"
+              :class="{ selected: selected === i, dimmed: selected !== null && selected !== i }"
+              :style="{ '--disc-accent': d.accent }"
+              @click="selectStage(i)">
+              <!-- Side wall (front arc + two vertical edges + bottom arc) -->
+              <path :d="d.wallPath" :fill="d.accent" :opacity="d.wallOpacity" />
+              <!-- Top face ellipse -->
+              <ellipse :cx="d.cx" :cy="d.cy" :rx="d.rx" :ry="d.ry"
+                :fill="d.accent" :opacity="d.faceOpacity" />
+              <!-- Selection ring (visible on selected disc) -->
+              <ellipse v-if="selected === i" :cx="d.cx" :cy="d.cy"
+                :rx="d.rx + 4" :ry="d.ry + 1.5"
+                fill="none" stroke="var(--c-primary)" stroke-width="1.5" opacity="0.5" />
+              <!-- Stage label + count on disc face -->
+              <text :x="d.cx" :y="d.cy - 5" text-anchor="middle"
+                fill="#fff" font-size="13" font-weight="800"
+                style="font-variant-numeric:tabular-nums;text-shadow:0 1px 2px rgba(0,0,0,.25)"
+                pointer-events="none">{{ d.count }}</text>
+              <text :x="d.cx" :y="d.cy + 13" text-anchor="middle"
+                fill="#fff" font-size="9.5" font-weight="600"
+                style="text-shadow:0 1px 1px rgba(0,0,0,.2)"
+                pointer-events="none">{{ d.label }}</text>
+            </g>
+          </svg>
+        </div>
+        <!-- Right: Insight Rail -->
+        <div class="funnel-insight" :key="selected">
+          <div v-if="sel" class="insight-inner">
+            <!-- Header -->
+            <div class="insight-header">
+              <span class="insight-dot" :style="{ background: selAccent }"></span>
+              <span class="insight-label">{{ sel.label }}</span>
+              <span v-if="sel.bottleneck" class="badge-bottleneck">瓶颈</span>
+              <span v-else class="health-badge" :class="'health-'+sel.health">{{ healthLabel(sel.health) }}</span>
+            </div>
+            <!-- Core metrics row -->
+            <div class="insight-metrics">
+              <div class="insight-metric">
+                <div class="insight-metric-val">{{ sel.count }}<span class="insight-metric-unit"> 人</span></div>
+                <div class="insight-metric-sub">占 {{ sel.pct }}</div>
+              </div>
+              <div class="insight-metric" v-if="sel.conv">
+                <div class="insight-metric-val">
+                  {{ sel.conv }}
+                  <span class="wow-delta" :class="sel.wowUp ? 'up' : 'down'">
+                    <svg viewBox="0 0 10 10" style="width:8px;height:8px">
+                      <polyline v-if="sel.wowUp" points="1,7 5,2 9,7" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                      <polyline v-else points="1,3 5,8 9,3" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    {{ sel.wow }}
+                  </span>
+                </div>
+                <div class="insight-metric-sub">转化率 · WoW</div>
+              </div>
+              <div class="insight-metric">
+                <div class="insight-metric-val">{{ sel.dwell }}</div>
+                <div class="insight-metric-sub">平均停留</div>
+              </div>
+            </div>
+            <!-- 7-day sparkline -->
+            <div class="insight-spark-wrap">
+              <svg viewBox="0 0 140 32" class="insight-spark">
+                <polyline :points="sparkPath(sel.spark)" fill="none" :stroke="selAccent" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <polygon :points="sparkFillPath(sel.spark)" :fill="selAccent" opacity="0.08"/>
+              </svg>
+              <span class="insight-spark-label">过去 7 天趋势</span>
+            </div>
+            <!-- Insight note -->
+            <div class="insight-note">{{ sel.note }}</div>
+            <!-- Owner -->
+            <div class="insight-owner">
+              <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:var(--c-sub);stroke-width:2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              {{ sel.owner }}
+            </div>
+            <!-- CTA -->
+            <button class="insight-cta" @click="router.push(sel.link)">查看 {{ sel.label }} 详情 →</button>
           </div>
-          <div v-if="i < FUNNEL_STEPS.length - 1" class="funnel-conversion">
-            <svg width="12" height="8" viewBox="0 0 12 8"><path d="M6 8L0 0h12z" fill="var(--c-sub)"/></svg>
-            <span>{{ conversionRate(i) }}</span>
-          </div>
+        </div>
+      </div>
+      <!-- Bottom stepper (test contract carrier) -->
+      <div class="viz-funnel funnel-stepper">
+        <div v-for="(step, i) in FUNNEL_STEPS" :key="'step'+i"
+          class="viz-funnel-step funnel-step-chip"
+          :class="{ active: selected === i }"
+          role="link" :tabindex="0"
+          :aria-label="'跳转到 ' + step.label + ' 详情'"
+          @click="selectStage(i)"
+          @keydown.enter.space.prevent="selectStage(i)">
+          <span class="step-chip-dot" :style="{ background: accentColor(step) }"></span>
+          {{ step.label }}
+          <span class="step-chip-count">{{ step.count }}</span>
         </div>
       </div>
     </div>
@@ -118,9 +219,11 @@ const deptScope = ref('all');
 const showAlerts = ref(false);
 const deptOpen = ref(false);
 const channelOpen = ref(false);
-const funnelHover = ref(-1);
-const funnelAnimated = ref(false);
 const kpiTransforms = ref({});
+
+// Funnel: selected stage + motion preference
+const selected = ref(3); // default: bottleneck stage (Offer, index 3)
+const motionOK = ref(true);
 
 const role = localStorage.getItem('hr_role') || 'hr';
 const isInterviewerRole = role === 'interviewer' || role === 'temp_interviewer';
@@ -134,17 +237,112 @@ const kpis = computed(() => {
 const deptSummary = computed(() => DEPT_PROGRESS.map(d => d.dept + ' ' + d.hired + '/' + d.total).join(' · '));
 const channelSummary = computed(() => CHANNEL_DATA.map(c => c.channel + ' ' + c.resume).join(' · '));
 
-function calcFunnelWidth(i) {
-  const widths = ['100%', '82%', '60%', '38%', '24%'];
-  return widths[i] || '100%';
+// -- Funnel: selected stage data --
+const sel = computed(() => FUNNEL_STEPS[selected.value] || FUNNEL_STEPS[0]);
+const selAccent = computed(() => accentColor(sel.value));
+
+// -- Disc geometry (5 isometric stacked discs, top → bottom) --
+const discs = computed(() => {
+  const cx = 120;
+  const rxValues = [110, 92, 74, 56, 38];
+  const wallH = 14;
+  return FUNNEL_STEPS.map((step, i) => {
+    const rx = rxValues[i];
+    const ry = rx * 0.30;
+    const y = 66 + i * 82;
+    const accent = accentColor(step);
+    // Face opacity: range 0.45–0.95 mapped from step opacity
+    const faceOpacity = 0.45 + (step.opacity || 1) * 0.50;
+    const wallOpacity = faceOpacity * 0.58;
+    const wallTopY = y + ry;
+    const wallBotY = y + ry + wallH;
+    // Wall path: left-top → arc front of top ellipse → right-top → down → arc front of bottom ellipse → close
+    const wallPath = [
+      `M ${cx - rx} ${wallTopY}`,
+      `A ${rx} ${ry} 0 0 0 ${cx + rx} ${wallTopY}`,
+      `L ${cx + rx} ${wallBotY}`,
+      `A ${rx} ${ry * 1.05} 0 0 1 ${cx - rx} ${wallBotY}`,
+      `Z`
+    ].join(' ');
+    return { cx, rx, ry, y, accent, faceOpacity, wallOpacity, wallPath, count: step.count, label: step.label };
+  });
+});
+
+// -- Helical spiral path (weaves behind disc stack) --
+const helixPath = computed(() => {
+  const totalTurns = 3.5;
+  const points = 80;
+  const topY = 42;
+  const botY = 436;
+  const cx = 120;
+  const maxRx = 115;
+  const minRx = 32;
+  let d = '';
+  for (let i = 0; i <= points; i++) {
+    const t = i / points; // 0 → 1
+    const angle = t * totalTurns * Math.PI * 2;
+    const y = topY + t * (botY - topY);
+    const r = maxRx + t * (minRx - maxRx);
+    const x = cx + Math.cos(angle) * r;
+    const py = y + Math.sin(angle) * r * 0.30;
+    if (i === 0) d += `M ${x} ${py}`;
+    else d += ` L ${x} ${py}`;
+  }
+  return d;
+});
+
+// -- Static dot positions along helix (reduced-motion fallback) --
+const staticParticles = computed(() => {
+  const pts = [];
+  const totalTurns = 3.5;
+  const topY = 42;
+  const botY = 436;
+  const cx = 120;
+  const maxRx = 115;
+  const minRx = 32;
+  for (let p = 0; p < 8; p++) {
+    const t = p / 7;
+    const angle = t * totalTurns * Math.PI * 2;
+    const y = topY + t * (botY - topY);
+    const r = maxRx + t * (minRx - maxRx);
+    const x = cx + Math.cos(angle) * r;
+    const py = y + Math.sin(angle) * r * 0.30;
+    pts.push({ x: parseFloat(x.toFixed(1)), y: parseFloat(py.toFixed(1)) });
+  }
+  return pts;
+});
+
+// -- Sparkline helpers --
+function sparkPath(spark) {
+  if (!spark || !spark.length) return '0,16 140,16';
+  const maxV = Math.max(...spark);
+  const minV = Math.min(...spark);
+  const range = maxV - minV || 1;
+  const w = 140, h = 28, pad = 2;
+  return spark.map((v, i) => {
+    const x = pad + (i / (spark.length - 1)) * (w - pad * 2);
+    const y = pad + (1 - (v - minV) / range) * (h - pad * 2);
+    return `${parseFloat(x.toFixed(1))},${parseFloat(y.toFixed(1))}`;
+  }).join(' ');
 }
 
-function conversionRate(i) {
-  const steps = FUNNEL_STEPS;
-  if (i >= steps.length - 1) return '';
-  const cur = steps[i].count, next = steps[i + 1].count;
-  return ((next / cur) * 100).toFixed(1) + '%';
+function sparkFillPath(spark) {
+  if (!spark || !spark.length) return '0,30 140,30 140,32 0,32';
+  const pts = sparkPath(spark).split(' ').map(p => p.split(',').map(Number));
+  const last = pts[pts.length - 1];
+  const first = pts[0];
+  return `${first[0]},32 ${pts.map(p => `${p[0]},${p[1]}`).join(' ')} ${last[0]},32`;
 }
+
+// -- Utilities --
+function accentColor(step) { return step.color || 'var(--c-primary)'; }
+
+function healthLabel(h) {
+  const map = { good: '健康', watch: '关注', risk: '风险' };
+  return map[h] || h;
+}
+
+function selectStage(i) { selected.value = i; }
 
 function kpiAccent(i) {
   const colors = ['var(--c-primary)', 'var(--c-done)', 'var(--c-warn)', 'var(--c-reject)'];
@@ -185,8 +383,11 @@ function onDocClick(e) {
 }
 onMounted(() => {
   document.addEventListener('click', onDocClick);
-  // Trigger funnel entrance animation
-  setTimeout(() => { funnelAnimated.value = true; }, 100);
+  // Respect prefers-reduced-motion
+  const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  motionOK.value = !mq.matches;
+  const onChange = (e) => { motionOK.value = !e.matches; };
+  mq.addEventListener('change', onChange);
 });
 onUnmounted(() => document.removeEventListener('click', onDocClick));
 </script>
@@ -257,94 +458,277 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
 }
 .dashboard-kpi-card:hover .kpi-trend { opacity: 1; }
 
-/* Funnel — 3D isometric */
-.funnel-viz {
+/* Funnel — SVG 2.5D Stacked-Disc Cone + Helical Spiral */
+.funnel-layout {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  padding: 8px 0 0;
+}
+.funnel-svg-wrap {
+  flex: 0 0 240px;
+  min-width: 200px;
+}
+.funnel-svg {
+  width: 100%;
+  height: 440px;
+  display: block;
+}
+/* Helix flowing animation */
+.funnel-helix.helix-flow {
+  animation: helixDashFlow 2.5s linear infinite;
+}
+@keyframes helixDashFlow {
+  to { stroke-dashoffset: -24; }
+}
+/* Disc interaction */
+.funnel-disc {
+  cursor: pointer;
+  transition: opacity .25s ease;
+}
+.funnel-disc.dimmed {
+  opacity: 0.52;
+}
+.funnel-disc.selected {
+  opacity: 1;
+}
+.funnel-disc.dimmed ellipse:first-of-type,
+.funnel-disc.dimmed path:first-of-type {
+  filter: brightness(0.7);
+}
+/* Insight rail */
+.funnel-insight {
+  flex: 1;
+  min-width: 180px;
+  max-width: 340px;
+  border-left: 1px solid var(--c-border);
+  padding: 6px 0 6px 20px;
+  display: flex;
+  align-items: stretch;
+}
+.insight-inner {
+  width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0;
-  perspective: 900px;
-  padding: 20px 0;
+  gap: 12px;
+  animation: insightRailIn .25s ease;
 }
-.funnel-step {
-  position: relative;
-  width: var(--w);
-  height: var(--h);
-  margin-bottom: 6px;
-  cursor: pointer;
-  transform-style: preserve-3d;
-  opacity: 0;
-  transform: translateY(20px) rotateX(-8deg);
-  transition: opacity .4s ease var(--delay), transform .4s ease var(--delay);
+@keyframes insightRailIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
 }
-.funnel-entered .funnel-step {
-  opacity: 1;
-  transform: translateY(0) rotateX(0deg);
-}
-.funnel-step-content {
-  width: 100%;
-  height: 100%;
-  background: var(--accent);
-  opacity: var(--opacity);
-  border-radius: 6px;
+.insight-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
+  gap: 8px;
+}
+.insight-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.insight-label {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--c-text);
+}
+.badge-bottleneck {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--c-reject);
   color: #fff;
-  font-size: 14px;
-  position: relative;
-  z-index: 2;
-  transition: transform .2s ease, box-shadow .2s ease;
-  box-shadow: 0 4px 12px rgba(23,32,51,.15);
+  line-height: 16px;
 }
-.funnel-step:hover .funnel-step-content {
-  transform: translateZ(12px) scale(1.02);
-  box-shadow: 0 8px 24px rgba(23,32,51,.2);
+.health-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  line-height: 16px;
 }
-.funnel-step-label {
-  font-weight: 600;
+.health-good { background: rgba(34,197,94,0.12); color: var(--c-done); }
+.health-watch { background: rgba(245,158,11,0.12); color: var(--c-warn); }
+.health-risk { background: rgba(239,68,68,0.12); color: var(--c-reject); }
+
+.insight-metrics {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
 }
-.funnel-step-count b {
+.insight-metric {
+  flex: 1;
+  min-width: 70px;
+}
+.insight-metric-val {
   font-size: 18px;
   font-weight: 800;
+  color: var(--c-text);
   font-variant-numeric: tabular-nums;
-}
-.funnel-step-pct {
-  font-size: 12px;
-  opacity: .85;
-}
-.funnel-conversion {
-  position: absolute;
-  bottom: -14px;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
+}
+.insight-metric-unit {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--c-sub);
+}
+.insight-metric-sub {
+  font-size: 11px;
+  color: var(--c-sub);
+  margin-top: 2px;
+}
+.wow-delta {
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.wow-delta.up { color: var(--c-done); }
+.wow-delta.down { color: var(--c-reject); }
+
+.insight-spark-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.insight-spark {
+  width: 120px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.insight-spark-label {
   font-size: 10px;
   color: var(--c-sub);
-  font-weight: 600;
-  z-index: 1;
-  opacity: 0;
-  transition: opacity .3s;
 }
-.funnel-step:hover .funnel-conversion,
-.funnel-entered .funnel-conversion {
-  opacity: 1;
+.insight-note {
+  font-size: 12px;
+  color: var(--c-body);
+  line-height: 1.6;
+  padding: 8px 10px;
+  background: var(--c-bg);
+  border-radius: 6px;
+  border: 1px solid var(--c-border-light);
+}
+.insight-owner {
+  font-size: 12px;
+  color: var(--c-sub);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.insight-cta {
+  width: 100%;
+  padding: 8px 0;
+  border: 1px solid var(--c-primary);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--c-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  font-family: inherit;
+}
+.insight-cta:hover {
+  background: var(--c-primary);
+  color: #fff;
+}
+
+/* Bottom stepper */
+.funnel-stepper {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  padding: 16px 0 4px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--c-border-light);
+  margin-top: 8px;
+}
+.viz-funnel-step.funnel-step-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--c-border);
+  background: var(--c-card);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c-body);
+  transition: all .18s ease;
+  white-space: nowrap;
+}
+.viz-funnel-step.funnel-step-chip:hover,
+.viz-funnel-step.funnel-step-chip.active {
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+  background: rgba(79,110,247,0.06);
+}
+.viz-funnel-step.funnel-step-chip.active {
+  font-weight: 700;
+}
+.step-chip-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.step-chip-count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text);
 }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .dashboard-kpi-card,
-  .funnel-step,
-  .funnel-step-content {
+  .dashboard-kpi-card {
     transition: none !important;
     transform: none !important;
   }
-  .funnel-entered .funnel-step {
-    opacity: 1;
-    transform: none;
+  .funnel-disc {
+    transition: none !important;
+  }
+  .funnel-helix.helix-flow {
+    animation: none !important;
+  }
+  .insight-inner {
+    animation: none !important;
+  }
+  .funnel-step-chip {
+    transition: none !important;
+  }
+}
+
+/* Mobile: stack vertically */
+@media (max-width: 680px) {
+  .funnel-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+  .funnel-svg-wrap {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 280px;
+  }
+  .funnel-svg {
+    height: 360px;
+  }
+  .funnel-insight {
+    max-width: none;
+    border-left: none;
+    border-top: 1px solid var(--c-border);
+    padding: 14px 0 0;
+  }
+  .funnel-stepper {
+    gap: 6px;
+  }
+  .viz-funnel-step.funnel-step-chip {
+    padding: 4px 10px;
+    font-size: 11px;
   }
 }
 </style>

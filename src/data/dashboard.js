@@ -22,12 +22,39 @@ export const KPI_SETS = {
   ]
 };
 
+// 招聘全漏斗 — 每个阶段带经营判断字段（转化、环比、停留、健康度、趋势、负责人、洞察）
+// conv = 从上一阶段进入本阶段的转化率；入口阶段为 null
 export const FUNNEL_STEPS = [
-  { label: '收简历', count: 346, pct: '100%', link: '/recruit-talent', opacity: 1 },
-  { label: '筛选通过', count: 89, pct: '25.7%', link: '/recruit-demand', opacity: 0.85 },
-  { label: '面试', count: 42, pct: '12.1%', link: '/recruit-interview', opacity: 0.72 },
-  { label: 'Offer', count: 8, pct: '2.3%', link: '/recruit-interview', opacity: 0.58 },
-  { label: '入职', count: 5, pct: '1.4%', link: '/recruit-demand', opacity: 1, color: 'var(--c-done)' }
+  {
+    label: '收简历', count: 346, pct: '100%', link: '/recruit-talent', opacity: 1,
+    conv: null, wow: '+8.4%', wowUp: true, dwell: '1.2d', health: 'good',
+    owner: 'HR 团队', spark: [38, 42, 51, 47, 55, 60, 53],
+    note: '本月入口流量稳定，邮箱采集与内推贡献最高，简历池充足。'
+  },
+  {
+    label: '筛选通过', count: 89, pct: '25.7%', link: '/recruit-demand', opacity: 0.86,
+    conv: '25.7%', wow: '+2.1%', wowUp: true, dwell: '2.4d', health: 'good',
+    owner: '用人部门 · HR', spark: [12, 10, 14, 11, 13, 15, 14],
+    note: '筛选通过率 25.7%，可继续优化 JD 精准度，减少无效投递。'
+  },
+  {
+    label: '面试', count: 42, pct: '12.1%', link: '/recruit-interview', opacity: 0.72,
+    conv: '47.2%', wow: '-6.3%', wowUp: false, dwell: '3.6d', health: 'watch',
+    owner: '面试官团队', spark: [7, 6, 5, 6, 5, 7, 6],
+    note: '面试排期充足，重点关注面试到 Offer 的转化质量与评估一致性。'
+  },
+  {
+    label: 'Offer', count: 8, pct: '2.3%', link: '/recruit-interview', opacity: 0.58,
+    conv: '19.0%', wow: '-4.5%', wowUp: false, dwell: '2.1d', health: 'risk', bottleneck: true,
+    owner: 'HR · 用人经理', spark: [1, 2, 1, 1, 2, 1, 0],
+    note: '面试→Offer 转化仅 19.0%，为当前最大瓶颈，建议复盘评估口径与决策时效。'
+  },
+  {
+    label: '入职', count: 5, pct: '1.4%', link: '/recruit-demand', opacity: 1, color: 'var(--c-done)',
+    conv: '62.5%', wow: '+0.4%', wowUp: true, dwell: '5.0d', health: 'good',
+    owner: 'HR 团队', spark: [1, 0, 1, 1, 1, 0, 1],
+    note: 'Offer 到入职转化健康，保持 offer 后跟进与入职关怀节奏。'
+  }
 ];
 
 export const DEPT_PROGRESS = [
