@@ -375,7 +375,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import BossIntegration from '../components/BossIntegration.vue';
@@ -404,6 +404,11 @@ function showToast(text) {
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => { toast.show = false; }, 2000);
 }
+onBeforeUnmount(() => { clearTimeout(toast.timer); });
+
+// Watch: clear error on input change so deadlock is broken
+watch(() => jdForm.requirements, () => { if (jdError.value) jdError.value = ''; });
+watch(searchQuery, () => { if (searchError.value) { searchError.value = ''; searchAttempted.value = false; } });
 
 // --- Tab 1: JD ---
 const levels = ['初级', '中级', '高级', '资深', '专家'];
@@ -417,8 +422,8 @@ const jdStatus = computed(() => jdLoading.value ? 'submitted' : (jdError.value ?
 async function generateJd() {
   if (!jdForm.position || !jdForm.department) return;
   jdError.value = ''; jdLoading.value = true;
-  try { jdResult.value = await runJdGenerate({ ...jdForm }); }
-  catch (e) { jdError.value = e.message || '生成失败，请重试'; }
+  try { jdResult.value = await runJdGenerate({ ...jdForm }); showToast('JD 草稿生成完成'); }
+  catch (e) { jdError.value = e.message || '生成失败，请重试'; showToast(jdError.value); }
   finally { jdLoading.value = false; }
 }
 

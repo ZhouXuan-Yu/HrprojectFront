@@ -131,7 +131,7 @@ defineProps({
   border-top-right-radius: var(--radius-sm, 6px);
 }
 [data-slot="chat-message"][data-status="error"] [data-slot="chat-message-bubble"] {
-  background: #FEF2F2;
+  background: var(--c-error-subtle, #FEF2F2);
 }
 
 /* Error */
