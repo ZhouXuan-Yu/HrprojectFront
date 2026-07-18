@@ -290,7 +290,7 @@ const checkedIntCount = computed(() => Object.keys(checkedInt).filter(k => check
 
 // External filtering
 const extFiltered = computed(() => {
-  let list = EXT_DATA.filter(c => {
+  let list = EXT_DATA_SOURCE.value.filter(c => {
     if (extFilters.status !== 'all' && c.status !== extFilters.status) return false;
     if (extFilters.source !== 'all') {
       const m = { mail: '邮箱', boss: 'Boss', liepin: '猎聘', refer: '内推', upload: '手动上传' };
@@ -339,7 +339,7 @@ function clearSelectionExt() {
   try { document.getElementById('checkAllExt').checked = false; } catch(e) {}
 }
 function toggleAllInt(e) {
-  INT_DATA.forEach(e2 => { checkedInt[e2.id] = e.target.checked; });
+  INT_DATA_SOURCE.value.forEach(e2 => { checkedInt[e2.id] = e.target.checked; });
 }
 function onCheckInt() {}
 function clearSelectionInt() {
@@ -352,14 +352,14 @@ function renderExt() {}
 function openNote(id, name) {
   currentNoteId.value = id; currentNoteType.value = 'ext';
   noteTarget.value = name;
-  const c = EXT_DATA.find(x => x.id === id);
+  const c = EXT_DATA_SOURCE.value.find(x => x.id === id);
   noteText.value = c ? c.note : '';
   showNoteModal.value = true;
 }
 function openIntNote(id, name) {
   currentNoteId.value = id; currentNoteType.value = 'int';
   noteTarget.value = name;
-  const e = INT_DATA.find(x => x.id === id);
+  const e = INT_DATA_SOURCE.value.find(x => x.id === id);
   noteText.value = e ? e.note : '';
   showNoteModal.value = true;
 }
@@ -431,12 +431,6 @@ onMounted(() => {
 });
 onUnmounted(() => document.removeEventListener('click', onDocClick));
 
-async function loadFromApi() {
-  try {
-    const res = await fetchTalent({ tab: activeTab.value });
-    // API data loaded — page already uses reactive fallback
-  } catch (e) { console.warn('[Talent] API fallback:', e.message); }
-}
 </script>
 
 <style scoped>
