@@ -35,6 +35,14 @@
       </div>
     </div>
 
+    <!-- Summary stats row -->
+    <div class="metric-row" style="margin-bottom:12px">
+      <div v-for="stat in summaryStats" :key="stat.key" class="metric-card">
+        <div class="metric-icon" v-html="stat.icon"></div>
+        <div><div class="metric-value">{{ stat.value }}</div><div class="metric-label">{{ stat.label }}</div></div>
+      </div>
+    </div>
+
     <!-- Tabs -->
     <div class="tabs" role="tablist">
       <button v-for="tab in visibleTabs" :key="tab.id"
@@ -190,7 +198,26 @@ const kpis = computed(() => {
     { key:'evaluating', value: count('evaluating'), label:'待评价', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' },
     { key:'offer', value: count('offer'), label:'待录用', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="20 6 9 17 4 12"/></svg>' },
     { key:'onboard', value: count('onboard'), label:'待入职', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' },
-    { key:'done', value: count('done'), label:'已入职', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M20 6L9 17l-5-5"/></svg>' },
+    { key:'done', value: count('done'), label:'已完成', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M20 6L9 17l-5-5"/></svg>' },
+  ];
+});
+
+// Summary stats — 平均时长/评分/通过率 derived from INTERVIEWS_SOURCE (API-first, mock fallback)
+const summaryStats = computed(() => {
+  const source = INTERVIEWS_SOURCE.value;
+  const scored = source.filter(i => i.score != null);
+  const timed = source.filter(i => i.duration != null);
+  const done = source.filter(i => i.status === 'done');
+  const passed = done.filter(i => i.result === 'pass');
+
+  const avgScore = scored.length > 0 ? (scored.reduce((s, i) => s + i.score, 0) / scored.length).toFixed(1) : '--';
+  const avgDuration = timed.length > 0 ? Math.round(timed.reduce((s, i) => s + i.duration, 0) / timed.length) + ' min' : '--';
+  const passRate = done.length > 0 ? Math.round((passed.length / done.length) * 100) + '%' : '--';
+
+  return [
+    { key:'avgScore', value: avgScore, label:'平均评分', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' },
+    { key:'avgDuration', value: avgDuration, label:'平均时长', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
+    { key:'passRate', value: passRate, label:'通过率', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>' },
   ];
 });
 

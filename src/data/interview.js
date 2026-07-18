@@ -14,13 +14,13 @@ export const ALL_INTERVIEWS = [
   {name:'王工', position:'高级Java工程师', round:'内部面试', interviewer:'刘博', date:'07-20', time:'09:00', method:'飞书视频', status:'scheduled', statusLabel:'待面试', createdBy:'刘博', isMine:false},
   {name:'李四', position:'前端工程师', round:'复试(2/2轮)', interviewer:'王面试官', date:'07-25', time:'15:00', method:'飞书视频', status:'scheduled', statusLabel:'待面试', createdBy:'张HR', isMine:false},
   {name:'周明', position:'高级Java工程师', round:'初试(1/3轮)', interviewer:'李面试官', date:'07-21', time:'13:00', method:'现场', status:'scheduled', statusLabel:'待面试', createdBy:'刘博', isMine:false},
-  {name:'孙九', position:'高级Java工程师', round:'复试(2/3轮)', interviewer:'张HR', date:'07-13', time:'10:00', method:'现场', status:'evaluating', statusLabel:'待评价', createdBy:'张HR', isMine:true},
-  {name:'陈二', position:'产品经理', round:'初试(2/2轮)', interviewer:'张HR', date:'07-14', time:'09:00', method:'电话', status:'evaluating', statusLabel:'待评价', createdBy:'张HR', isMine:true},
-  {name:'吴六', position:'运营总监', round:'初试(1/3轮)', interviewer:'刘博', date:'07-12', time:'11:00', method:'飞书视频', status:'evaluating', statusLabel:'待评价', createdBy:'刘博', isMine:false},
+  {name:'孙九', position:'高级Java工程师', round:'复试(2/3轮)', interviewer:'张HR', date:'07-13', time:'10:00', method:'现场', status:'evaluating', statusLabel:'待评价', createdBy:'张HR', isMine:true, score:82, duration:45},
+  {name:'陈二', position:'产品经理', round:'初试(2/2轮)', interviewer:'张HR', date:'07-14', time:'09:00', method:'电话', status:'evaluating', statusLabel:'待评价', createdBy:'张HR', isMine:true, score:75, duration:30},
+  {name:'吴六', position:'运营总监', round:'初试(1/3轮)', interviewer:'刘博', date:'07-12', time:'11:00', method:'飞书视频', status:'evaluating', statusLabel:'待评价', createdBy:'刘博', isMine:false, score:68, duration:50},
   {name:'郑一', position:'前端工程师', round:'终面(2/2轮)', interviewer:'王面试官', date:'07-12', time:'15:00', method:'现场', status:'offer', statusLabel:'待录用', createdBy:'王面试官', isMine:false},
   {name:'王五', position:'数据分析师', round:'Offer确认', interviewer:'张HR', date:'07-26', time:'09:30', method:'飞书消息', status:'onboard', statusLabel:'待入职', createdBy:'张HR', isMine:true},
-  {name:'周工', position:'产品经理', round:'初试(1/2轮)', interviewer:'张HR', date:'07-05', time:'10:00', method:'现场', status:'done', statusLabel:'已入职', createdBy:'张HR', isMine:true},
-  {name:'陈二', position:'产品经理', round:'初试(1/2轮)', interviewer:'张HR', date:'07-10', time:'09:00', method:'电话', status:'done', statusLabel:'已入职', createdBy:'张HR', isMine:true, result:'reject'}
+  {name:'周工', position:'产品经理', round:'初试(1/2轮)', interviewer:'张HR', date:'07-05', time:'10:00', method:'现场', status:'done', statusLabel:'已入职', createdBy:'张HR', isMine:true, result:'pass', score:88, duration:40},
+  {name:'陈二', position:'产品经理', round:'初试(1/2轮)', interviewer:'张HR', date:'07-10', time:'09:00', method:'电话', status:'done', statusLabel:'已入职', createdBy:'张HR', isMine:true, result:'reject', score:55, duration:35}
 ];
 
 export const STATUSES = ['all','pending','scheduled','evaluating','offer','onboard','done'];

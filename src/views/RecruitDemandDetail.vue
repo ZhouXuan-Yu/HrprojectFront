@@ -157,8 +157,8 @@ const filteredCandidates = computed(() => {
     if (filters.status !== 'all' && c.status !== filters.status) return false;
     const ageVal = parseInt(filters.age) || 9999;
     if (ageVal < 9999 && c.ageDays > ageVal) return false;
-    if (filters.edu !== 'all' && meta.edu !== filters.edu) return false;
-    if (filters.years !== 'all' && meta.years !== filters.years) return false;
+    if (filters.edu !== 'all' && edu !== filters.edu) return false;
+    if (filters.years !== 'all' && years !== filters.years) return false;
     if (filters.keyword && c.name.indexOf(filters.keyword) < 0) return false;
     return true;
   });
