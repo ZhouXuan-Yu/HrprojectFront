@@ -69,13 +69,29 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { AI_TABS, AI_PANELS, EMBEDDED_AI } from '../data/ai.js';
+import { fetchAiCapabilities } from '../api/config.js';
 
 const tabs = AI_TABS;
 const activeTab = ref('chat');
 const embeddedAI = EMBEDDED_AI;
+
+const embeddedAI = ref(EMBEDDED_AI);
+
+async function loadFromApi() {
+  try {
+    const apiCapabilities = await fetchAiCapabilities();
+    if (apiCapabilities && apiCapabilities.length) {
+      embeddedAI.value = apiCapabilities;
+    }
+  } catch (e) {
+    console.warn('API fallback to mock:', e.message);
+  }
+}
+
+onMounted(() => { loadFromApi(); });
 
 const currentPanel = computed(() => AI_PANELS[activeTab.value] || AI_PANELS['chat']);
 

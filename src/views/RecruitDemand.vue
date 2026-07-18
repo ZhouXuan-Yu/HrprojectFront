@@ -175,6 +175,10 @@ function goDetail(){ router.push('/recruit-demand-detail'); }
 function approveDemand(id){ alert('审批通过：' + id); }
 function moreOps(id){ alert('更多操作：' + id); }
 function alert(msg){ window.alert(msg); }
+
+onMounted(() => {
+  loadFromApi();
+});
 </script>
 
 <style scoped>

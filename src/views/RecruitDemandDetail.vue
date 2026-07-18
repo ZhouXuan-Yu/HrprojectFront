@@ -126,11 +126,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { DEMAND_INFO, ALL_CANDIDATES, CANDIDATE_META } from '../data/demand-detail.js';
+import { fetchDemandDetail, fetchDemandCandidates } from '../api/demand.js';
 
-const info = DEMAND_INFO;
+const info = ref(DEMAND_INFO);
 const candidates = ref([...ALL_CANDIDATES]);
 
 const checkedSet = reactive({});
