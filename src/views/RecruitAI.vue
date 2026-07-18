@@ -200,6 +200,7 @@ function focusNextTab() {
   .tabs {
     flex-wrap: wrap;
     gap: 4px;
+    border-bottom-width: 1px;
   }
   .tab {
     font-size: 12px;
@@ -211,6 +212,9 @@ function focusNextTab() {
   .permission-bar {
     padding: 8px 12px;
     font-size: 11px;
+  }
+  .table-wrap {
+    overflow-x: auto;
   }
 }
 </style>

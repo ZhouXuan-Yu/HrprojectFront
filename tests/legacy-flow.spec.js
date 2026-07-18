@@ -192,6 +192,9 @@ test('core data components expose density, sorting, reset, KPI context, and dial
   await page.getByRole('button', { name: '+ 新建需求' }).click();
   await expect(page.locator('#demandModal .modal-box')).toHaveAttribute('role', 'dialog');
   await expect(page.locator('#demandModal .modal-box')).toHaveAttribute('aria-modal', 'true');
+  // Close modal via cancel button or overlay click
+  await page.locator('#demandModal .modal-box button:has-text("取消")').click();
+  await expect(page.locator('#demandModal')).not.toBeVisible();
 });
 
 test('demand list supports filtering and create modal', async ({ page }) => {

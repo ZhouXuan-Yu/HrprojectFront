@@ -1,5 +1,6 @@
 <template>
   <div
+    role="article"
     data-slot="chat-message"
     :data-role="role"
     :data-status="status"
@@ -165,5 +166,28 @@ defineProps({
   gap: 6px;
   margin-top: 6px;
   padding: 0 4px;
+}
+
+/* ===== Mobile (≤768px) ===== */
+@media (max-width: 768px) {
+  [data-slot="chat-message"] {
+    gap: 8px;
+    padding: 10px 0;
+  }
+  [data-slot="chat-message-avatar"] {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+  [data-slot="chat-message-bubble"] {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="chat-message-shimmer"] {
+    animation: none;
+  }
 }
 </style>
