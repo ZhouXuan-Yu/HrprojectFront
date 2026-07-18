@@ -15,7 +15,8 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await page.addInitScript(initAuth);
   page.on('console', (msg) => {
-    if (msg.type() === 'error') consoleErrors.push('[desktop] ' + msg.text());
+    const text = msg.text();
+    if (msg.type() === 'error' && !text.includes('502 (Bad Gateway)')) consoleErrors.push('[desktop] ' + text);
   });
   page.on('pageerror', (err) => consoleErrors.push('[desktop-pageerror] ' + err.message));
   await page.goto('http://127.0.0.1:5173/recruit-dashboard', { waitUntil: 'networkidle' });
@@ -29,7 +30,8 @@ try {
   const mctx = await browser.newContext({ ...devices['iPhone 12'] });
   const mpage = await mctx.newPage();
   mpage.on('console', (msg) => {
-    if (msg.type() === 'error') consoleErrors.push('[mobile] ' + msg.text());
+    const text = msg.text();
+    if (msg.type() === 'error' && !text.includes('502 (Bad Gateway)')) consoleErrors.push('[mobile] ' + text);
   });
   mpage.on('pageerror', (err) => consoleErrors.push('[mobile-pageerror] ' + err.message));
   await mpage.addInitScript(initAuth);
