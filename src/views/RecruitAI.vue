@@ -152,7 +152,7 @@
             :status="searchStatus"
             :disabled="!searchQuery.trim()"
             placeholder="描述你想要的候选人，例如：5年Java 大厂背景 做过微服务架构 熟悉K8s..."
-            hint="Ctrl+Enter 快速搜索"
+            hint="Enter 快速搜索"
             layout="compact"
             aria-label="搜索描述"
             @submit="searchResume"
@@ -162,7 +162,7 @@
     </div>
 
     <!-- ============ Tab 3: 人岗匹配 ============ -->
-    <div class="tab-panel" :class="{ active: activeTab === 'match' }" role="tabpanel" aria-label="人岗匹配工作台">
+    <div class="tab-panel" :class="{ active: activeTab === 'match' }" role="tabpanel" aria-labelledby="tab-btn-match" aria-label="人岗匹配工作台">
       <div data-slot="ai-workspace">
         <div data-slot="ai-conversation">
           <AiChatMessage role="ai" status="complete">
@@ -214,7 +214,7 @@
     </div>
 
     <!-- ============ Tab 4: 面试辅助 ============ -->
-    <div class="tab-panel" :class="{ active: activeTab === 'interview' }" role="tabpanel" aria-label="面试辅助">
+    <div class="tab-panel" :class="{ active: activeTab === 'interview' }" role="tabpanel" aria-labelledby="tab-btn-interview" aria-label="面试辅助">
       <div data-slot="ai-workspace">
         <div data-slot="ai-conversation">
           <AiChatMessage role="ai" status="complete">
@@ -266,7 +266,7 @@
     </div>
 
     <!-- ============ Tab 5: 招聘深度报表 ============ -->
-    <div class="tab-panel" :class="{ active: activeTab === 'report' }" role="tabpanel" aria-label="招聘深度报表">
+    <div class="tab-panel" :class="{ active: activeTab === 'report' }" role="tabpanel" aria-labelledby="tab-btn-report" aria-label="招聘深度报表">
       <div data-slot="ai-workspace">
         <div data-slot="ai-conversation">
           <AiChatMessage role="ai" status="complete">
@@ -301,7 +301,7 @@
     </div>
 
     <!-- ============ Tab 6: 候选人沟通助手 ============ -->
-    <div class="tab-panel" :class="{ active: activeTab === 'chat' }" role="tabpanel" aria-label="候选人沟通助手">
+    <div class="tab-panel" :class="{ active: activeTab === 'chat' }" role="tabpanel" aria-labelledby="tab-btn-chat" aria-label="候选人沟通助手">
       <div data-slot="ai-workspace">
         <div data-slot="ai-conversation">
           <AiChatMessage role="ai" status="complete">
