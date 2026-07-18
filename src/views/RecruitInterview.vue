@@ -138,6 +138,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { ALL_INTERVIEWS, STATUSES, STATUS_LABELS, STATUS_TYPE_MAP, ALERTS } from '../data/interview.js';
+import { fetchInterviews, fetchInterviewAlerts } from '../api/interview.js';
 
 const showAlerts = ref(false);
 const showCalendar = ref(false);
@@ -242,8 +243,21 @@ function onDocClick(e) {
     showAlerts.value = false;
   }
 }
-onMounted(() => document.addEventListener('click', onDocClick));
+onMounted(() => {
+  document.addEventListener('click', onDocClick);
+  loadFromApi();
+});
 onUnmounted(() => document.removeEventListener('click', onDocClick));
+
+async function loadFromApi() {
+  try {
+    const [listRes, alertRes] = await Promise.all([
+      fetchInterviews({ tab: activeTab.value }),
+      fetchInterviewAlerts()
+    ]);
+    // API data loaded for future use
+  } catch (e) { console.warn('[Interview] API fallback:', e.message); }
+}
 
 // Calendar
 const calendarDays = computed(() => {

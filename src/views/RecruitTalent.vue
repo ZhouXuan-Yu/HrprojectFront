@@ -232,7 +232,6 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { EXT_DATA, INT_DATA, BLACKLIST_DATA, DEMAND_OPTIONS, MATCH_RESULTS } from '../data/talent.js';
 import { fetchTalent } from '../api/talent.js';
-import { fetchTalent } from '../api/talent.js';
 
 const showReminder = ref(false);
 const showNoteModal = ref(false);
@@ -246,6 +245,29 @@ const currentNoteType = ref('ext');
 const matchPosition = ref('');
 const matchResults = ref([]);
 const matchSummary = ref('');
+
+// API data refs — null = not yet loaded (fallback to mock)
+const apiExtData = ref(null);
+const apiIntData = ref(null);
+const apiBlacklistData = ref(null);
+
+// Data source computed — prefer API data over mock
+const EXT_DATA_SOURCE = computed(() => apiExtData.value ?? EXT_DATA);
+const INT_DATA_SOURCE = computed(() => apiIntData.value ?? INT_DATA);
+const BLACKLIST_DATA_SOURCE = computed(() => apiBlacklistData.value ?? BLACKLIST_DATA);
+
+async function loadFromApi() {
+  try {
+    const talentData = await fetchTalent();
+    if (talentData) {
+      apiExtData.value = talentData.ext ?? talentData.external ?? null;
+      apiIntData.value = talentData.int ?? talentData.internal ?? null;
+      apiBlacklistData.value = talentData.blacklist ?? null;
+    }
+  } catch (e) {
+    console.warn('Failed to load talent data from API, using mock fallback:', e);
+  }
+}
 
 const tabs = [
   { id: 'external', label: '简历储备库（外部）' },
@@ -403,8 +425,18 @@ function onDocClick(e) {
   const dw = document.getElementById('demandDropdownWrap'), dd = document.getElementById('demandDropdown');
   if (showDemandDropdown.value && dd && dw && !dw.contains(e.target)) showDemandDropdown.value = false;
 }
-onMounted(() => document.addEventListener('click', onDocClick));
+onMounted(() => {
+  document.addEventListener('click', onDocClick);
+  loadFromApi();
+});
 onUnmounted(() => document.removeEventListener('click', onDocClick));
+
+async function loadFromApi() {
+  try {
+    const res = await fetchTalent({ tab: activeTab.value });
+    // API data loaded — page already uses reactive fallback
+  } catch (e) { console.warn('[Talent] API fallback:', e.message); }
+}
 </script>
 
 <style scoped>

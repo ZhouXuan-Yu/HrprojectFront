@@ -409,25 +409,24 @@ function updateDiscs(now) {
       const local = Math.min(1, Math.max(0, (el - order * 140) / 850));
       d.reveal = easeOutCubic(local);
     });
-    pillars.forEach((p, i) => {
-      const order = pillars.length - 1 - i;
-      const local = Math.min(1, Math.max(0, (el - order * 140 - 200) / 850));
-      p.reveal = easeOutCubic(local);
+    coneFillers.forEach((f, i) => {
+      const order = coneFillers.length - 1 - i;
+      const local = Math.min(1, Math.max(0, (el - order * 140 - 100) / 850));
+      f.reveal = easeOutCubic(local);
     });
   }
   discs.forEach((d, i) => {
     const isSel = i === selected.value;
-    d.lift += ((isSel ? 0.24 : 0) - d.lift) * 0.07;
-    d.mat.emissiveIntensity += ((isSel ? 0.65 : 0.15) - d.mat.emissiveIntensity) * 0.08;
+    d.lift += ((isSel ? 0.18 : 0) - d.lift) * 0.07;
+    d.mat.emissiveIntensity += ((isSel ? 0.55 : 0.12) - d.mat.emissiveIntensity) * 0.08;
     d.ringMat.opacity += (0 - d.ringMat.opacity) * 0.1; // selection ring hidden
-    d.glowMat.opacity += ((isSel ? 0.75 : 0.28) - d.glowMat.opacity) * 0.08;
     const rv = d.reveal;
     d.mesh.position.y = d.baseY - (1 - rv) * 1.4 + d.lift;
     d.mesh.scale.setScalar(0.55 + 0.45 * rv);
-    d.mat.opacity = 0.68 * rv;
+    d.mat.opacity = 0.72 * rv;
   });
-  pillars.forEach((p) => {
-    p.mat.opacity = 0.45 * p.reveal;
+  coneFillers.forEach((f) => {
+    f.mat.opacity = 0.18 * f.reveal;
   });
 }
 
@@ -457,7 +456,7 @@ function updateHUD() {
     hudVec.project(camera);
     const ex = (hudVec.x * 0.5 + 0.5) * w;
     const ey = (-hudVec.y * 0.5 + 0.5) * h;
-    const ax = side < 0 ? 118 : w - 118;
+    const ax = side < 0 ? 72 : w - 72;
     chip.style.top = cy + 'px';
     line.setAttribute('x1', ax);
     line.setAttribute('y1', cy);
