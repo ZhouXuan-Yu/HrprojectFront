@@ -4,7 +4,22 @@ import { api } from './index.js';
 export async function fetchDemands(params = {}) {
   const qs = new URLSearchParams(params).toString();
   const r = await api.get(`/demand/list${qs ? '?' + qs : ''}`);
-  return { data: r.data.items, total: r.data.total };
+  return { data: r.data, total: r.total || 0 };
+}
+
+export async function submitForApproval(demandId) {
+  const r = await api.post(`/demand/${demandId}/submit`);
+  return r.data;
+}
+
+export async function approveDemandApi(demandId, data) {
+  const r = await api.post(`/demand/${demandId}/approve`, data);
+  return r.data;
+}
+
+export async function rejectDemandApi(demandId, data) {
+  const r = await api.post(`/demand/${demandId}/reject`, data);
+  return r.data;
 }
 
 export async function fetchDemandDetail(id) {

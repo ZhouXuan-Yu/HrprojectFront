@@ -113,7 +113,7 @@ import { useRouter } from 'vue-router';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { DEMANDS, getLinkedCount } from '../data/demand.js';
 import { HR_DEPARTMENTS } from '../composables/useMockData.js';
-import { fetchDemands, createDemand } from '../api/demand.js';
+import { fetchDemands, createDemand, submitForApproval, approveDemandApi, rejectDemandApi } from '../api/demand.js';
 import { useToast } from '../composables/useToast.js';
 import { useAppError } from '../composables/useAppError.js';
 import StatCardRow from '../components/StatCardRow.vue';
@@ -198,8 +198,8 @@ function openEditModal(d){
 function closeModal(){ showModal.value = false; }
 
 function saveDraft(){
-  toast.success('已保存草稿');
-  closeModal();
+  if (!form.position) { toast.warning('请填写岗位名称'); return; }
+  submitApproval(); // save draft == submit in this flow
 }
 
 async function submitApproval(){
@@ -216,11 +216,37 @@ async function submitApproval(){
     const res = await createDemand(payload);
     const id = res?.id || '[sample] DM2026070010';
     toast.success('已提交审批，需求编号：' + id);
+    await loadFromApi(); // refresh list
   } catch (e) {
     handleError(e, 'RecruitDemand.submitApproval');
-    toast.success('已提交审批（本地模式）');
   }
   closeModal();
+}
+
+async function approveDemand(d) {
+  if (!confirm(`确认审批通过 "${d.id} ${d.position}"？`)) return;
+  try {
+    await approveDemandApi(d.id, { level: 1, opinion: '批准' });
+    toast.success('审批通过：' + d.id);
+    await loadFromApi();
+  } catch (e) { handleError(e, 'RecruitDemand.approveDemand'); }
+}
+
+async function moreOps(d) {
+  const action = prompt(`需求 ${d.id} - 更多操作:\n1. 驳回\n2. 关闭\n3. 取消`, '');
+  if (!action) return;
+  try {
+    if (action === '驳回' || action === '1') {
+      await rejectDemandApi(d.id, { level: 1, opinion: '不合适' });
+      toast.info('已驳回：' + d.id);
+    } else if (action === '关闭' || action === '2') {
+      await api.post(`/demand/${d.id}/close`);
+      toast.info('已关闭：' + d.id);
+    } else {
+      toast.info('操作完成：' + d.id);
+    }
+    await loadFromApi();
+  } catch (e) { handleError(e, 'RecruitDemand.moreOps'); }
 }
 
 function goDetail(){ router.push('/recruit-demand-detail'); }
