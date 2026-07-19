@@ -3,7 +3,8 @@ import { api } from './index.js';
 
 export async function fetchInterviews(params = {}) {
   const qs = new URLSearchParams(params).toString();
-  return await api.get(`/interview/list${qs ? '?' + qs : ''}`);
+  const r = await api.get(`/interview/list${qs ? '?' + qs : ''}`);
+  return r.data.items;
 }
 
 export async function fetchInterviewAlerts() {
