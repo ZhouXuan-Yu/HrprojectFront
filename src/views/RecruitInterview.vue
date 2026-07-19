@@ -25,17 +25,20 @@
       </button>
     </template>
 
-    <!-- Pipeline status chips — compact filter for list tab -->
-    <div data-slot="iv-pipeline-row">
-      <button v-for="kpi in kpis" :key="kpi.key"
-        data-slot="iv-pipeline-chip"
-        :data-active="listStatus === kpi.key"
-        @click="listStatus = listStatus === kpi.key ? 'all' : kpi.key"
-      >
-        <i class="iv-dot" :style="{ background: stageColor(kpi.key) }"></i>
-        <span data-slot="iv-pipeline-label">{{ kpi.label }}</span>
-        <span data-slot="iv-pipeline-val">{{ kpi.value }}</span>
-      </button>
+    <!-- Pipeline status stat-cards — clickable filter, talent-library style -->
+    <div class="iv-stat-row">
+      <article v-for="kpi in kpis" :key="kpi.key"
+        class="hero-summary-card iv-stat-card"
+        :class="{ 'is-active': listStatus === kpi.key }"
+        role="button" tabindex="0"
+        :aria-label="kpi.label + '，' + kpi.value + ' 项，点击筛选'"
+        @click="toggleStatus(kpi.key)"
+        @keydown.enter.space.prevent="toggleStatus(kpi.key)">
+        <span>{{ kpi.label }}</span>
+        <strong>{{ kpi.value }}</strong>
+        <em>{{ stageHint(kpi.key) }}</em>
+        <i class="iv-stat-icon" v-html="stageIcon(kpi.key)"></i>
+      </article>
     </div>
     <!-- Block hero-page-summary (redundant "当前筛选范围" label) — let hero-page-command/workspace inject from app.js -->
     <section class="hero-page-summary" style="display:none" aria-hidden="true"></section>
@@ -177,16 +180,28 @@ const kpis = computed(() => {
   ];
 });
 
-// 各阶段状态点配色（柔和克制，与企业后台蓝色系协调）
-const STAGE_COLORS = {
-  pending: '#F59E0B',
-  scheduled: '#4F6EF7',
-  evaluating: '#8B5CF6',
-  offer: '#6366F1',
-  onboard: '#14B8A6',
-  done: '#22A06B',
+// 各阶段图标（统一蓝色线性图标，见 components/kpiIcons.js）与副标题
+const STAGE_ICONS = {
+  pending: KPI_ICONS.clock,
+  scheduled: KPI_ICONS.calendar,
+  evaluating: KPI_ICONS.edit,
+  offer: KPI_ICONS.check,
+  onboard: KPI_ICONS.userCheck,
+  done: KPI_ICONS.checkSquare,
 };
-function stageColor(key) { return STAGE_COLORS[key] || '#4F6EF7'; }
+function stageIcon(key) { return STAGE_ICONS[key] || KPI_ICONS.clock; }
+
+const STAGE_HINTS = {
+  pending: '待协调时间',
+  scheduled: '流程进行中',
+  evaluating: '反馈待回收',
+  offer: 'Offer 审批中',
+  onboard: '入职跟进中',
+  done: '本期已闭环',
+};
+function stageHint(key) { return STAGE_HINTS[key] || ''; }
+
+function toggleStatus(key) { listStatus.value = listStatus.value === key ? 'all' : key; }
 
 const filteredList = computed(() => {
   return INTERVIEWS_SOURCE.value.filter(item => {
@@ -210,7 +225,7 @@ function renderActions(item) {
     case 'pending':
       return resumeBtn + ' <button class="btn btn-primary btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:schedule\',{detail:\'' + item.name + '|' + item.position + '\'}))">发起面试</button>';
     case 'scheduled':
-      return resumeBtn + ' <button class="btn btn-text-danger btn-sm" onclick="window.alert(\'取消面试：' + item.name + '\')">取消</button>';
+      return resumeBtn + ' <button class="btn btn-text-danger btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:cancel\',{detail:\'' + item.name + '\'}))">取消</button>';
     case 'evaluating':
       return resumeBtn + ' <button class="btn btn-primary btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:evaluate\',{detail:\'' + item.name + '\'}))">填评价</button>';
     case 'offer':
@@ -231,8 +246,8 @@ async function openGlobalScheduleModal(name, position, dept) {
   const title = name || '选择候选人';
   try {
     const res = await createInterview({ candidate: name || '', position: position || '', dept: dept || '' });
-    const id = res?.id || '[sample]';
-    window.alert('已创建面试：' + title + ' (ID: ' + id + ')');
+    const id = res?.id || '';
+    window.alert('✅ 已创建面试：' + title + '\n面试ID: ' + id + '\n系统已发送飞书通知');
   } catch (e) {
     console.warn('[RecruitInterview] createInterview failed, using mock:', e);
     window.alert('新建面试弹窗（demo）：' + title);
@@ -262,6 +277,23 @@ onMounted(() => {
       console.warn('[RecruitInterview] evaluateInterview failed, using mock:', err);
       window.alert('【面试评价】\n填写对' + name + '的评价\n[通过→待录用] [不通过→回流]');
     }
+  });
+  window.addEventListener('interview:schedule', async (e) => {
+    const parts = e.detail.split('|');
+    const name = parts[0] || '';
+    const position = parts[1] || '';
+    try {
+      const res = await createInterview({ name, position, round: '初试(1轮)' });
+      const id = res?.id || '';
+      window.alert('✅ 已发起面试：' + name + ' (' + position + ')\n面试ID: ' + id + '\n系统已发送飞书通知给面试官');
+    } catch (err) {
+      console.warn('[RecruitInterview] schedule failed:', err);
+      window.alert('发起面试（mock）：' + name + ' - ' + position);
+    }
+  });
+  window.addEventListener('interview:offer', async (e) => {
+    const name = e.detail;
+    window.alert('✅ 已发送Offer给 ' + name + '\n系统将通过邮件/飞书发送Offer函\n候选人确认后进入待入职流程');
   });
   loadFromApi();
 });

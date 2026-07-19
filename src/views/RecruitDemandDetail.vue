@@ -183,15 +183,14 @@ function rowClass(c) {
 }
 
 function actionCell(c) {
+  const viewBtn = '<button class="btn btn-outline btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'detail:view\',{detail:\'' + c.name + '|' + (c.isEmployee ? 'employee' : 'candidate') + '\'}))">查看</button>';
   if (c.isEmployee) {
-    const viewBtn = '<button class="btn btn-outline btn-sm" onclick="window.alert(\'员工抽屉：' + c.name + '\')">查看</button>';
     if (c.notRecReason) return '<span style="font-size:11px;color:var(--c-draft)">' + c.notRecReason + '</span>';
-    return viewBtn + ' <button class="btn btn-outline btn-sm" onclick="window.alert(\'联系：' + c.name + '（直属上级）\')">联系</button> <button class="btn btn-primary btn-sm" onclick="window.alert(\'发起内部面试：' + c.name + '\')">发起面试</button>';
+    return viewBtn + ' <button class="btn btn-outline btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'detail:contact\',{detail:\'' + c.name + '|员工\'}))">联系</button> <button class="btn btn-primary btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'detail:interview\',{detail:\'' + c.name + '\'}))">发起面试</button>';
   }
-  const viewBtn = '<button class="btn btn-outline btn-sm" onclick="window.alert(\'候选人抽屉：' + c.name + '\')">查看</button>';
   if (c.status === 'interviewing') return viewBtn + ' <span style="font-size:11px;color:var(--c-sub)">面试中</span>';
   if (c.notRecReason) return viewBtn + ' <span style="font-size:11px;color:var(--c-draft)">' + c.notRecReason + '</span>';
-  if (c.matchScore && c.matchScore >= 60) return '<button class="btn btn-outline btn-sm" onclick="window.alert(\'联系：' + c.name + '\')">联系</button> <button class="btn btn-primary btn-sm" onclick="window.alert(\'约面：' + c.name + ' - 高级Java工程师 - 技术部\')">约面</button>';
+  if (c.matchScore && c.matchScore >= 60) return viewBtn + ' <button class="btn btn-outline btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'detail:contact\',{detail:\'' + c.name + '|候选人\'}))">联系</button> <button class="btn btn-primary btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'detail:interview\',{detail:\'' + c.name + '\'}))">约面</button>';
   return '<span style="font-size:11px;color:var(--c-draft)">匹配分不足</span>';
 }
 
@@ -249,6 +248,21 @@ function batchAlert(label) {
   alert(label + ' ' + names.length + ' 人\n\n' + names.join('、'));
 }
 function doAlert(msg) { window.alert(msg); }
+
+// Custom event listeners for action buttons
+window.addEventListener('detail:view', (e) => {
+  const [name, type] = e.detail.split('|');
+  const label = type === 'employee' ? '员工' : '候选人';
+  window.alert('查看' + label + '信息：' + name + '\n（完整档案将在右侧抽屉展示）');
+});
+window.addEventListener('detail:contact', (e) => {
+  const [name, type] = e.detail.split('|');
+  window.alert('联系 ' + name + ' (' + type + ')\n可用方式：电话 / 邮件 / 飞书\n系统将辅助生成联系话术');
+});
+window.addEventListener('detail:interview', (e) => {
+  const name = e.detail;
+  window.alert('发起面试：' + name + '\n系统将创建面试预约并发送飞书通知');
+});
 
 async function loadFromApi() {
   try {
