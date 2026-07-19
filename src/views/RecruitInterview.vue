@@ -1,7 +1,6 @@
 <template>
   <WorkbenchLayout title="面试计划" :breadcrumb="{ text: '招聘管理', href: '/recruit-dashboard' }">
     <template #topbar-actions>
-      <!-- Alert dropdown -->
       <div style="position:relative">
         <button class="btn btn-ghost btn-sm" id="alertBtn" @click="showAlerts = !showAlerts" style="gap:4px">
           <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--c-warn);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -16,7 +15,6 @@
           </div>
         </div>
       </div>
-      <!-- Scope -->
       <select v-if="!isInterviewerRole" id="scopeSelect" v-model="currentScope" @change="onScopeChange" style="height:30px;padding:0 10px;border:1px solid var(--c-border);border-radius:6px;font-size:12px;font-family:inherit;background:var(--c-card);color:var(--c-body)">
         <option value="all">全部面试</option>
         <option value="created">我发起的</option>
@@ -27,12 +25,12 @@
       </button>
     </template>
 
-    <!-- Action-oriented KPI: 6-status pipeline (compact pills, not cards) -->
-    <div data-slot="iv-kpi-row">
+    <!-- Pipeline status chips — compact filter for list tab -->
+    <div data-slot="iv-pipeline-row">
       <button v-for="kpi in kpis" :key="kpi.key"
         data-slot="iv-pipeline-chip"
-        :data-active="activeTab === 'list' ? (listStatus === kpi.key ? 'true' : undefined) : (mineStatus === kpi.key ? 'true' : undefined)"
-        @click="onChipClick(kpi.key)"
+        :data-active="listStatus === kpi.key"
+        @click="listStatus = listStatus === kpi.key ? 'all' : kpi.key"
       >
         <span data-slot="iv-pipeline-val">{{ kpi.value }}</span>
         <span data-slot="iv-pipeline-label">{{ kpi.label }}</span>
@@ -52,7 +50,6 @@
 
     <!-- 全部面试 panel -->
     <div class="tab-panel" :class="{ active: activeTab === 'list' }">
-      <!-- Table (status filtering via top pipeline chips) -->
       <div class="table-wrap">
         <table><thead><tr><th>候选人</th><th>岗位</th><th>轮次</th><th>面试官</th><th>时间</th><th>方式</th><th>状态</th><th>操作</th></tr></thead>
         <tbody>
@@ -70,7 +67,7 @@
 
     <!-- 我的待办 panel -->
     <div class="tab-panel" :class="{ active: activeTab === 'mine' }">
-      <!-- Table -->
+      <div class="table-wrap">
         <table><thead><tr><th>候选人</th><th>岗位</th><th>轮次</th><th>时间</th><th>方式</th><th>状态</th><th>操作</th></tr></thead>
         <tbody>
           <tr v-for="(item, i) in filteredMine" :key="'m'+i">
@@ -82,6 +79,7 @@
           </tr>
         </tbody></table>
         <div class="table-count">共 {{ filteredMine.length }} 条</div>
+      </div>
     </div>
 
     <!-- Calendar Modal -->
@@ -95,7 +93,6 @@
               <button class="btn btn-ghost btn-sm" @click="showCalendar = false">关闭</button>
             </div>
           </div>
-          <!-- 7-day grid -->
           <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:16px">
             <div v-for="wd in calendarDays" :key="wd.key"
               :style="{ textAlign:'center', padding:'10px 4px', background: wd.today ? 'var(--c-primary-subtle)' : 'var(--c-bg)', border: wd.today ? '2px solid var(--c-primary)' : '1px solid var(--c-border)', borderRadius:'8px' }">
@@ -105,7 +102,6 @@
               <div v-else style="margin-top:4px;font-size:11px;color:var(--c-sub)">—</div>
             </div>
           </div>
-          <!-- Per-day interview lists -->
           <div v-for="wd in calendarDays.filter(d => d.count > 0)" :key="'cal-'+wd.key" style="margin-bottom:12px">
             <b style="font-size:13px">{{ wd.monthLabel }} · {{ wd.count }}场</b>
             <table style="margin-top:4px;font-size:12px"><thead><tr><th>候选人</th><th>岗位</th><th>轮次</th><th>时间</th><th>方式</th><th>状态</th></tr></thead>
@@ -142,15 +138,12 @@ const user = localStorage.getItem('hr_user') || '张HR';
 const role = localStorage.getItem('hr_role') || 'hr';
 const isInterviewerRole = role === 'interviewer' || role === 'temp_interviewer';
 
-// API data refs — null = not yet loaded (fallback to mock)
 const apiInterviewData = ref(null);
 const apiAlertData = ref(null);
 
-// Data source computed — prefer API data over mock
 const INTERVIEWS_SOURCE = computed(() => apiInterviewData.value ?? ALL_INTERVIEWS);
 const ALERTS_SOURCE = computed(() => apiAlertData.value ?? ALERTS);
 
-// Visible tabs
 const visibleTabs = computed(() => {
   const tabs = [];
   if (!isInterviewerRole) tabs.push({ id: 'list', label: '全部面试' });
@@ -158,10 +151,8 @@ const visibleTabs = computed(() => {
   return tabs;
 });
 
-// Initialize active tab for interviewer role
 if (isInterviewerRole) activeTab.value = 'mine';
 
-// Helpers
 function countBy(st, mineOnly = false) {
   const pool = mineOnly ? INTERVIEWS_SOURCE.value.filter(i => i.isMine) : INTERVIEWS_SOURCE.value;
   if (st === 'all') return pool.length;
@@ -172,40 +163,19 @@ function countMineBy(st) {
   return INTERVIEWS_SOURCE.value.filter(i => i.isMine && i.status === st).length;
 }
 
-// KPI values
 const kpis = computed(() => {
-  const source = (isInterviewerRole) ? INTERVIEWS_SOURCE.value.filter(i => i.isMine) : INTERVIEWS_SOURCE.value;
+  const source = INTERVIEWS_SOURCE.value;
   const count = (st) => source.filter(i => i.status === st).length;
   return [
-    { key:'pending', value: count('pending'), label:'待安排', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
-    { key:'scheduled', value: count('scheduled'), label:'待面试', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' },
-    { key:'evaluating', value: count('evaluating'), label:'待评价', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' },
-    { key:'offer', value: count('offer'), label:'待录用', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="20 6 9 17 4 12"/></svg>' },
-    { key:'onboard', value: count('onboard'), label:'待入职', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' },
-    { key:'done', value: count('done'), label:'已完成', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M20 6L9 17l-5-5"/></svg>' },
+    { key:'pending', value: count('pending'), label:'待安排', icon:'' },
+    { key:'scheduled', value: count('scheduled'), label:'待面试', icon:'' },
+    { key:'evaluating', value: count('evaluating'), label:'待评价', icon:'' },
+    { key:'offer', value: count('offer'), label:'待录用', icon:'' },
+    { key:'onboard', value: count('onboard'), label:'待入职', icon:'' },
+    { key:'done', value: count('done'), label:'已完成', icon:'' },
   ];
 });
 
-// Summary stats — 平均时长/评分/通过率 derived from INTERVIEWS_SOURCE (API-first, mock fallback)
-const summaryStats = computed(() => {
-  const source = INTERVIEWS_SOURCE.value;
-  const scored = source.filter(i => i.score != null);
-  const timed = source.filter(i => i.duration != null);
-  const done = source.filter(i => i.status === 'done');
-  const passed = done.filter(i => i.result === 'pass');
-
-  const avgScore = scored.length > 0 ? (scored.reduce((s, i) => s + i.score, 0) / scored.length).toFixed(1) : '--';
-  const avgDuration = timed.length > 0 ? Math.round(timed.reduce((s, i) => s + i.duration, 0) / timed.length) + ' min' : '--';
-  const passRate = done.length > 0 ? Math.round((passed.length / done.length) * 100) + '%' : '--';
-
-  return [
-    { key:'avgScore', value: avgScore, label:'平均评分', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' },
-    { key:'avgDuration', value: avgDuration, label:'平均时长', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
-    { key:'passRate', value: passRate, label:'通过率', icon:'<svg viewBox="0 0 24 24" style="width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>' },
-  ];
-});
-
-// Filtered data
 const filteredList = computed(() => {
   return INTERVIEWS_SOURCE.value.filter(item => {
     if (currentScope.value === 'created' && item.createdBy !== user) return false;
@@ -222,7 +192,6 @@ const filteredMine = computed(() => {
   });
 });
 
-// Render action buttons (returns HTML string like legacy)
 function renderActions(item) {
   const resumeBtn = '<button class="btn btn-outline btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:open-drawer\',{detail:\'' + item.name + '\'}))">简历</button>';
   switch (item.status) {
@@ -243,24 +212,13 @@ function renderActions(item) {
 }
 
 function onScopeChange() {}
-function onChipClick(key) {
-  if (activeTab.value === 'mine') {
-    mineStatus.value = mineStatus.value === key ? 'all' : key;
-  } else {
-    listStatus.value = listStatus.value === key ? 'all' : key;
-  }
-}
 function openCandidateDrawer(name) {
   window.alert('候选人简历抽屉：' + name + '（demo）');
 }
 async function openGlobalScheduleModal(name, position, dept) {
   const title = name || '选择候选人';
   try {
-    const res = await createInterview({
-      candidate: name || '',
-      position: position || '',
-      dept: dept || '',
-    });
+    const res = await createInterview({ candidate: name || '', position: position || '', dept: dept || '' });
     const id = res?.id || '[sample]';
     window.alert('已创建面试：' + title + ' (ID: ' + id + ')');
   } catch (e) {
@@ -273,7 +231,6 @@ function doAlert(msg) {
   window.alert(msg);
 }
 
-// Close alert dropdown on external click
 function onDocClick(e) {
   const btn = document.getElementById('alertBtn');
   const dd = document.getElementById('alertDropdown');
@@ -281,6 +238,7 @@ function onDocClick(e) {
     showAlerts.value = false;
   }
 }
+
 onMounted(() => {
   document.addEventListener('click', onDocClick);
   window.addEventListener('interview:evaluate', async (e) => {
@@ -308,15 +266,12 @@ async function loadFromApi() {
   } catch (e) { console.warn('[Interview] API fallback:', e.message); }
 }
 
-// Calendar
 const calendarDays = computed(() => {
   const now = new Date();
   const weekStart = new Date(now);
   weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
   const days = ['一','二','三','四','五','六','日'];
   const todayKey = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
-
-  // Build calendar data
   const calData = {};
   INTERVIEWS_SOURCE.value.forEach(item => {
     if (['scheduled','evaluating','onboard','done'].includes(item.status) && item.date !== '待定') {
@@ -325,7 +280,6 @@ const calendarDays = computed(() => {
       calData[k].push(item);
     }
   });
-
   const result = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekStart);
@@ -363,9 +317,7 @@ const calendarWeekNum = computed(() => {
 .alert-dot.reject { background: var(--c-reject); }
 .alert-dot.warn { background: var(--c-warn); }
 .alert-dot.done { background: var(--c-done); }
-
-/* Pipeline chips — compact status filter row */
-[data-slot="iv-kpi-row"] {
+[data-slot="iv-pipeline-row"] {
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
@@ -401,8 +353,5 @@ const calendarWeekNum = computed(() => {
 }
 [data-slot="iv-pipeline-label"] {
   opacity: 0.85;
-}
-[data-slot="iv-pipeline-chip"][data-active] [data-slot="iv-pipeline-val"] {
-  color: #fff;
 }
 </style>
