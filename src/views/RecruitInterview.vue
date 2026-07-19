@@ -132,9 +132,17 @@ import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { ALL_INTERVIEWS, STATUSES, STATUS_LABELS, STATUS_TYPE_MAP, ALERTS } from '../data/interview.js';
 import { fetchInterviews, fetchInterviewAlerts, createInterview, evaluateInterview } from '../api/interview.js';
 import { KPI_ICONS } from '../components/kpiIcons.js';
+import ScheduleInterviewModal from '../components/ScheduleInterviewModal.vue';
+import OfferModal from '../components/OfferModal.vue';
 
 const showAlerts = ref(false);
 const showCalendar = ref(false);
+const showScheduleModal = ref(false);
+const showOfferModal = ref(false);
+const scheduleCandidate = ref({ name: '', id: '' });
+const scheduleDemand = ref({ position: '', id: '' });
+const offerCandidate = ref({ name: '', id: '' });
+const offerDemand = ref({ position: '', id: '' });
 const currentScope = ref('all');
 const activeTab = ref('list');
 const listStatus = ref('all');
@@ -334,14 +342,9 @@ async function handleSchedule(e) {
   const parts = e.detail.split('|');
   const name = parts[0] || '';
   const position = parts[1] || '';
-  try {
-    const res = await createInterview({ name, position, round: '初试(1轮)' });
-    const id = res?.id || '';
-    window.alert('✅ 已发起面试：' + name + ' (' + position + ')\n面试ID: ' + id + '\n系统已发送飞书通知给面试官');
-  } catch (err) {
-    console.warn('[RecruitInterview] schedule failed:', err);
-    window.alert('发起面试（mock）：' + name + ' - ' + position);
-  }
+  scheduleCandidate.value = { name, id: '' };
+  scheduleDemand.value = { position, id: '' };
+  showScheduleModal.value = true;
 }
 async function handleCancel(e) {
   const name = e.detail;
@@ -360,7 +363,9 @@ function handleApproval(e) {
 }
 function handleOffer(e) {
   const name = e.detail;
-  window.alert('✅ 已发送Offer给 ' + name + '\n系统将通过邮件/飞书发送Offer函\n候选人确认后进入待入职流程');
+  offerCandidate.value = { name, id: '' };
+  offerDemand.value = { position: '', id: '' };
+  showOfferModal.value = true;
 }
 function handleOpenDrawer(e) {
   const name = e.detail;
