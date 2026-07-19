@@ -120,12 +120,11 @@
 - 使用 `npm run preview` 验证生产包前，必须先重新 `npm run build`。
 
 当前验收基线：
-- Playwright：**33/33** 通过。
-- 视觉巡检：16 张截图，0 console error，0 移动端横向溢出。
-- 当前 UI 方向：HeroUIPro 无渐变专业工作台，包含模块胶囊导航、页面摘要 KPI、招聘项目总览、阶段转化、待处理事项、岗位风险、渠道效率、近期面试和高密表格。
-- 当前禁止项：不得使用 `gradient`；不得出现”AI 外呼””自动拨打””智能风险预警”等 AI 味或不可验证能力表达。
-- AI 集成：DeepSeek API 5 个工作流全部通过实际验证，前端 RecruitAI 6 tab 已激活。
-- boss-cli：`@joohw/boss-cli@0.6.6`，后端 10 个端点可用。
+- Playwright：**45/45** 通过。
+- 构建：**＜500ms**。
+- 后端：Flask + SQLite，种子数据 9 需求 + 6 候选人 + 4 模板 + 4 审计日志。
+- 前端桩操作：**12 个已修复**，4 个低优先级待处理。详细审计见 Memory.md。
+- 关键修复：`BaseModel.created_at` 时间戳 bug 修复、3 个服务 SQL 级分页、需求管理审批真实 API。
 ## 2026-07-18 当前工作口径补充：招聘看板材质化经营台
 
 - 做后台 UI 时先看 `D:\WorkProject\HeroUIPro\herouipro-v3\template`，但当前项目是 Vue shell + legacy HTML/CSS/JS，不能机械搬 React 组件；优先抽取 toolbar、KPI、chart、table、action queue、density control 等成熟结构。
