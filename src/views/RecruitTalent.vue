@@ -84,7 +84,7 @@
                   <span style="font-size:11px;color:var(--c-sub)"> 已锁定</span>
                 </template>
                 <template v-else>
-                  <button class="btn btn-outline btn-sm" @click="openContactModal(c.name)"> 联系</button>
+                  <button class="btn btn-outline btn-sm" @click="openContactModal(c.name, c.id)"> 联系</button>
                 </template>
               </template>
             </td>
@@ -146,7 +146,7 @@
       <div class="batch-bar" id="batchBarInt" :style="{ display: checkedIntCount > 0 ? 'flex' : 'none' }">
         <span>已选择 <span class="count" id="batchCountInt">{{ checkedIntCount }}</span> 位员工</span>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-primary btn-sm" @click="doAlert('选择目标岗位后关联内部员工')">加入需求 ▾</button>
+          <button class="btn btn-primary btn-sm" @click="doAlert('选择目标岗位后关联内部员工')">加入需求</button>
           <button class="btn btn-ghost btn-sm" @click="clearSelectionInt">清除选择</button>
         </div>
       </div>
@@ -416,107 +416,114 @@ async function runMatch() {
   const posNames = { java: '高级Java工程师（架构方向）', frontend: '前端工程师', pm: '产品经理', data: '数据分析师' };
   const posName = posNames[matchPosition.value] || matchPosition.value;
 
-  let results;
   try {
-    const { fetchMatchResults } = await import('../api/talent.js');
-    results = await fetchMatchResults(matchPosition.value);
-    if (!results || !results.length) {
-      results = MATCH_RESULTS[matchPosition.value] || [];
+    const resp = await fetchMatchResults(matchPosition.value);
+    if (resp && resp.results) {
+      matchResults.value = resp.results;
+    } else {
+      // API returned empty — no internal matches found
+      matchResults.value = [];
     }
   } catch (e) {
-    console.warn('[RecruitTalent] fetchMatchResults failed, using mock:', e);
-    results = MATCH_RESULTS[matchPosition.value] || [];
+    console.warn('[RecruitTalent] fetchMatchResults failed:', e);
+    matchResults.value = [];
   }
 
-  matchResults.value = results;
-  matchSummary.value = '匹配岗位：' + posName + ' · 匹配 ' + results.length + ' 人';
+  matchSummary.value = '匹配岗位：' + posName + ' · 匹配 ' + matchResults.value.length + ' 人（基于真实数据运算）';
+}
+
+// --- Candidate/Employee Drawer state ---
+const showCandidateDrawer = ref(false);
+const activeCandidateId = ref('');
+const activeCandidateName = ref('');
+function openCandidateDrawer(name) {
+  // Find the candidate id by name in current data
+  const c = EXT_DATA_SOURCE.value.find(x => x.name === name);
+  activeCandidateId.value = c?.id || name;
+  activeCandidateName.value = name;
+  showCandidateDrawer.value = true;
+}
+const showEmployeeDrawer = ref(false);
+const activeEmployeeId = ref('');
+const activeEmployeeName = ref('');
+function openEmployeeDrawer(name) {
+  const e = INT_DATA_SOURCE.value.find(x => x.name === name);
+  activeEmployeeId.value = e?.id || name;
+  activeEmployeeName.value = name;
+  showEmployeeDrawer.value = true;
+}
+
+// --- Contact Modal state ---
+const showContactModal = ref(false);
+const contactCandidateId = ref('');
+const contactCandidateName = ref('');
+const contactBatchNames = ref([]);
+const contactIsBatch = ref(false);
+function openContactModal(name, id) {
+  contactCandidateId.value = id || '';
+  contactCandidateName.value = name;
+  contactBatchNames.value = [];
+  contactIsBatch.value = false;
+  showContactModal.value = true;
 }
 
 // Batch
 async function addToDemand(demandId, demandName) {
   const checkedIds = Object.keys(checkedExt).filter(k => checkedExt[k]);
   const names = checkedIds.map(id => { const c = EXT_DATA_SOURCE.value.find(x => x.id === id); return c ? c.name : ''; }).filter(Boolean);
-  if (names.length === 0) { alert('请先勾选候选人'); return; }
-  const key = 'demand_' + demandId + '_linked';
-  const linked = (() => { try { return JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return []; } })();
+  if (names.length === 0) return;
 
-  // Fire-and-forget API call
-  for (const name of names) {
-    import('../api/demand.js').then(({ linkCandidateToDemand }) => {
-      linkCandidateToDemand(demandId, name).catch(e => console.warn('[RecruitTalent] linkCandidateToDemand failed:', e));
-    }).catch(e => console.warn('[RecruitTalent] dynamic import failed:', e));
+  try {
+    await linkTalentToDemand(demandId, names);
+  } catch (e) {
+    console.warn('[RecruitTalent] linkTalentToDemand failed:', e);
   }
 
+  // Also persist to localStorage for downstream demand detail page
+  const key = 'demand_' + demandId + '_linked';
+  const linked = (() => { try { return JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return []; } })();
   names.forEach(n => { if (linked.indexOf(n) < 0) linked.push(n); });
   localStorage.setItem(key, JSON.stringify(linked));
-  window.alert('已将 ' + names.length + ' 位候选人加入「' + demandName + '」\n\n' + names.join('、'));
+
   showDemandDropdown.value = false;
   clearSelectionExt();
 }
 function batchContact() {
   const checkedIds = Object.keys(checkedExt).filter(k => checkedExt[k]);
   const names = checkedIds.map(id => { const c = EXT_DATA_SOURCE.value.find(x => x.id === id); return c ? c.name : ''; }).filter(Boolean);
-  if (names.length === 0) { doAlert('请先勾选候选人'); return; }
-  // Fire-and-forget API call
-  import('../api/talent.js').then(({ updateTalentNote }) => {
-    updateTalentNote(names[0], '【批量联系】HR发起联系').catch(e => console.warn(e));
-  }).catch(e => console.warn('[RecruitTalent] dynamic import failed:', e));
-  window.alert('批量联系 ' + names.length + ' 人\n\n请选择实际联系方式：电话 / 邮件 / 飞书。系统仅辅助生成联系话术，不代替人工拨号。\n\n' + names.join('、'));
+  if (names.length === 0) return;
+  contactCandidateId.value = '';
+  contactCandidateName.value = '';
+  contactBatchNames.value = names;
+  contactIsBatch.value = true;
+  showContactModal.value = true;
 }
 
-// Helpers
-async function openCandidateDrawer(name) {
-  try {
-    const { fetchTalent } = await import('../api/talent.js');
-    const data = await fetchTalent({ name });
-    window.alert('候选人简历抽屉：' + name + '\n（将展示完整画像、技能标签、匹配记录）');
-  } catch (e) {
-    console.warn('[RecruitTalent] openCandidateDrawer failed:', e);
-    window.alert('候选人简历抽屉：' + name + '（demo）');
+function onContactDone(result) {
+  showContactModal.value = false;
+  const names = result?.names || [];
+  if (result?.fallback) {
+    // API failed but ContactModal already displayed the fallback
+    return;
   }
+  // API recorded successfully — no extra alert needed, data persisted
 }
-async function openEmployeeDrawer(name) {
-  try {
-    const { fetchTalent } = await import('../api/talent.js');
-    const data = await fetchTalent({ name, type: 'internal' });
-    window.alert('员工信息抽屉：' + name + '\n（将展示在职信息、绩效、匹配记录）');
-  } catch (e) {
-    console.warn('[RecruitTalent] openEmployeeDrawer failed:', e);
-    window.alert('员工信息抽屉：' + name + '（demo）');
-  }
+
+function onCandidateJoin(data) {
+  showCandidateDrawer.value = false;
+  // Prompt user to select demand
+  showDemandDropdown.value = true;
 }
-async function openContactModal(name) {
-  try {
-    const { updateTalentNote } = await import('../api/talent.js');
-    await updateTalentNote(name, '【联系记录】HR发起联系');
-    window.alert('联系候选人：' + name + '\n可用方式：电话 / 邮件 / 飞书\n系统已记录本次联系操作');
-  } catch (e) {
-    console.warn('[RecruitTalent] openContactModal failed:', e);
-    window.alert('联系候选人：' + name + '\n可用方式：电话 / 邮件 / 飞书');
-  }
-}
+
 async function doAlert(msg) {
-  try {
-    // Connect specific alert actions to real API calls
-    if (msg.indexOf('上传简历') >= 0) {
-      window.alert('上传简历 PDF/DOCX\n解析服务打标并生成画像\n（文件上传对话框将弹出）');
-    } else if (msg.indexOf('发起内部面试') >= 0) {
-      const { createInterview } = await import('../api/interview.js');
-      const name = matchResults.value[0]?.name || '';
-      if (name) {
-        await createInterview({ name, position: matchPosition.value, type: 'internal' });
-        window.alert('✅ 已发起内部面试：' + name + '\n系统已发送飞书通知');
-      } else {
-        window.alert(msg);
-      }
-    } else if (msg.indexOf('选择目标岗位') >= 0) {
-      window.alert(msg);
-    } else {
-      window.alert(msg);
+  if (msg.indexOf('上传简历') >= 0) {
+    // TODO: implement file upload via /api/resume/upload
+  } else if (msg.indexOf('发起内部面试') >= 0) {
+    const { createInterview } = await import('../api/interview.js');
+    const name = matchResults.value[0]?.name || '';
+    if (name) {
+      await createInterview({ name, position: matchPosition.value, type: 'internal' });
     }
-  } catch (e) {
-    console.warn('[RecruitTalent] doAlert failed:', e);
-    window.alert(msg);
   }
 }
 function wrapSkills(html) { return '<span class="skill-inline">' + html + '</span>'; }
