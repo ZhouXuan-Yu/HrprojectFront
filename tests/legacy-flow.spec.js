@@ -15,6 +15,8 @@ test.beforeEach(async ({ page }) => {
     localStorage.setItem('hr_token', 'e2e-test-token-admin');
     localStorage.setItem('hr_role', 'admin');
     localStorage.setItem('hr_user', '测试用户');
+    // E2E mode: disable toast notifications to avoid blocking clicks
+    window.__E2E_DISABLE_TOAST__ = true;
   });
 });
 

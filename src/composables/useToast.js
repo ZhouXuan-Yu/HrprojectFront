@@ -13,6 +13,12 @@ if (typeof window !== 'undefined') {
 }
 
 function addToast(message, type = 'info', duration = 4000) {
+  // E2E mode: skip toast rendering to avoid blocking clicks
+  if (typeof window !== 'undefined' && window.__E2E_DISABLE_TOAST__) {
+    console.log(`[E2E Toast ${type}]`, message);
+    return -1;
+  }
+
   const id = ++_id;
   toasts.push({ id, message, type, duration });
   if (toasts.length > 5) toasts.shift();

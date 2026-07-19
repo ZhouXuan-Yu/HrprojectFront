@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="toast-container" role="status" aria-live="polite" aria-label="通知提示">
+    <div v-if="!isE2EMode" class="toast-container" role="status" aria-live="polite" aria-label="通知提示">
       <TransitionGroup name="toast-slide">
         <div
           v-for="t in toasts"
@@ -32,9 +32,15 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { useToast } from '../composables/useToast.js';
 
 const { toasts, removeToast } = useToast();
+
+// E2E mode: hide toast container completely
+const isE2EMode = computed(() => {
+  return typeof window !== 'undefined' && window.__E2E_DISABLE_TOAST__;
+});
 
 const iconMap = {
   success: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
