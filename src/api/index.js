@@ -1,5 +1,6 @@
 // api/index.js — HTTP client for backend API
 const BASE = '/api';
+const TIMEOUT_MS = 5000;
 
 async function request(path, options = {}) {
   const url = `${BASE}${path}`;
@@ -14,6 +15,7 @@ async function request(path, options = {}) {
   const config = {
     headers,
     ...options,
+    signal: options.signal || AbortSignal.timeout(TIMEOUT_MS),
   };
 
   // In dev mode, forward the current role as query param for auth

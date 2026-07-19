@@ -27,16 +27,16 @@
       </button>
     </template>
 
-    <!-- Merged KPI row: 6 status items + 3 compact summary stats inline -->
-    <div class="metric-row" style="margin-bottom:12px">
-      <div v-for="kpi in kpis" :key="kpi.key" class="metric-card" style="flex:1">
-        <div class="metric-icon" v-html="kpi.icon"></div>
-        <div><div class="metric-value">{{ kpi.value }}</div><div class="metric-label">{{ kpi.label }}</div></div>
-      </div>
-      <div v-for="stat in summaryStats" :key="stat.key" class="metric-card" style="flex:1;min-width:80px;background:transparent;border-style:dashed;border-color:var(--c-border-light)">
-        <div class="metric-icon" v-html="stat.icon" style="opacity:0.6"></div>
-        <div><div class="metric-value" style="font-size:18px;color:var(--c-body)">{{ stat.value }}</div><div class="metric-label">{{ stat.label }}</div></div>
-      </div>
+    <!-- Action-oriented KPI: 6-status pipeline (compact pills, not cards) -->
+    <div data-slot="iv-kpi-row">
+      <button v-for="kpi in kpis" :key="kpi.key"
+        data-slot="iv-pipeline-chip"
+        :data-active="activeTab === 'list' && listStatus === kpi.key ? 'true' : (activeTab === 'list' && listStatus === 'all' && kpi.key === 'pending' ? 'true' : undefined)"
+        @click="activeTab = 'list'; listStatus = kpi.key"
+      >
+        <span data-slot="iv-pipeline-val">{{ kpi.value }}</span>
+        <span data-slot="iv-pipeline-label">{{ kpi.label }}</span>
+      </button>
     </div>
     <!-- Sentinel: prevents app.js legacy workspace injection (duplicate content) -->
     <section class="hero-page-workspace" style="display:none" aria-hidden="true"></section>
