@@ -351,7 +351,9 @@ tr.row-archived{opacity:0.4}
 @media(max-width:1200px){.metric-row{grid-template-columns:repeat(2,1fr)}.grid-2{grid-template-columns:1fr}.grid-6-4{grid-template-columns:1fr}.drawer{width:100vw}}
 
 /* ===== Enterprise UI v6: DESIGN.md command-center foundation ===== */
+/* 保留第一个 :root 块中的语义色和基础变量，只移除重复定义 */
 :root{
+  /* 边框 — 默认可见 */
   --e-bg:#F6F8FB;
   --e-bg-rail:#EEF2F7;
   --e-surface:#FFFFFF;
@@ -361,9 +363,9 @@ tr.row-archived{opacity:0.4}
   --e-ink-2:#344054;
   --e-muted:#5B6475;
   --e-subtle:#8C95A6;
-  --e-border:#E1E6EF;
-  --e-border-soft:#EFF3F8;
-  --e-border-strong:#C9D2E3;
+  --e-border:#D0D5E0;
+  --e-border-soft:#E1E6EF;
+  --e-border-strong:#B0B8CC;
   --e-primary:#4F6EF7;
   --e-primary-hover:#6B84FF;
   --e-primary-active:#3D54D4;
@@ -566,7 +568,7 @@ button{letter-spacing:0}
   color:var(--e-ink-2);
 }
 .topbar select:hover,.filter-bar select:hover,.filter-bar input:hover,.form-group input:hover,.form-group select:hover,.form-group textarea:hover{
-  border-color:var(--e-border-strong);
+  border-color:var(--e-primary);
 }
 .topbar select:focus-visible,.filter-bar select:focus-visible,.filter-bar input:focus-visible,.form-group input:focus-visible,.form-group select:focus-visible,.form-group textarea:focus-visible{
   border-color:var(--e-primary);
@@ -589,7 +591,7 @@ button{letter-spacing:0}
   border-radius:8px;
   border:1px solid var(--e-border);
   background:var(--e-surface);
-  box-shadow:none;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);
 }
 .metric-card{
   min-height:112px;
@@ -602,7 +604,8 @@ button{letter-spacing:0}
   background:#FFFFFF;
 }
 .metric-card:hover,.card:hover,.table-wrap:hover{
-  border-color:#CFD8EA;
+  border-color:var(--e-border-strong);
+  box-shadow:0 2px 8px rgba(0,0,0,.06);
 }
 .metric-icon{
   width:38px;
