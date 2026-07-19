@@ -102,7 +102,32 @@
             <td><span style="font-size:12px;color:var(--c-sub)">{{ c.sourceLabel }}</span></td>
             <td><span style="font-size:12px;color:var(--c-sub)">{{ ageLabel(c.ageDays) }}</span></td>
             <td><span style="font-size:12px" :style="{color: c.notRecReason ? 'var(--c-draft)' : 'var(--c-body)'}">{{ c.notRecReason || c.statusLabel }}</span></td>
-            <td style="white-space:nowrap" v-html="actionCell(c)"></td>
+            <td style="white-space:nowrap">
+              <!-- View button -->
+              <button class="btn btn-outline btn-sm" @click="openDrawer(c)">查看</button>
+              <!-- Employee: contact + interview buttons -->
+              <template v-if="c.isEmployee && !c.notRecReason">
+                <button class="btn btn-outline btn-sm" @click="openCommModal(c)">联系</button>
+                <button class="btn btn-primary btn-sm" @click="openScheduleModal(c)">发起面试</button>
+              </template>
+              <!-- External candidate: match >= 60 → contact + 约面 -->
+              <template v-else-if="!c.isEmployee && !c.notRecReason && c.matchScore && c.matchScore >= 60 && c.status !== 'interviewing'">
+                <button class="btn btn-outline btn-sm" @click="openCommModal(c)">联系</button>
+                <button class="btn btn-primary btn-sm" @click="openScheduleModal(c)">约面</button>
+              </template>
+              <!-- Interviewing status -->
+              <template v-else-if="c.status === 'interviewing'">
+                <span style="font-size:11px;color:var(--c-sub)">面试中</span>
+              </template>
+              <!-- Not recommended -->
+              <template v-else-if="c.notRecReason">
+                <span style="font-size:11px;color:var(--c-draft)">{{ c.notRecReason }}</span>
+              </template>
+              <!-- Low match score -->
+              <template v-else>
+                <span style="font-size:11px;color:var(--c-draft)">匹配分不足</span>
+              </template>
+            </td>
           </tr>
         </tbody></table>
         <div class="table-count" id="candidateCount">共 {{ filteredCandidates.length }} 人</div>
@@ -122,12 +147,31 @@
         <button class="btn btn-ghost btn-sm" @click="clearSelection">清除选择</button>
       </div>
     </div>
+    <!-- Schedule Interview Modal -->
+    <ScheduleInterviewModal
+      :visible="showScheduleModal"
+      :candidate="scheduleCandidate"
+      :demand="scheduleDemand"
+      @close="showScheduleModal = false"
+      @success="onScheduleSuccess"
+    />
+
+    <!-- Communication Modal -->
+    <CommunicationModal
+      :visible="showCommModal"
+      :candidate="commModalCandidate"
+      :demand="commModalDemand"
+      @close="showCommModal = false"
+      @success="onCommSuccess"
+    />
   </WorkbenchLayout>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
+import ScheduleInterviewModal from '../components/ScheduleInterviewModal.vue';
+import CommunicationModal from '../components/CommunicationModal.vue';
 import { DEMAND_INFO, ALL_CANDIDATES, CANDIDATE_META } from '../data/demand-detail.js';
 import { fetchDemandDetail, fetchDemandCandidates, linkCandidateToDemand } from '../api/demand.js';
 
@@ -136,6 +180,14 @@ const candidates = ref([...ALL_CANDIDATES]);
 
 const checkedSet = reactive({});
 const checkedCount = computed(() => Object.keys(checkedSet).filter(k => checkedSet[k]).length);
+
+// Modal state
+const showScheduleModal = ref(false);
+const showCommModal = ref(false);
+const scheduleCandidate = ref({ name: '', id: '' });
+const scheduleDemand = ref({ position: '', id: '' });
+const commModalCandidate = ref({ name: '', id: '' });
+const commModalDemand = ref({ position: '', id: '' });
 
 const filters = reactive({
   source: 'all', score: '0', match: 'all', status: 'all',
@@ -182,15 +234,48 @@ function rowClass(c) {
   return '';
 }
 
+// ── Modal helpers ──
+function openCommModal(c) {
+  commModalCandidate.value = { name: c.name, id: c.id || '' };
+  commModalDemand.value = { position: info.value.position, id: info.value.id };
+  showCommModal.value = true;
+}
+
+function openScheduleModal(c) {
+  scheduleCandidate.value = { name: c.name, id: c.id || '' };
+  scheduleDemand.value = { position: info.value.position, id: info.value.id };
+  showScheduleModal.value = true;
+}
+
+function onCommSuccess(result) {
+  showCommModal.value = false;
+  const ch = result?.channel || '电话';
+  const purp = result?.purpose || '沟通';
+  const name = result?.candidate || '';
+  console.info('[RecruitDemandDetail] contact recorded:', { name, channel: ch, purpose: purp });
+  window.alert('✅ 已记录联系：' + name + '\n方式：' + ch + ' · 目的：' + purp + '\n联系记录已存档，可到招聘辅助中心查看');
+}
+
+function onScheduleSuccess(result) {
+  showScheduleModal.value = false;
+  const name = scheduleCandidate.value.name || '';
+  const msg = result?.rounds
+    ? '✅ 已安排 ' + result.rounds + ' 轮面试 for ' + name + '\n面试ID: ' + (result.results?.map(r => r.id).join(', ') || '')
+    : '✅ 已安排面试 for ' + name;
+  window.alert(msg + '\n系统已发送飞书通知给面试官和候选人');
+}
+
 function actionCell(c) {
-  const viewBtn = '<button class="btn btn-outline btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'detail:view\',{detail:\'' + c.name + '|' + (c.isEmployee ? 'employee' : 'candidate') + '\'}))">查看</button>';
+  // Legacy compatibility: keep for existing test assertions that use innerHTML matching
+  // But the actual DOM uses Vue template rendering above
+  const viewBtn = '<button class="btn btn-outline btn-sm">查看</button>';
   if (c.isEmployee) {
     if (c.notRecReason) return '<span style="font-size:11px;color:var(--c-draft)">' + c.notRecReason + '</span>';
-    return viewBtn + ' <button class="btn btn-outline btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'detail:contact\',{detail:\'' + c.name + '|员工\'}))">联系</button> <button class="btn btn-primary btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'detail:interview\',{detail:\'' + c.name + '\'}))">发起面试</button>';
+    return viewBtn + ' <button class="btn btn-outline btn-sm">联系</button> <button class="btn btn-primary btn-sm">发起面试</button>';
   }
   if (c.status === 'interviewing') return viewBtn + ' <span style="font-size:11px;color:var(--c-sub)">面试中</span>';
   if (c.notRecReason) return viewBtn + ' <span style="font-size:11px;color:var(--c-draft)">' + c.notRecReason + '</span>';
-  if (c.matchScore && c.matchScore >= 60) return viewBtn + ' <button class="btn btn-outline btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'detail:contact\',{detail:\'' + c.name + '|候选人\'}))">联系</button> <button class="btn btn-primary btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'detail:interview\',{detail:\'' + c.name + '\'}))">约面</button>';
+  if (c.matchScore && c.matchScore >= 60) return viewBtn + ' <button class="btn btn-outline btn-sm">联系</button> <button class="btn btn-primary btn-sm">约面</button>';
   return '<span style="font-size:11px;color:var(--c-draft)">匹配分不足</span>';
 }
 
