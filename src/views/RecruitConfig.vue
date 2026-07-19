@@ -8,6 +8,9 @@
       本页面仅<b>系统管理员</b>可操作 · HR 无配置权限 · 配置变更即时生效，请谨慎操作
     </div>
 
+    <!-- 配置概览统计卡（hero-summary-card 同款） -->
+    <StatCardRow :cards="statCards" />
+
     <!-- 邮箱配置 -->
     <BaseAccordion title="邮箱配置" :open="true">
       <div class="accordion-desc">
@@ -180,10 +183,12 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue';
+import { reactive, ref, computed, onMounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { EMAIL_ACCOUNTS, CHANNELS, SCORE_RULES, NOTIFY_TEMPLATES, ROLE_PERMISSIONS, AUDIT_LOGS, EMAIL_PRESETS } from '../data/config.js';
 import { fetchEmailAccounts, fetchChannels, fetchScoreRules, fetchNotifyTemplates, fetchRolePermissions, fetchAuditLogs } from '../api/config.js';
+import StatCardRow from '../components/StatCardRow.vue';
+import { KPI_ICONS } from '../components/kpiIcons.js';
 
 const emailAccounts = ref(EMAIL_ACCOUNTS);
 const channels = ref(CHANNELS);
@@ -192,6 +197,14 @@ const notifyTemplates = ref(NOTIFY_TEMPLATES);
 const rolePermissions = ref(ROLE_PERMISSIONS);
 const auditLogs = ref(AUDIT_LOGS);
 const showEmailModal = ref(false);
+
+// 顶部配置概览统计卡（hero-summary-card 同款，纯展示）
+const statCards = computed(() => [
+  { key: 'email', label: '邮箱账号', value: emailAccounts.value.length, hint: emailAccounts.value.filter(a => a.status === '异常').length + ' 个异常', icon: KPI_ICONS.mail },
+  { key: 'channel', label: '渠道配置', value: channels.value.length, hint: channels.value.filter(c => c.status === '启用').length + ' 个启用', icon: KPI_ICONS.briefcase },
+  { key: 'template', label: '通知模板', value: notifyTemplates.value.length, hint: '最近更新', icon: KPI_ICONS.bell },
+  { key: 'role', label: '角色权限', value: rolePermissions.value.length, hint: '权限分组', icon: KPI_ICONS.users },
+]);
 
 const emailForm = reactive({
   addr: '', type: '', proto: 'IMAP（推荐）', port: '993',

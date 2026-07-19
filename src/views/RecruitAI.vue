@@ -19,6 +19,9 @@
       >{{ tab.number }} {{ tab.title }}</button>
     </div>
 
+    <!-- 辅助能力统计卡（hero-summary-card 同款） -->
+    <StatCardRow :cards="statCards" />
+
     <!-- Dynamic tab content with KeepAlive -->
     <KeepAlive>
       <component :is="activeComponent" :key="activeTab" />
@@ -70,6 +73,8 @@ import BossIntegration from '../components/BossIntegration.vue';
 import { AI_TABS, EMBEDDED_AI, MOCK_CANDIDATES, MOCK_DEMANDS } from '../data/ai.js';
 import { fetchDemands } from '../api/demand.js';
 import { fetchTalent } from '../api/talent.js';
+import StatCardRow from '../components/StatCardRow.vue';
+import { KPI_ICONS } from '../components/kpiIcons.js';
 
 import AiTabJD from './ai/AiTabJD.vue';
 import AiTabSearch from './ai/AiTabSearch.vue';
@@ -82,6 +87,17 @@ import AiTabCommunication from './ai/AiTabCommunication.vue';
 const tabs = AI_TABS;
 const activeTab = ref('jd');
 const embeddedAI = ref(EMBEDDED_AI);
+
+// 顶部辅助能力统计卡（hero-summary-card 同款，按嵌入能力状态统计）
+const statCards = computed(() => {
+  const cnt = (st) => embeddedAI.value.filter(a => a.status === st).length;
+  return [
+    { key: 'all', label: '辅助能力', value: embeddedAI.value.length, hint: '流程内嵌', icon: KPI_ICONS.settings },
+    { key: 'done', label: '已上线', value: cnt('done'), hint: '可直接使用', icon: KPI_ICONS.check },
+    { key: 'warn', label: '进行中', value: cnt('warn'), hint: '需新增工作流', icon: KPI_ICONS.clock },
+    { key: 'draft', label: '待规划', value: cnt('draft'), hint: '需复核评估', icon: KPI_ICONS.bell },
+  ];
+});
 
 const tabMap = {
   jd: AiTabJD,

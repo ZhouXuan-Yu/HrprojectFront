@@ -27,6 +27,9 @@
       >{{ tab.label }}</button>
     </div>
 
+    <!-- 资产统计卡（hero-summary-card 同款，点击切换对应 tab） -->
+    <StatCardRow :cards="statCards" :active-key="statActiveKey" clickable @select="onStatSelect" />
+
     <!-- ===== Tab 1: 简历储备库（外部） ===== -->
     <div class="tab-panel" :class="{ active: activeTab === 'external' }">
       <div class="filter-bar">
@@ -232,6 +235,8 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { EXT_DATA, INT_DATA, BLACKLIST_DATA, DEMAND_OPTIONS, MATCH_RESULTS } from '../data/talent.js';
 import { fetchTalent, updateTalentNote } from '../api/talent.js';
+import StatCardRow from '../components/StatCardRow.vue';
+import { KPI_ICONS } from '../components/kpiIcons.js';
 
 const showReminder = ref(false);
 const showNoteModal = ref(false);
@@ -255,6 +260,19 @@ const apiBlacklistData = ref(null);
 const EXT_DATA_SOURCE = computed(() => apiExtData.value ?? EXT_DATA);
 const INT_DATA_SOURCE = computed(() => apiIntData.value ?? INT_DATA);
 const BLACKLIST_DATA_SOURCE = computed(() => apiBlacklistData.value ?? BLACKLIST_DATA);
+
+// 顶部统计卡（人才库资产视角），点击切换对应 tab
+const statCards = computed(() => [
+  { key: 'external', label: '外部候选人', value: EXT_DATA_SOURCE.value.length, hint: '可筛选入库', icon: KPI_ICONS.users },
+  { key: 'internal', label: '内部人才', value: INT_DATA_SOURCE.value.length, hint: '可调岗评估', icon: KPI_ICONS.userCheck },
+  { key: 'blacklist', label: '黑名单', value: BLACKLIST_DATA_SOURCE.value.length, hint: '风险隔离', icon: KPI_ICONS.ban },
+  { key: 'contact', label: '待联系', value: EXT_DATA_SOURCE.value.filter(c => c.status === 'available').length, hint: '人工确认', icon: KPI_ICONS.mail },
+]);
+const statActiveKey = computed(() => (activeTab.value === 'external' && extFilters.status === 'available' ? 'contact' : activeTab.value));
+function onStatSelect(c) {
+  if (c.key === 'contact') { activeTab.value = 'external'; extFilters.status = 'available'; }
+  else { activeTab.value = c.key; extFilters.status = 'all'; }
+}
 
 async function loadFromApi() {
   try {

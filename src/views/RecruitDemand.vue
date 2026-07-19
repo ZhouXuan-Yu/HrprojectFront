@@ -9,6 +9,9 @@
       一个表格看全部：审批进度 + 招聘进展 + 岗位匹配，点击「查看详情」进入完整页面
     </div>
 
+    <!-- 需求状态统计卡（hero-summary-card 同款，点击按状态筛选） -->
+    <StatCardRow :cards="statCards" :active-key="filters.status" clickable @select="onStatSelect" />
+
     <!-- Filter bar -->
     <div class="filter-bar">
       <input id="demandSearch" type="text" v-model="filters.search" placeholder="搜索需求编号 / 部门 / 岗位..." @input="applyFilters">
@@ -105,6 +108,8 @@ import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { DEMANDS, getLinkedCount } from '../data/demand.js';
 import { HR_DEPARTMENTS } from '../composables/useMockData.js';
 import { fetchDemands, createDemand } from '../api/demand.js';
+import StatCardRow from '../components/StatCardRow.vue';
+import { KPI_ICONS } from '../components/kpiIcons.js';
 
 const router = useRouter();
 const apiDemands = ref(null);
@@ -142,6 +147,19 @@ const statusCounts = computed(() => {
   demands.value.forEach(d => { if (counts[d.status] !== undefined) counts[d.status]++; });
   return counts;
 });
+
+// 顶部统计卡（需求状态视角），点击按状态筛选
+const demandList = computed(() => apiDemands.value?.data || demands.value);
+const statCards = computed(() => {
+  const cnt = (st) => demandList.value.filter(d => d.status === st).length;
+  return [
+    { key: 'all', label: '全部需求', value: demandList.value.length, hint: '含各状态', icon: KPI_ICONS.fileText },
+    { key: 'open', label: '招聘中', value: cnt('open'), hint: '进展中', icon: KPI_ICONS.briefcase },
+    { key: 'approval', label: '待审批', value: cnt('approval'), hint: '审批流程中', icon: KPI_ICONS.clock },
+    { key: 'closed', label: '已关闭', value: cnt('closed'), hint: '本期完成', icon: KPI_ICONS.check },
+  ];
+});
+function onStatSelect(c) { filters.status = c.key; applyFilters(); }
 
 function applyFilters(){}
 function resetFilters(){
