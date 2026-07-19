@@ -2,7 +2,7 @@
   <WorkbenchLayout title="需求详情" :breadcrumb="{ text: '招聘管理', href: '/recruit-dashboard' }">
     <template #topbar-actions>
       <StatusBadge type="progress">招聘中</StatusBadge>
-      <button class="btn btn-outline btn-sm" style="margin-left:8px" @click="doAlert('重新匹配（demo）')">重新匹配</button>
+      <button class="btn btn-outline btn-sm" style="margin-left:8px" @click="doAlert('重新匹配')">重新匹配</button>
       <button class="btn btn-text-danger btn-sm" @click="doAlert('确认撤回该需求？')">撤回</button>
     </template>
 
@@ -242,7 +242,12 @@ const filteredCandidates = computed(() => {
     if (ageVal < 9999 && c.ageDays > ageVal) return false;
     if (filters.edu !== 'all' && edu !== filters.edu) return false;
     if (filters.years !== 'all' && years !== filters.years) return false;
-    if (filters.keyword && c.name.indexOf(filters.keyword) < 0) return false;
+    if (filters.keyword) {
+      const kw = filters.keyword.toLowerCase();
+      const name = (c.name || '').toLowerCase();
+      const skills = (c.skills || []).some(s => s.toLowerCase().indexOf(kw) >= 0);
+      if (name.indexOf(kw) < 0 && !skills) return false;
+    }
     return true;
   });
   list.sort((a, b) => {
@@ -383,11 +388,20 @@ async function addToDemand() {
 async function batchMoveDemand() {
   const names = Object.keys(checkedSet).filter(k => checkedSet[k]);
   if (!names.length) { alert('请先勾选候选人'); return; }
-  try {
-    const demandId = info.value.id || 'DM2026070005';
-    await linkCandidateToDemand(demandId, names[0]);
-  } catch (e) { console.warn('[RecruitDemandDetail] batchMoveDemand API failed:', e); }
-  window.alert('批量移出需求 ' + names.length + ' 人\n\n' + names.join('、'));
+  const demandId = info.value.id || 'DM2026070005';
+  const statusList = [];
+  for (const name of names) {
+    try {
+      const r = await linkCandidateToDemand(demandId, name);
+      statusList.push(name + ': ' + (r?.status || '成功'));
+    } catch (e) {
+      console.warn('[RecruitDemandDetail] batchMoveDemand failed for', name, e);
+      statusList.push(name + ': 失败');
+    }
+  }
+  const ok = statusList.filter(s => s.indexOf('失败') < 0).length;
+  const fail = statusList.length - ok;
+  window.alert('批量移出需求完成：共 ' + names.length + ' 人\n成功 ' + ok + ' 人，失败 ' + fail + ' 人\n\n' + statusList.join('\n'));
 }
 async function batchSchedule() {
   const names = Object.keys(checkedSet).filter(k => checkedSet[k]);
@@ -509,4 +523,15 @@ onUnmounted(() => {
 .row-locked { opacity: 0.7; }
 .row-reserve { opacity: 0.6; }
 .match-expired { opacity: 0.65; }
+.drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,.25); z-index:1000; display:flex; justify-content:flex-end; }
+.drawer-panel { width:420px; max-width:90vw; height:100%; background:var(--c-card); overflow-y:auto; padding:24px; box-shadow:-4px 0 24px rgba(0,0,0,.1); }
+.drawer-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+.drawer-header h3 { font-size:18px; margin:0; }
+.drawer-kpis { display:flex; gap:16px; margin-bottom:20px; }
+.drawer-kpis > div { flex:1; text-align:center; padding:12px; background:var(--c-bg); border-radius:8px; }
+.drawer-kpis span { display:block; font-size:11px; color:var(--c-sub); margin-bottom:4px; }
+.drawer-kpis b { display:block; font-size:22px; color:var(--c-primary); font-variant-numeric:tabular-nums; }
+.drawer-body > div { margin-bottom:16px; }
+.drawer-body > div > span { font-size:11px; color:var(--c-sub); display:block; margin-bottom:4px; }
+.drawer-body p { font-size:13px; color:var(--c-body); line-height:1.7; }
 </style>
