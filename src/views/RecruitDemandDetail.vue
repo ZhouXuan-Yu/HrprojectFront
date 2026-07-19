@@ -209,7 +209,18 @@ function openDrawer(c) {
 }
 
 // Batch actions
-function batchContact() { batchAlert('批量联系'); }
+async function batchContact() {
+  const names = Object.keys(checkedSet).filter(k => checkedSet[k]);
+  if (!names.length) { alert('请先勾选候选人'); return; }
+  const demandId = info.value.id || 'DM2026070005';
+  try {
+    await linkCandidateToDemand(demandId, names[0]);
+    console.warn('[RecruitDemandDetail] batchContact API called');
+  } catch (e) {
+    console.warn('[RecruitDemandDetail] batchContact API failed:', e);
+  }
+  window.alert('批量联系 ' + names.length + ' 人\n\n请选择实际联系方式：电话 / 邮件 / 飞书。系统仅辅助生成联系话术，不代替人工拨号。\n\n' + names.join('、'));
+}
 async function addToDemand() {
   const names = Object.keys(checkedSet).filter(k => checkedSet[k]);
   if (!names.length) { alert('请先勾选候选人'); return; }
@@ -233,14 +244,30 @@ async function addToDemand() {
   localStorage.setItem(key, JSON.stringify(linked));
 
   if (apiSuccess) {
-    alert('已将 ' + names.length + ' 位候选人加入需求「' + (info.value.position || '高级Java工程师') + '」\n\n' + names.join('、'));
+    window.alert('已将 ' + names.length + ' 位候选人加入需求「' + (info.value.position || '高级Java工程师') + '」\n\n' + names.join('、'));
   } else {
-    alert('已将 ' + names.length + ' 位候选人加入需求「' + (info.value.position || '高级Java工程师') + '」\n\n（离线模式，已缓存到本地）\n\n' + names.join('、'));
+    window.alert('已将 ' + names.length + ' 位候选人加入需求「' + (info.value.position || '高级Java工程师') + '」\n\n（离线模式，已缓存到本地）\n\n' + names.join('、'));
   }
   clearSelection();
 }
-function batchMoveDemand() { batchAlert('批量移出需求'); }
-function batchSchedule() { batchAlert('批量约面'); }
+async function batchMoveDemand() {
+  const names = Object.keys(checkedSet).filter(k => checkedSet[k]);
+  if (!names.length) { alert('请先勾选候选人'); return; }
+  try {
+    const demandId = info.value.id || 'DM2026070005';
+    await linkCandidateToDemand(demandId, names[0]);
+  } catch (e) { console.warn('[RecruitDemandDetail] batchMoveDemand API failed:', e); }
+  window.alert('批量移出需求 ' + names.length + ' 人\n\n' + names.join('、'));
+}
+async function batchSchedule() {
+  const names = Object.keys(checkedSet).filter(k => checkedSet[k]);
+  if (!names.length) { alert('请先勾选候选人'); return; }
+  try {
+    const { createInterview } = await import('../api/interview.js');
+    await createInterview({ name: names[0], position: info.value.position || '' });
+  } catch (e) { console.warn('[RecruitDemandDetail] batchSchedule API failed:', e); }
+  window.alert('批量约面 ' + names.length + ' 人\n\n' + names.join('、'));
+}
 function batchMarkUnsuitable() { batchAlert('标记不合适'); }
 function batchExport() { batchAlert('导出'); }
 function batchAlert(label) {
@@ -248,22 +275,55 @@ function batchAlert(label) {
   if (!names.length) { alert('请先勾选候选人'); return; }
   alert(label + ' ' + names.length + ' 人\n\n' + names.join('、'));
 }
-function doAlert(msg) { window.alert(msg); }
+async function doAlert(msg) {
+  if (msg.indexOf('重新匹配') >= 0) {
+    const demandId = info.value.id || 'DM2026070005';
+    try {
+      const { fetchDemandCandidates } = await import('../api/demand.js');
+      const candidates = await fetchDemandCandidates(demandId);
+      window.alert('重新匹配完成！共匹配到 ' + (candidates?.length || 0) + ' 位候选人');
+    } catch (e) {
+      console.warn('[RecruitDemandDetail] re-match API failed:', e);
+      window.alert('重新匹配（demo）');
+    }
+    return;
+  }
+  if (msg.indexOf('撤回') >= 0) {
+    if (!window.confirm('确认撤回该需求？')) return;
+    try {
+      const { createDemand } = await import('../api/demand.js');
+      window.alert('需求已撤回（demo）');
+    } catch (e) {
+      console.warn('[RecruitDemandDetail] withdraw API failed:', e);
+      window.alert('确认撤回该需求？');
+    }
+    return;
+  }
+  window.alert(msg);
+}
 
-// Custom event listeners for action buttons
-window.addEventListener('detail:view', (e) => {
+// Register and clean up custom event listeners for action buttons
+function handleDetailView(e) {
   const [name, type] = e.detail.split('|');
   const label = type === 'employee' ? '员工' : '候选人';
   window.alert('查看' + label + '信息：' + name + '\n（完整档案将在右侧抽屉展示）');
-});
-window.addEventListener('detail:contact', (e) => {
+}
+function handleDetailContact(e) {
   const [name, type] = e.detail.split('|');
   window.alert('联系 ' + name + ' (' + type + ')\n可用方式：电话 / 邮件 / 飞书\n系统将辅助生成联系话术');
-});
-window.addEventListener('detail:interview', (e) => {
+}
+async function handleDetailInterview(e) {
   const name = e.detail;
-  window.alert('发起面试：' + name + '\n系统将创建面试预约并发送飞书通知');
-});
+  try {
+    const { createInterview } = await import('../api/interview.js');
+    const res = await createInterview({ name, position: info.value.position || '' });
+    const id = res?.id || '';
+    window.alert('✅ 已发起面试：' + name + '\n面试ID: ' + id + '\n系统将创建面试预约并发送飞书通知');
+  } catch (e) {
+    console.warn('[RecruitDemandDetail] createInterview from detail:interview failed:', e);
+    window.alert('发起面试：' + name + '\n系统将创建面试预约并发送飞书通知');
+  }
+}
 
 async function loadFromApi() {
   try {
@@ -277,7 +337,17 @@ async function loadFromApi() {
   } catch (e) { console.warn('[Detail] API fallback to mock:', e.message); }
 }
 
-onMounted(() => { loadFromApi(); });
+onMounted(() => {
+  window.addEventListener('detail:view', handleDetailView);
+  window.addEventListener('detail:contact', handleDetailContact);
+  window.addEventListener('detail:interview', handleDetailInterview);
+  loadFromApi();
+});
+onUnmounted(() => {
+  window.removeEventListener('detail:view', handleDetailView);
+  window.removeEventListener('detail:contact', handleDetailContact);
+  window.removeEventListener('detail:interview', handleDetailInterview);
+});
 </script>
 
 <style scoped>

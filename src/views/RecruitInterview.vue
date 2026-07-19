@@ -429,54 +429,32 @@ const calendarWeekNum = computed(() => {
 .alert-dot.reject { background: var(--c-reject); }
 .alert-dot.warn { background: var(--c-warn); }
 .alert-dot.done { background: var(--c-done); }
-[data-slot="iv-pipeline-row"] {
-  display: flex;
-  gap: 8px;
+/* 状态统计卡（人才库 hero-summary-card 同款，6 列可点击筛选） */
+.iv-stat-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
   margin-bottom: 16px;
-  flex-wrap: wrap;
 }
-[data-slot="iv-pipeline-chip"] {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 14px;
-  border-radius: 18px;
-  border: 1px solid var(--c-border);
-  background: var(--c-card);
+.iv-stat-card {
   cursor: pointer;
-  transition: all 0.15s;
-  font-family: inherit;
-  font-size: 12px;
-  color: var(--c-body);
+  transition: border-color .15s, box-shadow .15s;
 }
-[data-slot="iv-pipeline-chip"]:hover {
+.iv-stat-card:hover { border-color: var(--c-primary); }
+.iv-stat-card.is-active {
   border-color: var(--c-primary);
+  box-shadow: 0 0 0 3px var(--c-primary-subtle);
+}
+/* 图标块内放蓝色线性图标（隐藏 hero-summary-card 默认彩色圆点装饰） */
+.iv-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--c-primary);
-  box-shadow: 0 2px 8px rgba(79, 110, 247, 0.12);
 }
-/* 仅当真正激活（data-active="true"）时才填充主色，
-   注意必须用属性值选择器，否则 data-active="false" 也会被命中 */
-[data-slot="iv-pipeline-chip"][data-active="true"] {
-  background: var(--c-primary);
-  border-color: var(--c-primary);
-  color: #fff;
-  font-weight: 600;
-}
-[data-slot="iv-pipeline-chip"][data-active="true"] .iv-dot {
-  background: #fff !important;
-}
-.iv-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-[data-slot="iv-pipeline-val"] {
-  font-weight: 700;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-[data-slot="iv-pipeline-label"] {
-  opacity: 0.85;
-}
+.iv-stat-icon::after { display: none; }
+.iv-stat-icon svg { width: 18px; height: 18px; }
+
+@media (max-width: 1200px) { .iv-stat-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .iv-stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>
