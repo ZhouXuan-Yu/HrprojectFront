@@ -32,12 +32,9 @@ async function request(path, options = {}) {
 }
 
 async function handleResponse(resp) {
-  // 401 / 403 — clear stale token and redirect to login
-  if (resp.status === 401 || resp.status === 403) {
+  // 401 / 403 — clear stale token on real auth error (not missing token in dev mode)
+  if ((resp.status === 401 || resp.status === 403) && localStorage.getItem('hr_token')) {
     localStorage.removeItem('hr_token');
-    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-      window.location.replace('/login');
-    }
     const err = new Error('请重新登录');
     err.code = 'UNAUTHORIZED';
     err.status = resp.status;

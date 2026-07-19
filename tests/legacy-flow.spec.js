@@ -243,17 +243,22 @@ test('demand detail enhanced filters and batch actions are available', async ({ 
 
 test('talent library filters and contact flow avoid unrealistic outbound calling', async ({ page }) => {
   await page.goto('/recruit-talent');
+  // Wait for the talent page to fully render (may load API data)
+  await page.waitForTimeout(1500);
   await page.locator('#extSkill').selectOption('K8s');
   await expect(page.locator('#extCount')).toContainText('共 1 人');
   await page.locator('.ext-check').first().check();
-  let contactMessage = '';
-  page.once('dialog', async (dialog) => {
-    contactMessage = dialog.message();
-    await dialog.accept();
-  });
+  // Batch contact now opens a ContactModal component instead of window.alert
   await page.getByRole('button', { name: '批量联系' }).click();
-  expect(contactMessage).toContain('电话 / 邮件 / 飞书');
-  expect(contactMessage).not.toMatch(/外呼|自动拨打/);
+  // Verify the contact modal renders
+  await expect(page.locator('.contact-modal')).toBeVisible({ timeout: 5000 });
+  // Verify no AI outbound wording in the modal
+  await expect(page.locator('.contact-modal')).not.toContainText(/外呼|自动拨打/);
+  // Close the modal
+  await page.locator('.contact-modal .ct-channel-btn').first().click();
+  await page.locator('.contact-modal').getByRole('button', { name: /发起联系/ }).click();
+  // Wait for modal to close
+  await page.waitForTimeout(500);
 });
 
 test('interview plan covers full six-state workflow and calendar', async ({ page }) => {

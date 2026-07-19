@@ -392,7 +392,7 @@ async function doAlert(msg) {
   window.alert(msg);
 }
 
-// Register and clean up custom event listeners for action buttons
+// Keep Legacy CustomEvent listeners for backward-compatibility with any legacy scripts
 function handleDetailView(e) {
   const [name, type] = e.detail.split('|');
   const label = type === 'employee' ? '员工' : '候选人';
@@ -400,18 +400,24 @@ function handleDetailView(e) {
 }
 function handleDetailContact(e) {
   const [name, type] = e.detail.split('|');
-  window.alert('联系 ' + name + ' (' + type + ')\n可用方式：电话 / 邮件 / 飞书\n系统将辅助生成联系话术');
+  const c = candidates.value.find(x => x.name === name);
+  if (c) openCommModal(c);
+  else window.alert('联系 ' + name + ' (' + type + ')\n可用方式：电话 / 邮件 / 飞书\n系统将辅助生成联系话术');
 }
 async function handleDetailInterview(e) {
   const name = e.detail;
-  try {
-    const { createInterview } = await import('../api/interview.js');
-    const res = await createInterview({ name, position: info.value.position || '' });
-    const id = res?.id || '';
-    window.alert('✅ 已发起面试：' + name + '\n面试ID: ' + id + '\n系统将创建面试预约并发送飞书通知');
-  } catch (e) {
-    console.warn('[RecruitDemandDetail] createInterview from detail:interview failed:', e);
-    window.alert('发起面试：' + name + '\n系统将创建面试预约并发送飞书通知');
+  const c = candidates.value.find(x => x.name === name);
+  if (c) openScheduleModal(c);
+  else {
+    try {
+      const { createInterview } = await import('../api/interview.js');
+      const res = await createInterview({ name, position: info.value.position || '' });
+      const id = res?.id || '';
+      window.alert('✅ 已发起面试：' + name + '\n面试ID: ' + id + '\n系统将创建面试预约并发送飞书通知');
+    } catch (e) {
+      console.warn('[RecruitDemandDetail] createInterview from detail:interview failed:', e);
+      window.alert('发起面试：' + name + '\n系统将创建面试预约并发送飞书通知');
+    }
   }
 }
 
