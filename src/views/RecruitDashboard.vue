@@ -87,7 +87,7 @@ import { useRouter } from 'vue-router';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import FunnelHero from '../components/FunnelHero.vue';
 import { KPI_SETS, DEPT_PROGRESS, CHANNEL_DATA, RISK_ALERTS } from '../data/dashboard.js';
-import { fetchKpi, fetchDeptProgress, fetchChannel, fetchRiskAlerts } from '../api/dashboard.js';
+import { fetchKpi, fetchFunnel, fetchDeptProgress, fetchChannel, fetchRiskAlerts } from '../api/dashboard.js';
 import { resolveKpiIcon } from '../components/kpiIcons.js';
 
 const router = useRouter();
@@ -97,12 +97,15 @@ const showAlerts = ref(false);
 const deptOpen = ref(false);
 const channelOpen = ref(false);
 const kpiTransforms = ref({});
+const loading = ref(true);
+const loadError = ref('');
 
 const role = localStorage.getItem('hr_role') || 'hr';
 const isInterviewerRole = role === 'interviewer' || role === 'temp_interviewer';
 
 // Reactive data from API (with mock fallback)
 const apiKpis = ref(null);
+const apiFunnel = ref(null);
 const apiDeptProgress = ref(null);
 const apiChannelData = ref(null);
 const apiRiskAlerts = ref(null);
@@ -146,16 +149,22 @@ function onKpiLeave(i) {
 async function refreshDashboard() { await loadFromApi(); }
 
 async function loadFromApi() {
+  loading.value = true;
+  loadError.value = '';
   try {
-    const [kpiData, deptData, channelData, alertData] = await Promise.all([
-      fetchKpi(), fetchDeptProgress(), fetchChannel(), fetchRiskAlerts()
+    const [kpiData, funnelData, deptData, channelData, alertData] = await Promise.all([
+      fetchKpi(), fetchFunnel(), fetchDeptProgress(), fetchChannel(), fetchRiskAlerts()
     ]);
-    if (kpiData) apiKpis.value = kpiData;
-    if (deptData) apiDeptProgress.value = deptData;
-    if (channelData) apiChannelData.value = channelData;
-    if (alertData) apiRiskAlerts.value = alertData;
+    if (kpiData && kpiData.length) apiKpis.value = kpiData;
+    if (funnelData && funnelData.stages) apiFunnel.value = funnelData;
+    if (deptData && deptData.length) apiDeptProgress.value = deptData;
+    if (channelData && channelData.length) apiChannelData.value = channelData;
+    if (alertData && alertData.length) apiRiskAlerts.value = alertData;
   } catch (e) {
+    loadError.value = e.message;
     console.warn('API fetch fallback to mock:', e.message);
+  } finally {
+    loading.value = false;
   }
 }
 
