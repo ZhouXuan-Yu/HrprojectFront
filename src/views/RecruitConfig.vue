@@ -224,6 +224,8 @@ import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import StatCardRow from '../components/StatCardRow.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { KPI_ICONS } from '../components/kpiIcons.js';
+import { useToast } from '../composables/useToast.js';
+import { useAppError } from '../composables/useAppError.js';
 import {
   fetchEmailAccounts, fetchChannels, fetchScoreRules, fetchNotifyTemplates,
   fetchRolePermissions, fetchAuditLogs,
@@ -232,6 +234,9 @@ import {
   updateScoreRules,
   createNotifyTemplate, updateNotifyTemplate,
 } from '../api/config.js';
+
+const { toast } = useToast();
+const { handleError } = useAppError();
 
 const emailAccounts = ref([]);
 const channels = ref([]);
@@ -326,7 +331,7 @@ async function testEmailConn(acct) {
     await updateEmailAccount(editingEmail.value?.id || 0, { __test_conn: true });
   } catch (e) { /* ignore */ }
   emailSaving.value = false;
-  alert(`测试连接完成！\n\n服务器：${emailForm.server || acct?.server || '—'}\n端口：${emailForm.port || acct?.port || '993'}`);
+  toast.success('测试连接完成\n服务器：' + (emailForm.server || acct?.server || '—') + '\n端口：' + (emailForm.port || acct?.port || '993'));
   await loadAll();
 }
 async function deleteEmail(acct) {
@@ -334,7 +339,7 @@ async function deleteEmail(acct) {
   try {
     await deleteEmailAccount(acct.id);
   } catch (e) {
-    alert('删除失败: ' + e.message);
+    toast.error('删除失败: ' + e.message);
   }
   await loadAll();
 }
@@ -355,11 +360,11 @@ async function testConnection() {
     try { await updateEmailAccount(editingEmail.value.id, { __test_conn: true }); } catch (e) { /* ignore */ }
   }
   emailSaving.value = false;
-  alert(`正在测试连接...\n\n服务器：${emailForm.server}\n端口：${emailForm.port}\n\n连接成功！`);
+  toast.success('连接成功！\n服务器：' + emailForm.server + '\n端口：' + emailForm.port);
 }
 async function submitEmail() {
-  if (!emailForm.addr) { alert('请填写邮箱地址'); return; }
-  if (!editingEmail.value && !emailForm.pass) { alert('请填写密码/授权码'); return; }
+  if (!emailForm.addr) { toast.warning('请填写邮箱地址'); return; }
+  if (!editingEmail.value && !emailForm.pass) { toast.warning('请填写密码/授权码'); return; }
   emailSaving.value = true;
   const folder = emailForm.folder === 'custom' ? emailForm.folderCustom : 'INBOX';
   const payload = {
@@ -374,7 +379,7 @@ async function submitEmail() {
       await createEmailAccount(payload);
     }
   } catch (e) {
-    alert('操作失败: ' + e.message);
+    toast.error('操作失败: ' + e.message);
   }
   emailSaving.value = false;
   showEmailModal.value = false;
@@ -387,7 +392,7 @@ async function toggleChanStatus(ch) {
   try {
     await updateChannel(ch.code, { status: newStatus });
   } catch (e) {
-    alert('操作失败: ' + e.message);
+    toast.error('操作失败: ' + e.message);
   }
   await loadAll();
 }
@@ -397,16 +402,16 @@ async function updateChanCost(ch, e) {
   try {
     await updateChannel(ch.code, { cost: val });
   } catch (err) {
-    alert('更新失败: ' + err.message);
+    toast.error('更新失败: ' + err.message);
   }
   await loadAll();
 }
 async function submitChannel() {
-  if (!chanForm.name) { alert('请填写渠道名称'); return; }
+  if (!chanForm.name) { toast.warning('请填写渠道名称'); return; }
   try {
     await createChannel({ name: chanForm.name, type: chanForm.type, cost: chanForm.cost, status: 1 });
   } catch (e) {
-    alert('新增失败: ' + e.message);
+    toast.error('新增失败: ' + e.message);
   }
   showChanModal.value = false;
   chanForm.name = ''; chanForm.type = '第三方平台'; chanForm.cost = '¥0';
@@ -446,7 +451,7 @@ function editTemplate(tpl) {
   showTplModal.value = true;
 }
 function previewTemplate(tpl) {
-  alert(`预览：${tpl.name}\n\n${tpl.body || '（无内容）'}`);
+  toast.info('预览：' + tpl.name);
 }
 async function updateTplMethod(tpl, e) {
   const val = e.target.value.trim();
@@ -454,12 +459,12 @@ async function updateTplMethod(tpl, e) {
   try {
     await updateNotifyTemplate(tpl.id, { method: val, name: tpl.name, type: tpl.type, subject: tpl.subject, body: tpl.body });
   } catch (err) {
-    alert('更新失败: ' + err.message);
+    toast.error('更新失败: ' + err.message);
   }
   await loadAll();
 }
 async function submitTemplate() {
-  if (!tplForm.name) { alert('请填写模板名称'); return; }
+  if (!tplForm.name) { toast.warning('请填写模板名称'); return; }
   try {
     if (editingTpl.value?.id) {
       await updateNotifyTemplate(editingTpl.value.id, { ...tplForm });
@@ -467,13 +472,11 @@ async function submitTemplate() {
       await createNotifyTemplate({ ...tplForm });
     }
   } catch (e) {
-    alert('操作失败: ' + e.message);
+    toast.error('操作失败: ' + e.message);
   }
   showTplModal.value = false;
   await loadAll();
 }
-
-function alert(msg) { window.alert(msg); }
 </script>
 
 <style scoped>

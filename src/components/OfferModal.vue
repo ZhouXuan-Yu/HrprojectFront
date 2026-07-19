@@ -102,6 +102,7 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue';
 import { api } from '../api/index.js';
+import { useToast } from '../composables/useToast.js';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -114,6 +115,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'success']);
 
 const submitting = ref(false);
+const { toast } = useToast();
 
 const form = reactive({
   baseSalary: 15000,
@@ -178,7 +180,7 @@ async function handleSubmit() {
   } catch (e) {
     console.warn('[OfferModal] create failed:', e);
     submitting.value = false;
-    alert('发送 Offer 失败: ' + (e.message || '网络错误'));
+    toast.error('发送 Offer 失败: ' + (e.message || '网络错误'));
   }
 }
 

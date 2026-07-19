@@ -2,7 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  fullyParallel: true,
+  fullyParallel: false,
+  workers: 1,
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
@@ -13,7 +14,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'http://127.0.0.1:5173',
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 120000,
   },
   projects: [
