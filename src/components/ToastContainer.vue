@@ -32,7 +32,6 @@
 </template>
 
 <script setup>
-import { ref, onUnmounted } from 'vue';
 import { useToast } from '../composables/useToast.js';
 
 const { toasts, removeToast } = useToast();
@@ -43,9 +42,6 @@ const iconMap = {
   warning: '⚠',
   info: 'ℹ',
 };
-
-// Pause/resume progress bar on hover
-const timers = {};
 
 function pauseDismiss(t) {
   t._paused = true;

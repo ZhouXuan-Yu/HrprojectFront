@@ -32,6 +32,17 @@ async function request(path, options = {}) {
 }
 
 async function handleResponse(resp) {
+  // 401 / 403 — clear stale token and redirect to login
+  if (resp.status === 401 || resp.status === 403) {
+    localStorage.removeItem('hr_token');
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      window.location.replace('/login');
+    }
+    const err = new Error('请重新登录');
+    err.code = 'UNAUTHORIZED';
+    err.status = resp.status;
+    throw err;
+  }
   const json = await resp.json();
   if (!resp.ok) {
     const err = new Error(json?.error?.message || json?.message || '请求失败');
