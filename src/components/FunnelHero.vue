@@ -562,6 +562,7 @@ function onResize() {
 function disposeThree() {
   cancelAnimationFrame(rafId);
   if (io) { io.disconnect(); io = null; }
+  if (visIo) { visIo.disconnect(); visIo = null; }
   if (ro) { ro.disconnect(); ro = null; }
   window.removeEventListener('scroll', onScroll);
   window.removeEventListener('resize', onScroll);
@@ -603,7 +604,7 @@ onMounted(() => {
   window.addEventListener('resize', onScroll, { passive: true });
   onScroll();
   // Pause rAF when off-screen, resume when visible
-  const visIo = new IntersectionObserver((entries) => {
+  const visIoLocal = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       visible = entry.isIntersecting;
       if (visible && !destroyed && rafId === 0) {
@@ -611,7 +612,8 @@ onMounted(() => {
       }
     });
   }, { threshold: 0 });
-  visIo.observe(cardEl.value);
+  visIoLocal.observe(cardEl.value);
+  visIo = visIoLocal;
   // Layer-by-layer reveal when the card enters the viewport
   io = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
