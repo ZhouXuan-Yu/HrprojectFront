@@ -164,6 +164,31 @@
       @close="showCommModal = false"
       @success="onCommSuccess"
     />
+
+    <!-- Candidate Detail Drawer -->
+    <div v-if="drawerCandidate" class="drawer-overlay" @click.self="drawerCandidate = null">
+      <div class="drawer-panel">
+        <div class="drawer-header">
+          <h3>{{ drawerCandidate.name }}</h3>
+          <button class="btn btn-ghost btn-sm" @click="drawerCandidate = null">关闭</button>
+        </div>
+        <AiSkeleton v-if="drawerLoading" variant="text" :lines="4" />
+        <div v-else-if="drawerData" class="drawer-body">
+          <div class="drawer-kpis">
+            <div><span>画像分</span><b>{{ drawerData.profileScore || '--' }}</b></div>
+            <div><span>匹配分</span><b>{{ drawerData.matchScore || '--' }}</b></div>
+            <div><span>综合分</span><b>{{ drawerData.comprehensiveScore || '--' }}</b></div>
+          </div>
+          <div v-if="drawerData.matchReason"><span>匹配理由</span><p>{{ drawerData.matchReason }}</p></div>
+          <div v-if="drawerData.matchDetail"><span>详细分析</span><p>{{ drawerData.matchDetail }}</p></div>
+          <div><span>来源</span><p>{{ drawerData.sourceLabel || '--' }}</p></div>
+          <div><span>学历/年限</span><p>{{ drawerData.edu || '--' }} / {{ drawerData.years || '--' }}</p></div>
+        </div>
+        <div v-else class="drawer-body">
+          <p style="color:var(--c-sub)">匹配数据加载失败，请检查后端服务</p>
+        </div>
+      </div>
+    </div>
   </WorkbenchLayout>
 </template>
 
@@ -173,6 +198,7 @@ import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import ScheduleInterviewModal from '../components/ScheduleInterviewModal.vue';
 import CommunicationModal from '../components/CommunicationModal.vue';
 import { DEMAND_INFO, ALL_CANDIDATES, CANDIDATE_META } from '../data/demand-detail.js';
+import AiSkeleton from '../components/ai/AiSkeleton.vue';
 import { fetchDemandDetail, fetchDemandCandidates, linkCandidateToDemand } from '../api/demand.js';
 
 const info = ref(DEMAND_INFO);
@@ -180,6 +206,11 @@ const candidates = ref([...ALL_CANDIDATES]);
 
 const checkedSet = reactive({});
 const checkedCount = computed(() => Object.keys(checkedSet).filter(k => checkedSet[k]).length);
+
+// Candidate detail drawer
+const drawerCandidate = ref(null);
+const drawerLoading = ref(false);
+const drawerData = ref(null);
 
 // Modal state
 const showScheduleModal = ref(false);
@@ -287,10 +318,23 @@ function onCheck() {}
 function clearSelection() {
   Object.keys(checkedSet).forEach(k => delete checkedSet[k]);
 }
-function openDrawer(c) {
-  const type = c.isEmployee ? 'employee' : 'candidate';
-  const label = type === 'employee' ? '员工' : '候选人';
-  window.alert('查看' + label + '信息：' + c.name + '\n（完整档案将在右侧抽屉展示）\n\n• 技能标签：' + (c.skills?.join(', ') || '未标记') + '\n• 学历：' + (c.edu || '本科') + '\n• 工作年限：' + (c.years || '未填写') + '\n• 匹配分：' + (c.matchScore || '未匹配'));
+async function openDrawer(c) {
+  drawerCandidate.value = c;
+  drawerLoading.value = true;
+  drawerData.value = null;
+  try {
+    const demandId = info.value.id || 'DM2026070005';
+    const { default: api } = await import('../api/index.js');
+    const r = await api.post(`/demand/${demandId}/match`, {
+      candidateIds: [c.name],
+      topN: 1,
+    });
+    drawerData.value = r.data?.candidates?.[0] || r.data?.allCandidates?.[0] || null;
+  } catch (e) {
+    console.warn('[DemandDetail] match API failed:', e);
+  } finally {
+    drawerLoading.value = false;
+  }
 }
 
 // Batch actions
@@ -369,12 +413,21 @@ async function doAlert(msg) {
   if (msg.indexOf('重新匹配') >= 0) {
     const demandId = info.value.id || 'DM2026070005';
     try {
+      const { default: api } = await import('../api/index.js');
+      // Step 1: Run the matching engine
+      await api.post(`/demand/${demandId}/match`, { applyHardFilter: true, topN: 20 });
+      // Step 2: Re-fetch candidates
       const { fetchDemandCandidates } = await import('../api/demand.js');
-      const candidates = await fetchDemandCandidates(demandId);
-      window.alert('重新匹配完成！共匹配到 ' + (candidates?.length || 0) + ' 位候选人');
+      const fresh = await fetchDemandCandidates(demandId);
+      if (Array.isArray(fresh)) {
+        candidates.value = fresh;
+        window.alert('重新匹配完成！共匹配到 ' + fresh.length + ' 位候选人');
+      } else {
+        window.alert('重新匹配完成！');
+      }
     } catch (e) {
       console.warn('[RecruitDemandDetail] re-match API failed:', e);
-      window.alert('重新匹配（demo）');
+      window.alert('重新匹配失败，请检查后端服务是否运行');
     }
     return;
   }

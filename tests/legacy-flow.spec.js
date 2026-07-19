@@ -253,27 +253,18 @@ test('talent library filters and contact flow avoid unrealistic outbound calling
   await page.waitForTimeout(300);
   await expect(page.locator('#extCount')).toContainText('共');
 
-  // Batch contact opens window.alert dialog (talent page uses alert for multi-select)
+  // Batch contact opens ContactModal (not window.alert)
   await page.locator('.ext-check').first().check();
   await page.waitForTimeout(200);
-
-  let contactMessage = '';
-  const dialogHandler = (dialog) => {
-    contactMessage = dialog.message();
-    dialog.accept();
-  };
-  page.on('dialog', dialogHandler);
   await page.getByRole('button', { name: '批量联系' }).click();
-  await page.waitForTimeout(500);
-  page.off('dialog', dialogHandler);
-  // Verify dialog was triggered — skip if alert didn't fire (toast might have replaced it)
-  if (contactMessage) {
-    expect(contactMessage).toContain('电话 / 邮件 / 飞书');
-    expect(contactMessage).not.toMatch(/外呼|自动拨打/);
-  }
 
-  // Also verify no AI outbound wording on the page
+  // Verify ContactModal renders
+  await expect(page.locator('.contact-modal')).toBeVisible({ timeout: 5000 });
+  // Verify no AI outbound wording anywhere on the page
   await expect(page.locator('body')).not.toContainText(/外呼|自动拨打/);
+  // Close the ContactModal safely
+  await page.locator('.contact-modal .drawer-close').click();
+  await expect(page.locator('.contact-modal')).not.toBeVisible({ timeout: 3000 });
 });
 
 test('interview plan covers full six-state workflow and calendar', async ({ page }) => {
