@@ -38,9 +38,8 @@
         <span data-slot="iv-pipeline-label">{{ kpi.label }}</span>
       </button>
     </div>
-    <!-- Sentinels: prevents app.js injecting duplicate hero-page-summary and hero-page-workspace -->
+    <!-- Block hero-page-summary (redundant "当前筛选范围" label) — let hero-page-command/workspace inject from app.js -->
     <section class="hero-page-summary" style="display:none" aria-hidden="true"></section>
-    <section class="hero-page-workspace" style="display:none" aria-hidden="true"></section>
 
     <!-- Tabs -->
     <div class="tabs" role="tablist">
@@ -364,11 +363,46 @@ const calendarWeekNum = computed(() => {
 .alert-dot.reject { background: var(--c-reject); }
 .alert-dot.warn { background: var(--c-warn); }
 .alert-dot.done { background: var(--c-done); }
-.status-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.status-chip {
-  padding: 4px 14px; border-radius: 20px; font-size: 12px; cursor: pointer;
-  background: var(--c-bg); color: var(--c-body); border: 1px solid transparent; transition: all .15s;
+
+/* Pipeline chips — compact status filter row */
+[data-slot="iv-kpi-row"] {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
 }
-.status-chip.active { background: var(--c-primary-subtle); color: var(--c-primary); border-color: var(--c-primary); font-weight: 600; }
-.status-chip .cnt { font-weight: 700; }
+[data-slot="iv-pipeline-chip"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--c-border);
+  background: var(--c-card);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--c-body);
+}
+[data-slot="iv-pipeline-chip"]:hover {
+  border-color: var(--c-primary);
+  color: var(--c-primary);
+}
+[data-slot="iv-pipeline-chip"][data-active] {
+  background: var(--c-primary);
+  border-color: var(--c-primary);
+  color: #fff;
+  font-weight: 600;
+}
+[data-slot="iv-pipeline-val"] {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+[data-slot="iv-pipeline-label"] {
+  opacity: 0.85;
+}
+[data-slot="iv-pipeline-chip"][data-active] [data-slot="iv-pipeline-val"] {
+  color: #fff;
+}
 </style>

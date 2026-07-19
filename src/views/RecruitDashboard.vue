@@ -29,7 +29,7 @@
       <div v-for="(kpi, i) in kpis" :key="i" class="metric-card dashboard-kpi-card"
         :style="{ '--kpi-accent': kpiAccent(i) }"
         @mousemove="onKpiHover(i, $event)" @mouseleave="onKpiLeave(i)">
-        <div class="metric-icon dashboard-kpi-icon" v-html="kpi.icon"></div>
+        <div class="metric-icon dashboard-kpi-icon" v-html="resolveKpiIcon(kpi)"></div>
         <div><div class="metric-value">{{ kpi.val }}</div><div class="metric-label">{{ kpi.label }}</div></div>
         <div class="kpi-trend">{{ kpiTrend(i) }}</div>
       </div>
@@ -88,6 +88,7 @@ import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import FunnelHero from '../components/FunnelHero.vue';
 import { KPI_SETS, DEPT_PROGRESS, CHANNEL_DATA, RISK_ALERTS } from '../data/dashboard.js';
 import { fetchKpi, fetchDeptProgress, fetchChannel, fetchRiskAlerts } from '../api/dashboard.js';
+import { resolveKpiIcon } from '../components/kpiIcons.js';
 
 const router = useRouter();
 const timeRange = ref('month');
