@@ -288,23 +288,24 @@ function clearSelection() {
   Object.keys(checkedSet).forEach(k => delete checkedSet[k]);
 }
 function openDrawer(c) {
-  // Dispatch custom event for action cell buttons to consume
   const type = c.isEmployee ? 'employee' : 'candidate';
-  window.dispatchEvent(new CustomEvent('detail:view', { detail: c.name + '|' + type }));
+  const label = type === 'employee' ? '员工' : '候选人';
+  window.alert('查看' + label + '信息：' + c.name + '\n（完整档案将在右侧抽屉展示）\n\n• 技能标签：' + (c.skills?.join(', ') || '未标记') + '\n• 学历：' + (c.edu || '本科') + '\n• 工作年限：' + (c.years || '未填写') + '\n• 匹配分：' + (c.matchScore || '未匹配'));
 }
 
 // Batch actions
 async function batchContact() {
   const names = Object.keys(checkedSet).filter(k => checkedSet[k]);
   if (!names.length) { alert('请先勾选候选人'); return; }
-  const demandId = info.value.id || 'DM2026070005';
-  try {
-    await linkCandidateToDemand(demandId, names[0]);
-    console.warn('[RecruitDemandDetail] batchContact API called');
-  } catch (e) {
-    console.warn('[RecruitDemandDetail] batchContact API failed:', e);
+  // Open communication modal for the first checked candidate
+  const firstName = names[0];
+  const c = candidates.value.find(x => x.name === firstName);
+  if (c) {
+    clearSelection();
+    openCommModal(c);
+  } else {
+    window.alert('批量联系 ' + names.length + ' 人\n\n请选择实际联系方式：电话 / 邮件 / 飞书。系统仅辅助生成联系话术，不代替人工拨号。\n\n' + names.join(', '));
   }
-  window.alert('批量联系 ' + names.length + ' 人\n\n请选择实际联系方式：电话 / 邮件 / 飞书。系统仅辅助生成联系话术，不代替人工拨号。\n\n' + names.join('、'));
 }
 async function addToDemand() {
   const names = Object.keys(checkedSet).filter(k => checkedSet[k]);
@@ -347,11 +348,15 @@ async function batchMoveDemand() {
 async function batchSchedule() {
   const names = Object.keys(checkedSet).filter(k => checkedSet[k]);
   if (!names.length) { alert('请先勾选候选人'); return; }
-  try {
-    const { createInterview } = await import('../api/interview.js');
-    await createInterview({ name: names[0], position: info.value.position || '' });
-  } catch (e) { console.warn('[RecruitDemandDetail] batchSchedule API failed:', e); }
-  window.alert('批量约面 ' + names.length + ' 人\n\n' + names.join('、'));
+  // Open schedule modal for the first checked candidate
+  const firstName = names[0];
+  const c = candidates.value.find(x => x.name === firstName);
+  if (c) {
+    clearSelection();
+    openScheduleModal(c);
+  } else {
+    window.alert('批量约面 ' + names.length + ' 人\n\n' + names.join(', '));
+  }
 }
 function batchMarkUnsuitable() { batchAlert('标记不合适'); }
 function batchExport() { batchAlert('导出'); }
