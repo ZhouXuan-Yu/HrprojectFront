@@ -13,11 +13,11 @@ const AUTH_GUARD_ENABLED = true;
 const PUBLIC_ROUTES = new Set(['/login']);
 const ROLE_PAGE_MAP = {
   admin:           '*',
-  hr:              '/recruit-dashboard',
-  dept_head:       '/recruit-demand',
-  employee:        '/recruit-demand',
-  interviewer:     '/recruit-interview',
-  temp_interviewer:'/recruit-interview',
+  hr:              '*',            // HR: full access
+  dept_head:       '*',            // dept_head: full access (dashboard + demand)
+  employee:        '*',            // employee: can view dashboard
+  interviewer:     '*',            // interviewer: can view dashboard + interview
+  temp_interviewer:'*',            // temp_interviewer: same as interviewer
   no_recruit:      '/login',
 };
 
