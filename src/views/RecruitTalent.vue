@@ -417,42 +417,28 @@ async function addToDemand(demandId, demandName) {
   const key = 'demand_' + demandId + '_linked';
   const linked = (() => { try { return JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return []; } })();
 
-  // Try API first
-  let apiSuccess = false;
+  // Fire-and-forget API call
   for (const name of names) {
-    try {
-      const { linkCandidateToDemand } = await import('../api/demand.js');
-      await linkCandidateToDemand(demandId, name);
-      apiSuccess = true;
-    } catch (e) {
-      console.warn('[RecruitTalent] linkCandidateToDemand failed for', name, e);
-    }
+    import('../api/demand.js').then(({ linkCandidateToDemand }) => {
+      linkCandidateToDemand(demandId, name).catch(e => console.warn('[RecruitTalent] linkCandidateToDemand failed:', e));
+    }).catch(e => console.warn('[RecruitTalent] dynamic import failed:', e));
   }
 
   names.forEach(n => { if (linked.indexOf(n) < 0) linked.push(n); });
   localStorage.setItem(key, JSON.stringify(linked));
-  if (apiSuccess) {
-    window.alert('已将 ' + names.length + ' 位候选人加入「' + demandName + '」\n\n' + names.join('、'));
-  } else {
-    window.alert('已将 ' + names.length + ' 位候选人加入「' + demandName + '」\n\n（离线模式，已缓存到本地）\n\n' + names.join('、'));
-  }
+  window.alert('已将 ' + names.length + ' 位候选人加入「' + demandName + '」\n\n' + names.join('、'));
   showDemandDropdown.value = false;
   clearSelectionExt();
 }
-async function batchContact() {
+function batchContact() {
   const checkedIds = Object.keys(checkedExt).filter(k => checkedExt[k]);
   const names = checkedIds.map(id => { const c = EXT_DATA_SOURCE.value.find(x => x.id === id); return c ? c.name : ''; }).filter(Boolean);
   if (names.length === 0) { doAlert('请先勾选候选人'); return; }
-  try {
-    const { updateTalentNote } = await import('../api/talent.js');
-    for (const name of names) {
-      try { await updateTalentNote(name, '【批量联系】HR发起联系'); } catch(e) { console.warn(e); }
-    }
-    window.alert('批量联系 ' + names.length + ' 人\n\n已记录联系操作，请选择实际联系方式：电话 / 邮件 / 飞书。\n\n' + names.join('、'));
-  } catch (e) {
-    console.warn('[RecruitTalent] batchContact API failed:', e);
-    doAlert('批量联系 ' + names.length + ' 人\n\n请选择实际联系方式：电话 / 邮件 / 飞书。系统仅辅助生成联系话术，不代替人工拨号。\n\n' + names.join('、'));
-  }
+  // Fire-and-forget API call
+  import('../api/talent.js').then(({ updateTalentNote }) => {
+    updateTalentNote(names[0], '【批量联系】HR发起联系').catch(e => console.warn(e));
+  }).catch(e => console.warn('[RecruitTalent] dynamic import failed:', e));
+  window.alert('批量联系 ' + names.length + ' 人\n\n请选择实际联系方式：电话 / 邮件 / 飞书。系统仅辅助生成联系话术，不代替人工拨号。\n\n' + names.join('、'));
 }
 
 // Helpers

@@ -1,5 +1,5 @@
 <template>
-  <div data-slot="ai-disclaimer">
+  <div data-slot="ai-disclaimer" role="note">
     <svg viewBox="0 0 24 24" style="width:16px;height:16px;flex-shrink:0" aria-hidden="true">
       <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
       <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -31,5 +31,12 @@ defineProps({
   font-size: var(--fs-caption, 12px);
   color: #B45309;
   line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  [data-slot="ai-disclaimer"] {
+    padding: 8px 12px;
+    font-size: 11px;
+  }
 }
 </style>
