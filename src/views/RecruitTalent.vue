@@ -121,9 +121,9 @@
     <!-- ===== Tab 2: 内部员工库 ===== -->
     <div class="tab-panel" :class="{ active: activeTab === 'internal' }">
       <div class="filter-bar">
-        <input type="text" placeholder="搜索姓名 / 工号 / 技能...">
-        <select><option>全部部门</option><option>技术部</option><option>产品部</option><option>数据部</option></select>
-        <select><option>综合评估排序</option><option>工龄排序</option><option>绩效排序</option><option>最近匹配分排序</option></select>
+        <input type="text" v-model="intFilters.search" placeholder="搜索姓名 / 工号 / 技能...">
+        <select v-model="intFilters.dept"><option value="all">全部部门</option><option>技术部</option><option>产品部</option><option>数据部</option></select>
+        <select v-model="intFilters.sort"><option value="default">综合评估排序</option><option value="years">工龄排序</option><option value="perf">绩效排序</option><option value="match">最近匹配分排序</option></select>
         <button class="btn btn-primary btn-sm" @click="showMatchModal = true">内部匹配</button>
       </div>
       <div class="table-wrap">
@@ -331,6 +331,9 @@ function onStatSelect(c) {
   if (c.key === 'contact') { activeTab.value = 'external'; extFilters.status = 'available'; }
   else { activeTab.value = c.key; extFilters.status = 'all'; }
 }
+
+// Internal tab reactive filters
+const intFilters = reactive({ search: '', dept: 'all', sort: 'default' });
 
 async function loadFromApi() {
   try {

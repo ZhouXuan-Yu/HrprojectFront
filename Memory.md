@@ -4,10 +4,39 @@
 
 ## 当前状态
 
-- 日期：2026-07-17
-- 项目：智能招聘系统前端
-- 目录：`D:\WorkProject\HrProject\hr-web\frontend`
-- 阶段：原型保真迁移 + 企业级 UI 优化
+- 日期：2026-07-20
+- 测试基线：45/45 全通过，构建 <500ms
+
+## 2026-07-20 千亿级企业应用全面优化
+
+### 已完成的关键修复 (Phase 2)
+
+| 类别 | 修复内容 |
+|------|---------|
+| **关键 Bug** | `base.py` `func.now()` 冻结修复 → `server_default` + `default=datetime.now` |
+| **数据库级分页** | `talent_service.py`、`demand_service.py`、`interview_service.py` — `.all()` → `.offset().limit()` + SQL 级过滤 |
+| **前端桩操作消除** | RecruitDemand: `saveDraft`/`approveDemand`/`moreOps` → 真实 API；RecruitInterview: `handleCancel` → 调用 `cancelInterview`；RecruitDemandDetail: `batchExport` → CSV 导出 |
+| **前端内部标 tab 过滤器** | RecruitTalent: 内部员工 tab 的搜索/部门/排序控件添加 `v-model` |
+| **前端 API 模块** | `src/api/interview.js` 扩展为 10 个完整 CRUD 函数；`src/api/demand.js` 新增审批/驳回接口 |
+| **3D 漏斗性能** | MeshStandardMaterial 替代 PhysicalMaterial + 不可见时暂停 rAF + 移除 backdrop-filter |
+| **配置页全栈打通** | 6 个模块完整 CRUD + 审计日志自动写入 |
+
+### 审计发现 (Phase 1)
+
+- **前端 16+ 个桩操作** — 已修复 12 个，剩余 4 个低优先级（上传简历、黑名单按钮、记住密码、忘记密码）
+- **后端关键 Bug**: `func.now()` 冻结所有行的时间戳在同一秒 — 已修复
+- **后端无分页**: talent/demand/interview 全量加载到内存 — 已修复
+- **后端无输入验证**: 所有 POST/PUT 端点缺少 `@require_fields()` — 待评估
+- **后端 N+1 查询**: 多个服务存在 — 待优化
+- **音频 fallback 模式**: `MOCK_FALLBACK=false` 时正常，但无索引支持
+
+### 下次继续点
+
+1. 添加数据库索引（高并发过滤器字段）
+2. 应用 `@transactional` 装饰器到多步写入操作
+3. 使用 `@require_fields()` 装饰器到所有 POST/PUT 端点
+4. 添加时区感知 (`datetime.now(timezone.utc)`)
+5. 消除剩余 N+1 查询（Candidate._get_skills_for, InterviewBook._db_to_dict）
 - 技术栈：Vue 3 + Vite + Vue Router + Playwright
 - Git 当前最新提交：以 `git log -1 --oneline` 为准。
 
