@@ -320,4 +320,14 @@ h6[data-slot="ai-markdown-heading"] {
     opacity: 1;
   }
 }
+
+@media (max-width: 768px) {
+  [data-slot="ai-markdown"] {
+    font-size: 13px;
+  }
+  [data-slot="ai-markdown-code"] {
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+}
 </style>

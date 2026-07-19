@@ -286,4 +286,14 @@ function toggleExpanded() {
     transition: none;
   }
 }
+
+@media (max-width: 768px) {
+  [data-slot="chain-of-thought"] {
+    margin-bottom: 8px;
+  }
+  [data-slot="chain-of-thought-step"] {
+    padding: 8px 0;
+    font-size: 12px;
+  }
+}
 </style>

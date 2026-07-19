@@ -309,4 +309,16 @@ function toggleExpanded() {
     transition: none;
   }
 }
+
+@media (max-width: 768px) {
+  [data-slot="chat-tool"] {
+    font-size: 12px;
+  }
+  [data-slot="chat-tool-header"] {
+    padding: 8px 12px;
+  }
+  [data-slot="chat-tool-body"] {
+    padding: 8px 12px;
+  }
+}
 </style>

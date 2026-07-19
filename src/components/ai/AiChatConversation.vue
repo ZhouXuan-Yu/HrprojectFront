@@ -3,6 +3,8 @@
     <div
       ref="scrollContainerRef"
       data-slot="chat-conversation-content"
+      role="log"
+      aria-live="polite"
       @scroll="onScroll"
     >
       <slot></slot>
@@ -237,6 +239,20 @@ onBeforeUnmount(() => {
   .ct-scroll-btn-enter-active,
   .ct-scroll-btn-leave-active {
     transition: none;
+  }
+}
+
+@media (max-width: 768px) {
+  [data-slot="chat-conversation"] {
+    min-height: 200px;
+  }
+  [data-slot="chat-conversation-content"] {
+    padding: 4px 0;
+  }
+  [data-slot="chat-conversation-scroll-button"] {
+    width: 32px;
+    height: 32px;
+    font-size: 11px;
   }
 }
 </style>
