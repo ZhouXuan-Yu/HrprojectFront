@@ -21,6 +21,10 @@ const props = defineProps({
 
 const isOpen = ref(props.open);
 
+defineExpose({ isOpen });
+
+defineExpose({ isOpen });
+
 function toggle(){
   isOpen.value = !isOpen.value;
 }
