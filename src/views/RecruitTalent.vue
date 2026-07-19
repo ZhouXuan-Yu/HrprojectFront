@@ -235,9 +235,12 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
-import { EXT_DATA, INT_DATA, BLACKLIST_DATA, DEMAND_OPTIONS, MATCH_RESULTS } from '../data/talent.js';
-import { fetchTalent, updateTalentNote } from '../api/talent.js';
+import { EXT_DATA, INT_DATA, BLACKLIST_DATA, DEMAND_OPTIONS } from '../data/talent.js';
+import { fetchTalent, updateTalentNote, fetchMatchResults, linkTalentToDemand } from '../api/talent.js';
 import StatCardRow from '../components/StatCardRow.vue';
+import CandidateDrawer from '../components/CandidateDrawer.vue';
+import EmployeeDrawer from '../components/EmployeeDrawer.vue';
+import ContactModal from '../components/ContactModal.vue';
 import { KPI_ICONS } from '../components/kpiIcons.js';
 
 const showReminder = ref(false);
