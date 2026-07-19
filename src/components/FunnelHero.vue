@@ -260,6 +260,7 @@ let orbitLights = [];
 let rafId = 0;
 let revealStart = -1;
 let io = null;
+let visIo = null;
 let ro = null;
 let scrollP = 0;
 let ptrX = 0;
@@ -488,6 +489,7 @@ function updateHUD() {
 
 function tick(nowMs) {
   if (destroyed) return;
+  if (!visible) { rafId = 0; return; }
   rafId = requestAnimationFrame(tick);
   const time = nowMs / 1000;
 
@@ -717,9 +719,7 @@ onUnmounted(() => {
   gap: 6px;
   padding: 5px 10px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.85);
   border: 1px solid rgba(79, 110, 247, 0.18);
   border-left: 2px solid var(--hud-accent, var(--c-primary));
   box-shadow: 0 2px 8px rgba(49, 94, 251, 0.08);
@@ -808,8 +808,10 @@ onUnmounted(() => {
   padding: 16px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+
+
+
+
   border: 1px solid rgba(79, 110, 247, 0.14);
   animation: insightFadeIn .25s ease;
 }
@@ -850,8 +852,10 @@ onUnmounted(() => {
 .insight-metric-card {
   flex: 1;
   background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+
+
+
+
   border: 1px solid var(--c-border-light);
   border-radius: 8px;
   padding: 10px 12px;
@@ -905,8 +909,10 @@ onUnmounted(() => {
 /* Sparkline block */
 .insight-chart-block {
   background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+
+
+
+
   border-radius: 8px;
   padding: 10px 12px;
   border: 1px solid var(--c-border-light);
@@ -925,8 +931,10 @@ onUnmounted(() => {
 /* Conversion chain bars */
 .insight-chain {
   background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+
+
+
+
   border-radius: 8px;
   padding: 10px 12px;
   border: 1px solid var(--c-border-light);
