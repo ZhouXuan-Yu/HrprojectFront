@@ -67,6 +67,7 @@
 import { computed, ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { getRole, getUser, getVisibleMenus, ROLE_LABELS, ROLE_CLASS } from '../composables/useAuth.js';
+import ToastContainer from '../components/ToastContainer.vue';
 
 const props = defineProps({
   title: { type: String, default: '' },

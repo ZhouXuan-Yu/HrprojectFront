@@ -37,6 +37,12 @@ async function handleResponse(resp) {
     const err = new Error(json?.error?.message || json?.message || '请求失败');
     err.code = json?.error?.code || 'ERROR';
     err.status = resp.status;
+    // Dispatch global event for toast notification
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('api:error', {
+        detail: { message: err.message, code: err.code, status: err.status },
+      }));
+    }
     throw err;
   }
   return json;
