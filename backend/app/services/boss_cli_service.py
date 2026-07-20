@@ -7,8 +7,9 @@ Output is parsed into structured dicts. Times out after configurable seconds
 Design:
     - Every public function returns {"ok": True/False, ...}
     - All commands and results are logged
-    - boss-cli must be installed globally and `boss login` completed beforehand
-    - This is NOT a Python module import — it's a Node.js CLI, called via subprocess
+    - boss-cli must be installed globally and ``boss login`` completed beforehand
+    - boss-cli uses Puppeteer's persistent user data dir for login state
+    - subprocess uses shell=True on Windows (.CMD files need shell execution)
 """
 
 import json
@@ -53,11 +54,20 @@ def is_available() -> bool:
     return shutil.which("boss") is not None
 
 
+# ---------------------------------------------------------------------------
+# Login & session management
+# boss-cli uses Puppeteer with persistent user data dir (~/.boss-cli-browser/).
+# Login state persists across sessions — user only needs to login once.
+# ---------------------------------------------------------------------------
+
 def login() -> dict:
     """Open the BOSS login page in a browser via ``boss login``.
 
-    Returns immediately after launching the browser; does not wait for
-    the user to complete login.  Check ``GET /api/boss/status`` afterwards.
+    Returns immediately after launching the browser. boss-cli saves browser
+    profile (cookies, localStorage) to ~/.boss-cli-browser/ so login state
+    persists across sessions.
+
+    Check ``GET /api/boss/status`` afterwards to verify login completed.
     """
     if not is_available():
         return {"ok": False, "error": "boss-cli 未安装或未启用，请先执行 npm i -g @joohw/boss-cli"}
@@ -66,6 +76,8 @@ def login() -> dict:
         return {
             "ok": True,
             "login_url": "https://www.zhipin.com/web/user/",
+            "instruction": "请在打开的浏览器窗口中扫码登录，完成后调用 GET /api/boss/status 验证",
+            "persistence": "登录状态保存在 ~/.boss-cli-browser/ 目录，重启后无需重新登录",
             "output": (result.stdout or "").strip(),
         }
     except subprocess.TimeoutExpired:
@@ -73,6 +85,8 @@ def login() -> dict:
         return {
             "ok": True,
             "login_url": "https://www.zhipin.com/web/user/",
+            "instruction": "请在打开的浏览器窗口中扫码登录，完成后调用 GET /api/boss/status 验证",
+            "persistence": "登录状态保存在 ~/.boss-cli-browser/ 目录，重启后无需重新登录",
             "output": "browser launched (timeout expected)",
         }
     except FileNotFoundError:
@@ -80,17 +94,50 @@ def login() -> dict:
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
+
 def is_logged_in() -> dict:
-    """Quick check: can boss-cli list positions? If yes, login is active."""
+    """Quick check: can boss-cli read chat list? If yes, login is active.
+
+    Uses ``boss list`` as a lightweight read — if it works, we're logged in.
+    boss-cli's Puppeteer profile persists login state across sessions.
+    """
     if not is_available():
         return {"ok": False, "logged_in": False, "error": "unavailable"}
     try:
-        # boss list is a lightweight read — if it works, we're logged in
-        result = _run(["list", "--count", "1"], timeout=30, check=False)
+        result = _run(["list"], timeout=30, check=False)
         ok = result.returncode == 0 and "ERR" not in (result.stderr or "")[:50]
         return {"ok": True, "logged_in": ok, "output": (result.stdout or "")[:200]}
     except Exception:
         return {"ok": False, "logged_in": False, "error": "check failed"}
+
+
+def check_session() -> dict:
+    """Detailed session check — returns session persistence info."""
+    available = is_available()
+    logged_in = False
+    session_dir = os.path.expanduser("~/.boss-cli-browser")
+    session_exists = os.path.isdir(session_dir)
+
+    if available:
+        try:
+            login_status = is_logged_in()
+            logged_in = login_status.get("logged_in", False)
+        except Exception:
+            logged_in = False
+
+    return {
+        "ok": True,
+        "available": available,
+        "logged_in": logged_in,
+        "session_persistent": session_exists,
+        "session_dir": session_dir if session_exists else None,
+        "status": "connected" if logged_in else ("need_login" if available else "unavailable"),
+        "message": (
+            "BOSS 已连接，登录状态持久化" if logged_in
+            else ("boss-cli 可用但未登录，请执行 boss login 完成首次登录" if available
+            else "boss-cli 未安装或未启用")
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -191,22 +238,16 @@ def _parse_stdout(stdout: str):
 # ---------------------------------------------------------------------------
 
 def get_positions() -> list:
-    """Get position list from BOSS.
-
-    Returns:
-        If ok: {"ok": True, "data": [...]}
-        If not: {"ok": False, "error": "..."}
-    """
+    """Get position list from BOSS."""
     result = _run_json(["positions"])
     if result["ok"] and isinstance(result.get("data"), str):
-        # boss positions outputs a table-like text; parse lines
         parsed = _parse_positions_table(result["data"])
         result["data"] = parsed
     return result
 
 
 def _parse_positions_table(text: str) -> list:
-    """Parse `boss positions` text output into structured list."""
+    """Parse ``boss positions`` text output into structured list."""
     if not text:
         return []
     lines = text.strip().split("\n")
@@ -215,18 +256,15 @@ def _parse_positions_table(text: str) -> list:
         line = line.strip()
         if not line:
             continue
-        # boss positions outputs lines like "序号 名称  状态"
-        # Parse: extract name and status
         parts = line.split()
         if len(parts) >= 2:
-            # Try to identify status keywords
             status = "unknown"
             name_parts = []
             for part in parts:
                 if part in ("开放", "待开放", "已关闭", "open", "pending", "closed"):
                     status = part
                 elif part.isdigit() and len(part) <= 2:
-                    continue  # skip index numbers
+                    continue
                 else:
                     name_parts.append(part)
             name = " ".join(name_parts)
@@ -236,11 +274,7 @@ def _parse_positions_table(text: str) -> list:
 
 
 def get_position_detail(name: str) -> dict:
-    """Fetch position JD detail and cache as .md file.
-
-    Returns:
-        {"ok": True, "data": {"name": ..., "jd_text": ..., "cache_file": ...}}
-    """
+    """Fetch position JD detail and cache as .md file."""
     return _run_json(["jd", name])
 
 
@@ -255,14 +289,7 @@ def search_candidates(
     bonus: list = None,
     match: bool = False,
 ) -> dict:
-    """Search candidates via boss search or boss deep-search.
-
-    If any of job/core/bonus/match is provided, uses deep-search.
-    Otherwise, uses basic search.
-
-    Returns:
-        {"ok": True, "data": [...]}
-    """
+    """Search candidates via boss search or boss deep-search."""
     has_deep = job or core or bonus or match
     if has_deep:
         args = ["deep-search"]
@@ -291,11 +318,7 @@ def search_candidates(
 # ---------------------------------------------------------------------------
 
 def get_chat_list(unread_only: bool = False) -> list:
-    """Get chat list from BOSS.
-
-    Returns:
-        {"ok": True, "data": [{"name": ..., "unread": ...}, ...]}
-    """
+    """Get chat list from BOSS."""
     args = ["list"]
     if unread_only:
         args.append("--unread")
@@ -307,7 +330,7 @@ def get_chat_list(unread_only: bool = False) -> list:
 
 
 def _parse_chat_list(text: str) -> list:
-    """Parse `boss list` text output into structured list."""
+    """Parse ``boss list`` text output into structured list."""
     if not text:
         return []
     lines = text.strip().split("\n")
@@ -316,23 +339,12 @@ def _parse_chat_list(text: str) -> list:
         line = line.strip()
         if not line:
             continue
-        # Very simple parse: extract name, any number might be unread count
         chats.append({"name": line, "unread": 0, "_raw": line})
     return chats
 
 
 def open_chat(name: str, index: int = None, unread: bool = False, strict: bool = False) -> dict:
-    """Open a conversation with a candidate.
-
-    Args:
-        name: Candidate name to search for.
-        index: Optional 1-based index from `boss list`.
-        unread: If True, index refers to unread-only list.
-        strict: If True, exact name match.
-
-    Returns:
-        {"ok": True, "data": {...}}
-    """
+    """Open a conversation with a candidate."""
     args = ["chat", name]
     if index is not None:
         args.extend(["--index", str(index)])
@@ -344,15 +356,7 @@ def open_chat(name: str, index: int = None, unread: bool = False, strict: bool =
 
 
 def send_message(text: str, request_resume: bool = False) -> dict:
-    """Send a text message in the current chat.
-
-    Args:
-        text: Message content to send.
-        request_resume: If True, also request resume attachment after sending.
-
-    Returns:
-        {"ok": True, "data": {...}}
-    """
+    """Send a text message in the current chat."""
     args = ["send", "--text", text]
     if request_resume:
         args.append("--request-resume")
@@ -370,18 +374,7 @@ VALID_ACTIONS = {
 
 
 def do_action(action: str, remark: str = None) -> dict:
-    """Execute an action on the current candidate.
-
-    Must be on a chat page with candidate detail open.
-
-    Args:
-        action: One of resume|not-fit|remark|agree-resume|
-                request-attachment-resume|history|wechat
-        remark: Required remark text when action='remark'.
-
-    Returns:
-        {"ok": True, "data": {...}}
-    """
+    """Execute an action on the current candidate."""
     if action not in VALID_ACTIONS:
         return {
             "ok": False,
@@ -401,14 +394,7 @@ def do_action(action: str, remark: str = None) -> dict:
 # ---------------------------------------------------------------------------
 
 def preview_resume(name: str) -> dict:
-    """Preview a candidate's online resume.
-
-    NOTE: Must be on recommend/search/deep-search page with list loaded first.
-    Daily views are limited — use sparingly.
-
-    Returns:
-        {"ok": True, "data": {...}}
-    """
+    """Preview a candidate's online resume."""
     return _run_json(["preview", name])
 
 
@@ -420,13 +406,6 @@ def greet_candidate(name: str, job: str = None) -> dict:
     """Greet a candidate from the current recommend/deep-search list.
 
     NOTE: Consumes greeting quota. Costs are high. Use carefully.
-
-    Args:
-        name: Candidate name to greet.
-        job: Optional job keyword to switch position before greeting.
-
-    Returns:
-        {"ok": True, "data": {...}}
     """
     args = ["greet", name]
     if job:

@@ -46,36 +46,19 @@ def boss_login():
 # GET /api/boss/status — check boss-cli availability + login state
 # ===========================================================================
 
+# ===========================================================================
+# GET /api/boss/status — check boss-cli availability + login state + session
+# ===========================================================================
+
 @bp.route("/status")
 def get_status():
-    """Check if boss-cli is installed, enabled, and logged in."""
-    import shutil
-    available = shutil.which("boss") is not None
-    if not _get_enabled():
-        available = False
+    """Check if boss-cli is installed, enabled, and logged in.
 
-    logged_in = False
-    if available:
-        try:
-            login_status = boss.is_logged_in()
-            logged_in = login_status.get("logged_in", False)
-        except Exception:
-            logged_in = False
-
-    return success({
-        "available": available,
-        "logged_in": logged_in,
-        "status": "connected" if logged_in else ("need_login" if available else "unavailable"),
-        "message": "BOSS 已连接" if logged_in else ("boss-cli 可用但未登录" if available else "boss-cli 未安装或未启用"),
-    })
-
-
-def _get_enabled():
-    try:
-        from config import Config
-        return Config.BOSS_CLI_ENABLED
-    except Exception:
-        return True
+    boss-cli uses Puppeteer with persistent user data (~/.boss-cli-browser/)
+    so login state survives across process restarts — user only needs to
+    login once via ``boss login`` (POST /api/boss/login).
+    """
+    return success(boss.check_session())
 
 
 # ===========================================================================
