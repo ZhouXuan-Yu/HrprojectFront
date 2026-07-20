@@ -1,363 +1,45 @@
-# Wiki.md - 项目常识库
+# Wiki.md — 项目常识库
 
-> 长期稳定的项目背景、业务口径、接口说明和架构约定。改代码前先查这里。
+> 长期稳定的项目背景、业务口径、术语定义。
 
-## 1. 项目背景
+---
 
-智能招聘系统是企业级招聘管理平台，目标覆盖从招聘需求、候选人入库、AI 画像、人岗匹配、面试安排、评价到录用入职的完整链路。
+## 项目背景
 
-核心链路：
+智能招聘系统：**邮箱收简历 → AI 解析画像 → 人岗匹配 → 面试(飞书) → Offer → 入职**
 
-```text
-招聘需求 -> 简历/人才库 -> AI 画像 -> 人岗匹配 -> 面试计划 -> 评价/Offer -> 入职
+## 架构
+
+| 层 | 选型 |
+|----|------|
+| 前端 | Vue 3 + Vite + Vue Router + Three.js |
+| 后端 | Python Flask + SQLAlchemy + Celery |
+| 数据库 | SQLite(dev) / MySQL(prod) — 27 表 |
+| AI | DeepSeek API + 本地 ai_engine 降级 |
+| 集成 | 飞书 CLI (lark-cli) + Boss CLI |
+| 测试 | Playwright 33 E2E |
+
+## 后端目录 (50 .py)
+
+```
+backend/
+├── app.py, config.py
+├── app/
+│   ├── models/      (10 files, 27 tables)
+│   ├── api/         (9 files: auth/dashboard/demand/talent/interview/ai/config/boss/errors)
+│   ├── services/    (11 files: ai_engine/deepseek/approval/match/interview/feishu/iam/dashboard/demand/talent/config/boss_cli/dify)
+│   ├── middleware/   (auth)
+│   └── utils/       (response/enums/scoring)
+├── tasks/           (celery_app/email_sync/match_batch/notify)
+└── scripts/seed.py
 ```
 
-当前前端处于原型工程化阶段：保留原型页面和交互，逐步迁移到 Vue 3。
-
-## 2. 当前技术架构
-
-| 层 | 当前状态 | 说明 |
-|---|---|---|
-| 前端框架 | Vue 3 + Vite | 纯 Vue SFC，无遗留外壳 |
-| 路由 | Vue Router | 9 条路由，全部指向 Vue 组件 |
-| 业务页面 | `src/views/` | 7 个业务页 + 1 个登录页，全部 Vue 3 SFC |
-| 组件 | `src/components/` | BaseAccordion / BaseModal / StatusBadge / FunnelHero |
-| 测试 | Playwright | 当前 33 个 E2E 用例，全部通过 |
-| 构建 | `npm run build` | Vite build |
-| 本地运行 | `npm run dev` | 默认 `127.0.0.1:5173` |
-| 代码图谱 | codebase-memory-mcp | 索引了 `src/` 和文档；`public/` 被排除 |
-| 全局增强层 | `public/js/app.js` + `public/css/style.css` | 命令面板、表格排序/密度/列显隐、折叠面板、移动端壳 |
-
-## 3. 主要页面
-
-| 路由 | 页面 | 说明 |
-|---|---|---|
-| `/login` | 登录页 | 原创人才雷达中控台动效登录 |
-| `/recruit-dashboard` | 招聘看板 | 数据概览和角色化看板 |
-| `/recruit-demand` | 需求管理 | 招聘需求列表和筛选 |
-| `/recruit-demand-detail` | 需求详情 | 岗位视角候选人和流程操作 |
-| `/recruit-talent` | 人才库 | 候选人池、筛选、加入需求 |
-| `/recruit-interview` | 面试计划 | 面试状态、安排、提醒 |
-| `/recruit-ai` | 招聘辅助中心 | 候选人沟通辅助、简历摘要、话术建议、效率分析 |
-| `/recruit-config` | 招聘基础配置 | 邮箱、流程、基础配置 |
-
-## 4. 登录页口径
-
-当前登录页不是 GitHub demo 复刻，而是本项目原创视觉：
-
-- 名称：人才雷达中控台。
-- 交互：双镜片跟随鼠标。
-- 账号聚焦：模块略向表单靠近。
-- 密码聚焦：镜片收合，降低隐私输入被注视感。
-- 移动端：隐藏左侧动效，仅保留表单。
-- 可访问性：skip link、可见 label、focus-visible、reduced motion。
-
-版权边界：
-
-- 不复制参考仓库源码、类名、Tailwind 结构。
-- 不复制动物/角色形态、构图、文案或素材。
-- 只保留通用交互思想：鼠标坐标驱动视觉反馈。
-
-登录角色：
-
-- 管理员
-- HR 专员
-- 部门负责人
-- 基层员工
-- 面试官
-- 临时面试官
-- 无招聘权限员工
-
-## 5. 角色和权限
-
-| 角色 | 当前登录选择 | 数据范围/说明 |
-|---|---|---|
-| 管理员 | `admin` | 全部功能与系统配置 |
-| HR 专员 | `hr` | 招聘全流程操作 |
-| 面试官 | `interviewer` | 面试评价与查看 |
-
-登录后写入：
-
-- `localStorage.hr_role`
-- `localStorage.hr_user`
-
-默认跳转：
-
-- `recruit-dashboard.html`
-
-## 6. 核心业务模块
-
-| 模块 | 职责 | 边界 |
-|---|---|---|
-| 招聘看板 | 总览招聘进展、KPI、预警 | 不承载复杂编辑 |
-| 需求管理 | 岗位需求、审批状态、候选人推荐 | 不作为人才主档 |
-| 人才库 | 候选人池、筛选、标签、备注 | 不直接替代岗位流程 |
-| 面试计划 | 面试安排、评价、提醒、状态流转 | 不负责画像计算 |
-| 招聘辅助中心 | 简历摘要、沟通话术、效率分析 | 不直接改业务数据，不承诺自动联系候选人 |
-| 基础配置 | 邮箱、流程、字段等配置 | 不放业务操作 |
-
-## 7. 面试状态体系
-
-当前采用 6 个三字状态：
-
-```text
-待安排 -> 待面试 -> 待评价 -> 待录用 -> 待入职 -> 已入职
-```
-
-含义：
-
-| 状态 | 含义 |
-|---|---|
-| 待安排 | 候选人已进入岗位流程，尚未创建面试 |
-| 待面试 | 已排期，等待面试发生 |
-| 待评价 | 面试结束，等待评价 |
-| 待录用 | 评价通过，进入 Offer/审批 |
-| 待入职 | Offer 确认，等待报到 |
-| 已入职 | 流程终态 |
-
-## 8. 人才库到需求流转
-
-当前原型口径：
-
-```text
-人才库筛选候选人 -> 勾选 -> 加入需求 -> localStorage -> 需求详情页查看关联候选人
-```
-
-说明：
-
-- 人才库是候选人大池子。
-- 需求详情是岗位视角。
-- 当前使用 `localStorage` 模拟跨页面流转。
-- 后端接入后应替换为正式 API。
-
-## 9. 设计规范
-
-| 场景 | 当前口径 |
-|---|---|
-| 整体风格 | 亮色企业管理后台 |
-| 主色 | `#4F6EF7` |
-| 文本主色 | `#172033` |
-| 背景 | `#F6F8FB` / 白色表面 |
-| 控件 | 清晰边框、明确 hover/focus |
-| 动效 | 克制，只辅助理解 |
-| 登录页 | 可以有品牌动效，但不能干扰表单 |
-| 移动端 | 优先可读和可操作，不强求动效 |
-
-## 10. 验证命令
-
-```bash
-npm run build
-npm test
-```
-
-当前 E2E 覆盖：
-
-- 登录选择角色并进入看板。
-- 登录背景响应鼠标移动。
-- 登录雷达模块响应账号和密码聚焦。
-- 登录展示完整演示角色，并验证角色菜单裁剪。
-- 各业务路由可渲染。
-- 侧边栏导航留在 Vue 路由内。
-- 需求管理筛选和新建需求弹窗。
-- 需求详情增强筛选和批量操作。
-- 人才库增强筛选和真实联系渠道口径。
-- 面试计划六状态 KPI 和日程弹窗。
-- 招聘辅助中心候选人沟通辅助。
-- 全页面不出现 AI 外呼或自动拨打类文案。
-- 候选人抽屉和日程弹窗可用。
-- AI 标签页、配置弹窗、提醒下拉可用。
-
-## 11. AI 联系候选人边界
-
-不使用“AI 外呼”作为产品能力口径。
-
-允许的 AI 能力：
-
-- 生成电话、邮件、飞书联系话术。
-- 引导 HR 补齐候选人信息。
-- 总结沟通记录和候选人意向。
-- 提醒缺失字段，如期望薪资、到岗时间、城市偏好、最新版简历。
-
-不允许的表达：
-
-- AI 自动打电话。
-- 系统自动拨号并记录结果。
-- 系统已自动确认候选人意向。
-
-实际联系方式：
-
-- 外部候选人：电话、邮件、飞书。
-- 内部员工：电话本人、飞书本人、联系直属上级。
-
-## 12. 长期文档制度
-
-四个长期文档分工：
-
-- `Claude.md`：工作方式和代码风格。
-- `Memory.md`：当前进度。
-- `Learning.md`：复盘记录。
-- `Wiki.md`：稳定项目知识。
-
-每三轮实际修改，至少更新 `Memory.md`；若产生教训或稳定知识，同步更新 `Learning.md` 和 `Wiki.md`。
-
-## 13. UI v6 设计系统口径
-
-当前 UI 改造依据 `E:/Obsidian仓库/ZhouXuan私人领域/顶级UI设计/templates/_场景A-管理后台/DESIGN.md`，作为项目级设计 skill 使用。
-
-稳定原则：
-- 后台不是营销页，第一优先级是可读、可筛选、可比较、可审计、可恢复。
-- 当前视觉路线是企业级浅色工作台 + 深色侧边栏 command-center 骨架。
-- 主色：`#4F6EF7`；辅助色：青色、绿色、琥珀、红色仅用于语义状态。
-- 卡片圆角保持 8px 左右，默认不用大阴影；Modal、Drawer、Command Palette 可以使用受控阴影。
-- 表格优先，筛选栏、批量操作、分页、状态、空/加载/错误态必须完整。
-- 移动端允许表格横向滚动，但不能撑开整个页面。
-
-页面命名口径：
-- `/recruit-ai` 对外显示为“招聘辅助中心”。
-- 禁止使用“AI 外呼”“自动拨打”“AI 智能体自动发送 Offer/入职包”等不可验证能力。
-- 允许使用“联系话术草稿”“候选人沟通助手”“解析服务”“匹配评分”“面试辅助”等辅助口径。
-
-当前质量基线：
-- `npm test`：22 个 Playwright 用例。
-- UI 巡检：桌面/移动 16 张截图，0 console error，0 移动端横向溢出。
-
-## 14. Vue Shell 与 Legacy 外壳时序
-
-当前项目由 Vue Router 承载 `public/legacy/` 页面。
-
-稳定规则：
-
-- `LegacyPage.vue` 负责拉取 legacy HTML、移除外部 script、执行页面内联 script、归一化 legacy 链接。
-- 每个 legacy 页面内联脚本通常会调用 `renderSidebar()`，因此侧栏、顶栏等外壳 DOM 在页面脚本执行后才完整。
-- 全局工作台外壳增强由 `window.__enhanceWorkbenchShell()` 触发，当前实际指向完整安装入口，会补齐路由标记、导航语义、顶栏动作区和命令入口。
-- 修改外壳增强时，必须同时覆盖首次加载和 Vue 路由切换后的页面注入场景。
-- 回归测试需同时验证 `Ctrl/Cmd + K` 键盘路径和 `#commandTrigger` 点击路径。
-
-## 15. 专业组件参考源
-
-长期参考路径：
-
-```text
-D:\WorkProject\HeroUIPro\herouipro-v3
-```
-
-使用规则：
-
-- 后续任何项目做后台组件、数据可视化、表格、KPI、筛选、弹窗、抽屉时，都先检查该目录。
-- 有合适组件可以直接复制或改写，但不能机械搬运 React/依赖；必须适配当前项目技术栈。
-- 当前项目是 Vue shell + legacy HTML/CSS/JS，所以 HeroUIPro 的 React 组件主要抽取组件结构、交互状态、数据展示语法和 CSS token 思路。
-- 本轮已参考的组件范式：`EmployeesTable`、`KpiRow`、`AnalyticsKpiRow`、`SessionsOverTimeCard`。
-- 关键设计原则：表格要有 Filter/Sort/Columns/Search 语言，KPI 要有 title/value/trend/context，图表卡要有标题、主数、趋势、legend 或明确口径。
-
-## 16. HeroUIPro 无渐变专业工作台口径
-
-用户给出的最新稳定口径：
-
-- 浅色企业后台，不做营销页、海报页或纯展示页。
-- 左侧为清晰导航，当前项使用深色胶囊强化。
-- 顶部需要业务模块级胶囊导航，方便扫描不同招聘模块。
-- 页面开场需要 KPI/摘要层，不让列表页直接裸露成低级 CRUD。
-- 数据可视化采用趋势折线、阶段转化、漏斗、进度条、风险表格等业务图表，禁止使用渐变色，避免 AI 味和无意义装饰。
-- 表格保持高密、可排序、可筛选、可横向浏览；移动端允许表格内部横向滚动，但不能撑开整个页面。
-- 弹窗、抽屉采用纯色表面、细线、清晰焦点，不做夸张动效。
-- 招聘看板是核心总控页，第一屏必须看到项目总览、阶段转化、待处理事项、岗位风险、渠道效率和近期面试，并能跳转到对应业务页。
-
-当前落地：
-
-- `body.hero-pro-workbench` 是 HeroUIPro 专业工作台覆盖入口。
-- `.hero-module-tabs` 是页面级业务模块导航。
-- `.hero-page-summary` 是非看板页顶部业务摘要层。
-- `.hero-analytics-grid` 是招聘看板趋势与阶段转化区域。
-- `.hero-workbench-grid` 是招聘看板总控区，包含待处理、风险、渠道和日程。
-
-版权边界：
-
-- 参考图和 HeroUIPro 只抽取设计语言与组件范式。
-- 不复制第三方品牌、文案、素材、截图布局细节或项目无关业务元素。
-- 当前项目视觉必须围绕“智能招聘系统/招聘管理工作台”重新表达。
-- 当前项目不再使用 `gradient` 作为视觉质感来源；如后续确需恢复，必须先获得用户明确同意。
-## 17. 招聘看板经营台信息架构
-
-招聘看板是当前系统的核心展示页，不再只是漏斗和若干统计卡片。稳定信息架构如下：
-
-- 顶部：`hero-command-toolbar`，展示“招聘经营看板”、当前视图切换和跨模块入口。
-- 经营信号：`hero-signal-grid`，展示综合健康度、待审批需求、可推进候选人、面试待闭环、沟通辅助任务。
-- KPI 层：沿用 `kpiRow`，用于保留角色和周期相关的关键指标。
-- 主数据层：`hero-analytics-grid`，展示招聘项目总览趋势和阶段转化。
-- 工作台层：`hero-workbench-grid`，展示待处理事项、岗位风险、渠道效率、近期面试，并全部联动到需求、人才库、面试、招聘辅助中心。
-- 决策层：`hero-decision-grid`，展示招聘瓶颈地图、负责人负载、下一动作队列。
-- 明细层：旧的招聘全漏斗、部门招聘进度、渠道效果统计保留，但统一标记为 `明细层`，不再承担首屏主视觉。
-
-设计口径：
-- 后台页面不做 Cinematic Scrollytelling 的大叙事，只吸收“节奏与层次”的原则。
-- Kinetic Typography 只用于标题轻微响应，不能造成文字错位或阅读障碍。
-- Glassmorphism 2.0 在本项目中定义为：`rgba` 表面、`12px` blur、细边框、轻阴影、清晰层级；不使用渐变。
-- Micro-Delight 只用于 hover、active、focus-visible、轻量入场，必须支持 `prefers-reduced-motion`。
-- 招聘联系相关能力继续保持“候选人沟通辅助 / 话术草稿 / 人工发送 / 效率分析”口径，禁止写成自动外呼或自动拨打。
-
-当前质量基线：
-- `npm run build` 通过。
-- `npm test` 通过，25/25。
-- 看板材质化巡检报告：`test-results/phase-dashboard-material-final-report.json`。
-- 当前巡检覆盖桌面/移动端 16 个页面：0 console error、0 page error、0 禁用词、0 页面级横向溢出。
-## 18. 主业务页面工作台化口径
-
-除登录页外，当前主业务页均采用页面级工作台结构：
-
-```text
-模块导航 -> KPI 摘要 -> 页面工作台标题 -> 三栏业务判断区 -> 原有筛选/表格/弹窗/抽屉
-```
-
-页面定位：
-- 需求管理：需求流转工作台。第一层回答哪些需求待审批、哪些岗位有风险、下一步谁处理。
-- 需求详情：岗位对象详情台。第一层回答当前岗位候选人处在哪个阶段、哪些批量动作可执行、哪些审计动作要留痕。
-- 人才库：人才资产工作台。第一层回答候选人池质量、标签覆盖、联系动作和风险隔离。
-- 面试计划：面试任务流工作台。第一层回答面试安排、评价回收、Offer/入职闭环和面试官负载。
-- 招聘辅助中心：候选人沟通辅助工作台。只做摘要、话术草稿、字段提醒和效率分析；所有联系动作必须由 HR 人工确认。
-- 招聘基础配置：配置影响工作台。第一层回答配置变更影响范围、审计风险和下一步配置动作。
-
-实现入口：
-- `ensureHeroOperationalWorkspace()`：非看板主页面的工作台增强器。
-- `.hero-page-command`：页面级标题和快捷入口。
-- `.hero-page-workspace`：三栏业务判断区。
-
-验收口径：
-- 非看板主页面必须存在 `.hero-page-command` 和 `.hero-page-workspace`。
-- 页面级工作台不能替代原业务功能；原筛选、表格、弹窗、抽屉必须继续可用。
-- 仍然禁止 `gradient` 和”AI 外呼 / 自动拨打”等不实能力表达。
-
-## 19. AI & LLM 集成口径
-
-### DeepSeek API
-
-- **提供商**：DeepSeek（`api.deepseek.com`），兼容 OpenAI SDK
-- **模型**：`deepseek-chat`
-- **调用规则**：全部由 Flask 后端代理转发，**前端绝不直连 LLM API**
-- **6 个工作流端点**（`POST /api/ai/run/<workflow>`）：
-  | 工作流 | 端点 | 说明 |
-  |--------|------|------|
-  | JD 草稿生成 | `jd-generate` | 结构化 JD（职责/技能/任职资格） |
-  | 语义简历搜索 | `resume-search` | 自然语言→结构化搜索条件 |
-  | 人岗匹配 | `match` | 候选人×岗位打分+理由 |
-  | 面试问题生成 | `interview-questions` | 按轮次动态生成面试题 |
-  | 沟通话术 | `communication-draft` | 电话/邮件/飞书话术草稿 |
-  | 分析报告 | `report-analysis` | 招聘数据 AI 分析 |
-- **降级策略**：API 不可用时自动 fallback 到本地 `ai_engine.py` 规则引擎
-- **免责声明**：所有 AI 生成内容必须显示”此内容由AI生成，请人工审核确认后使用”
-- **现有本地引擎**：`backend/app/services/ai_engine.py`（基于正则的简历解析/匹配/面试题），保留作为 fallback
-
-### boss-cli (BOSS 直聘浏览器自动化)
-
-- **CLI 版本**：`@joohw/boss-cli@0.6.6`
-- **后端封装**：`backend/app/services/boss_cli_service.py`（subprocess 调用）
-- **API 端点**：`/api/boss/*`（10 个端点：status/positions/search/chat/action/greet/preview）
-- **重要限制**：BOSS 平台**无官方聊天 API**，不存在自动 AI 对话；所有沟通必须由 HR 人工在会话中完成
-- **前端组件**：`src/components/BossIntegration.vue`，嵌入 RecruitAI 页面
-
-### 当前质量基线
-
-- `npm run build`：通过
-- `npm test`：**33/33** 通过
-- DeepSeek 5 工作流：全部通过实际 API 验证
-- boss-cli：`is_available: True`
-- `/api/ai/capabilities`：全部 9 项能力标记为 `done`
+## 关键决策
+
+| # | 决策 | 结论 |
+|---|------|------|
+| 1 | AI | Dify 去除 → 纯 Python 引擎 + DeepSeek API |
+| 2 | 审批 | v0.1 三步硬编码，v0.2 引擎化 |
+| 3 | 数据库 | `BigInteger().with_variant(INTEGER, 'sqlite')` 兼容 |
+| 4 | 飞书 | lark-cli 子进程，MOCK_MODE 切换 |
+| 5 | Boss | boss-cli 子进程，`/api/boss/*` 10 端点 |

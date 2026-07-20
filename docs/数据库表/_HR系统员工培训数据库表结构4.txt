@@ -1,0 +1,872 @@
+HR 系统员工培训模块数据库表设计
+1.公共字段
+字段名 数据类型 字段说明
+create_by bigint 创建人 ID
+create_time datetime 创建时间
+update_by bigint 更新人 ID
+update_time datetime 更新时间
+is_deleted tinyint 逻辑删除标记：0 - 未删除 1 - 已删除
+2. 讲师管理表
+表名：t_training_lecturer
+主键 /
+字段名 数据类型 字段说明
+约束
+主键、
+lecturer_id bigint 讲师唯一标识 ID
+自增
+lecturer_name varchar(64) 非空 讲师姓名
+讲师类型：1 - 内部
+lecturer_type tinyint 非空
+讲师 2 - 外部讲师
+内部讲师关联员工
+emp_id bigint 可空
+ID，外部讲师为空
+内部讲师所属部门
+dept_id bigint 可空
+ID
+授课擅长领域，多领
+good_at_field varchar(255) 可空
+域用逗号分隔
+内部讲师职级 / 外
+lecturer_level varchar(32) 可空
+部讲师等级
+字段名 | 数据类型 | 字段说明
+create_by | bigint | 创建人 ID
+create_time | datetime | 创建时间
+update_by | bigint | 更新人 ID
+update_time | datetime | 更新时间
+is_deleted | tinyint | 逻辑删除标记：0 - 未删除 1 - 已删除
+
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+lecturer_id | bigint | 主键、
+自增 | 讲师唯一标识 ID
+lecturer_name | varchar(64) | 非空 | 讲师姓名
+lecturer_type | tinyint | 非空 | 讲师类型：1 - 内部
+讲师 2 - 外部讲师
+emp_id | bigint | 可空 | 内部讲师关联员工
+ID，外部讲师为空
+dept_id | bigint | 可空 | 内部讲师所属部门
+ID
+good_at_field | varchar(255) | 可空 | 授课擅长领域，多领
+域用逗号分隔
+lecturer_level | varchar(32) | 可空 | 内部讲师职级 / 外
+部讲师等级
+
+主键 /
+字段名 数据类型 字段说明
+约束
+聘任状态：1 - 已聘
+hire_status tinyint 非空 任 2 - 待聘任 3 -
+已解聘
+外部讲师合作资质说
+cooperate_qualification varchar(255) 可空
+明
+授课报价标准（元 /
+price_standard decimal(10,2) 可空
+课时）
+contract_no varchar(64) 可空 合作合同编号
+contact_person varchar(32) 可空 外部机构对接联系人
+contact_phone varchar(32) 可空 联系电话
+contact_email varchar(64) 可空 联系邮箱
+total_class_hour decimal(8,2) 默认 0 累计授课课时
+启用状态：1 - 启用
+status tinyint 非空
+0 - 停用
+remark varchar(500) 可空 备注说明
+3. 课程管理模块
+课程主表
+表名：t_training_course
+主键
+字段名 数据类型 / 约 字段说明
+束
+主键、
+course_id bigint 课程唯一标识 ID
+自增
+course_name varchar(128) 非空 课程名称
+课程分类：1 - 新员工培训 2
+course_category tinyint 非空
+- 岗位技能 3 - 管理提升 4 -
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+hire_status | tinyint | 非空 | 聘任状态：1 - 已聘
+任 2 - 待聘任 3 -
+已解聘
+cooperate_qualification | varchar(255) | 可空 | 外部讲师合作资质说
+明
+price_standard | decimal(10,2) | 可空 | 授课报价标准（元 /
+课时）
+contract_no | varchar(64) | 可空 | 合作合同编号
+contact_person | varchar(32) | 可空 | 外部机构对接联系人
+contact_phone | varchar(32) | 可空 | 联系电话
+contact_email | varchar(64) | 可空 | 联系邮箱
+total_class_hour | decimal(8,2) | 默认 0 | 累计授课课时
+status | tinyint | 非空 | 启用状态：1 - 启用
+0 - 停用
+remark | varchar(500) | 可空 | 备注说明
+
+字段名 | 数据类型 | 主键
+/ 约
+束 | 字段说明
+course_id | bigint | 主键、
+自增 | 课程唯一标识 ID
+course_name | varchar(128) | 非空 | 课程名称
+course_category | tinyint | 非空 | 课程分类：1 - 新员工培训 2
+- 岗位技能 3 - 管理提升 4 -
+
+主键
+字段名 数据类型 / 约 字段说明
+束
+安全合规 5 - 企业文化 6 -
+其他
+授课形式：1 - 线上 2 - 线下
+course_type tinyint 非空
+3 - 混合式
+course_intro text 可空 课程简介
+course_outline text 可空 课程大纲
+courseware_url varchar(255) 可空 课件资源存储地址
+duration int 非空 课程总时长（单位：分钟）
+credit decimal(4,1) 非空 课程对应学分
+exam_standard varchar(255) 可空 考核合格标准说明
+难度等级：1 - 入门 2 - 初级
+difficulty_level tinyint 非空
+3 - 中级 4 - 高级
+version varchar(32) 非空 课程版本号
+version_desc varchar(255) 可空 版本更新说明
+课程状态：0 - 草稿 1 - 启用
+status tinyint 非空
+2 - 停用
+remark varchar(500) 可空 备注说明
+讲师-课程多对多关联表
+表名：t_course_lecturer_rel
+主键 /
+字段名 数据类型 字段说明
+约束
+主键、
+rel_id bigint 关联关系唯一 ID
+自增
+字段名 | 数据类型 | 主键
+/ 约
+束 | 字段说明
+ |  |  | 安全合规 5 - 企业文化 6 -
+其他
+course_type | tinyint | 非空 | 授课形式：1 - 线上 2 - 线下
+3 - 混合式
+course_intro | text | 可空 | 课程简介
+course_outline | text | 可空 | 课程大纲
+courseware_url | varchar(255) | 可空 | 课件资源存储地址
+duration | int | 非空 | 课程总时长（单位：分钟）
+credit | decimal(4,1) | 非空 | 课程对应学分
+exam_standard | varchar(255) | 可空 | 考核合格标准说明
+difficulty_level | tinyint | 非空 | 难度等级：1 - 入门 2 - 初级
+3 - 中级 4 - 高级
+version | varchar(32) | 非空 | 课程版本号
+version_desc | varchar(255) | 可空 | 版本更新说明
+status | tinyint | 非空 | 课程状态：0 - 草稿 1 - 启用
+2 - 停用
+remark | varchar(500) | 可空 | 备注说明
+
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+rel_id | bigint | 主键、
+自增 | 关联关系唯一 ID
+
+主键 /
+字段名 数据类型 字段说明
+约束
+非空、
+关联课程 ID，对应
+course_id bigint 联合唯
+t_training_course 表
+一索引
+非空、
+关联讲师 ID，对应
+lecturer_id bigint 联合唯
+t_training_lecturer 表
+一索引
+非空、 讲师授课角色：1 - 主讲讲师 2
+lecturer_role tinyint
+默认 1 - 助理讲师 3 - 特邀讲师
+排序号，控制课程详情页讲师展
+sort_num int 默认 0
+示顺序
+该讲师负责的授课内容 / 章节
+teach_content varchar(255) 可空
+说明
+非空、
+status tinyint 关联状态：1 - 有效 0 - 失效
+默认 1
+课程内容表
+表名：t_course_chapter
+主键 /
+字段名 数据类型 字段说明
+约束
+主键、
+chapter_id bigint 章节唯一 ID
+自增
+非空、
+course_id bigint 关联课程 ID，对应课程主表
+外键
+父章节 ID，支持「章 - 节」
+parent_id bigint 默认 0
+二级层级
+chapter_title varchar(128) 非空 章节 / 小节标题
+sort_num int 非空 排序号，控制章节展示顺序
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+course_id | bigint | 非空、
+联合唯
+一索引 | 关联课程 ID，对应
+t_training_course 表
+lecturer_id | bigint | 非空、
+联合唯
+一索引 | 关联讲师 ID，对应
+t_training_lecturer 表
+lecturer_role | tinyint | 非空、
+默认 1 | 讲师授课角色：1 - 主讲讲师 2
+- 助理讲师 3 - 特邀讲师
+sort_num | int | 默认 0 | 排序号，控制课程详情页讲师展
+示顺序
+teach_content | varchar(255) | 可空 | 该讲师负责的授课内容 / 章节
+说明
+status | tinyint | 非空、
+默认 1 | 关联状态：1 - 有效 0 - 失效
+
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+chapter_id | bigint | 主键、
+自增 | 章节唯一 ID
+course_id | bigint | 非空、
+外键 | 关联课程 ID，对应课程主表
+parent_id | bigint | 默认 0 | 父章节 ID，支持「章 - 节」
+二级层级
+chapter_title | varchar(128) | 非空 | 章节 / 小节标题
+sort_num | int | 非空 | 排序号，控制章节展示顺序
+
+主键 /
+字段名 数据类型 字段说明
+约束
+章节类型：1 - 图文 2 - 视
+chapter_type tinyint 非空 频 3 - 音频 4 - 测验 5 -
+附件
+章节正文内容（图文类型使
+chapter_content mediumtext 可空
+用）
+resource_url varchar(255) 可空 视频 / 音频 / 附件资源地址
+duration int 默认 0 本章节时长（分钟）
+是否必修：1 - 必修 0 - 选
+is_required tinyint 默认 1
+修
+status tinyint 默认 1 状态：1 - 启用 0 - 停用
+课程资料表
+表名：t_course_material
+主键
+字段名 数据类型 / 约 字段说明
+束
+主
+material_id bigint 键、 资料唯一标识 ID
+自增
+非
+关联课程 ID，对应课程主
+course_id bigint 空、
+表
+外键
+material_name varchar(128) 非空 资料名称
+资料类型：1 - 课件 2 -
+讲义 3 - 习题集 4 - 参考
+material_type tinyint 非空
+文档 5 - 实操素材 6 - 其
+他
+file_url varchar(255) 非空 文件存储地址
+file_size bigint 可空 文件大小（单位：字节）
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+chapter_type | tinyint | 非空 | 章节类型：1 - 图文 2 - 视
+频 3 - 音频 4 - 测验 5 -
+附件
+chapter_content | mediumtext | 可空 | 章节正文内容（图文类型使
+用）
+resource_url | varchar(255) | 可空 | 视频 / 音频 / 附件资源地址
+duration | int | 默认 0 | 本章节时长（分钟）
+is_required | tinyint | 默认 1 | 是否必修：1 - 必修 0 - 选
+修
+status | tinyint | 默认 1 | 状态：1 - 启用 0 - 停用
+
+字段名 | 数据类型 | 主键
+/ 约
+束 | 字段说明
+material_id | bigint | 主
+键、
+自增 | 资料唯一标识 ID
+course_id | bigint | 非
+空、
+外键 | 关联课程 ID，对应课程主
+表
+material_name | varchar(128) | 非空 | 资料名称
+material_type | tinyint | 非空 | 资料类型：1 - 课件 2 -
+讲义 3 - 习题集 4 - 参考
+文档 5 - 实操素材 6 - 其
+他
+file_url | varchar(255) | 非空 | 文件存储地址
+file_size | bigint | 可空 | 文件大小（单位：字节）
+
+主键
+字段名 数据类型 / 约 字段说明
+束
+文件格式：
+file_format varchar(32) 可空
+PPT/PDF/MP4/DOCX 等
+默认
+sort_num int 排序号，控制资料展示顺序
+0
+默认 是否必修资料：1 - 是 0 -
+is_required tinyint
+0 否
+默认 下载权限：1 - 允许下载 2
+download_permission tinyint
+1 - 仅在线查看
+默认
+status tinyint 状态：1 - 启用 0 - 禁用
+1
+课程考试表
+表名：t_course_exam
+主键 /
+字段名 数据类型 字段说明
+约束
+主键、
+exam_id bigint 考试唯一标识 ID
+自增
+非空、
+course_id bigint 关联课程 ID，对应课程主表
+外键
+考试名称（如：第一章随堂
+exam_name varchar(128) 非空
+测、结课正式考试）
+考试类型：1 - 随堂测验 2
+exam_type tinyint 非空 - 结课考试 3 - 补考 4 -
+线下实操
+exam_duration int 非空 考试时长（单位：分钟）
+full_score decimal(5,2) 非空 考试满分
+pass_score decimal(5,2) 非空 及格分数线
+字段名 | 数据类型 | 主键
+/ 约
+束 | 字段说明
+file_format | varchar(32) | 可空 | 文件格式：
+PPT/PDF/MP4/DOCX 等
+sort_num | int | 默认
+0 | 排序号，控制资料展示顺序
+is_required | tinyint | 默认
+0 | 是否必修资料：1 - 是 0 -
+否
+download_permission | tinyint | 默认
+1 | 下载权限：1 - 允许下载 2
+- 仅在线查看
+status | tinyint | 默认
+1 | 状态：1 - 启用 0 - 禁用
+
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+exam_id | bigint | 主键、
+自增 | 考试唯一标识 ID
+course_id | bigint | 非空、
+外键 | 关联课程 ID，对应课程主表
+exam_name | varchar(128) | 非空 | 考试名称（如：第一章随堂
+测、结课正式考试）
+exam_type | tinyint | 非空 | 考试类型：1 - 随堂测验 2
+- 结课考试 3 - 补考 4 -
+线下实操
+exam_duration | int | 非空 | 考试时长（单位：分钟）
+full_score | decimal(5,2) | 非空 | 考试满分
+pass_score | decimal(5,2) | 非空 | 及格分数线
+
+主键 /
+字段名 数据类型 字段说明
+约束
+最多允许考试次数（用于补
+max_attempts tinyint 默认 1
+考次数管控）
+关联题库 ID（若有题库系
+question_bank_id bigint 可空
+统）
+防作弊配置（JSON 格式，如
+anti_cheat_config varchar(500) 可空
+切屏限制、人脸识别）
+start_time datetime 可空 考试开放开始时间
+end_time datetime 可空 考试开放截止时间
+is_required tinyint 默认 1 是否必考：1 - 是 0 - 否
+状态：0 - 草稿 1 - 已发布
+status tinyint 非空
+2 - 已关闭
+课程-岗位职级关联表
+表名：t_course_position_rel
+主键 /
+字段名 数据类型 字段说明
+约束
+主键、自
+rel_id bigint 关联关系唯一 ID
+增
+course_id bigint 非空 关联课程 ID
+岗位 ID，为空表示全
+position_id bigint 可空
+岗位适用
+职级编码，为空表示全
+job_level varchar(32) 可空
+职级适用
+课程属性：1 - 必修课
+course_attr tinyint 非空
+2 - 选修课
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+max_attempts | tinyint | 默认 1 | 最多允许考试次数（用于补
+考次数管控）
+question_bank_id | bigint | 可空 | 关联题库 ID（若有题库系
+统）
+anti_cheat_config | varchar(500) | 可空 | 防作弊配置（JSON 格式，如
+切屏限制、人脸识别）
+start_time | datetime | 可空 | 考试开放开始时间
+end_time | datetime | 可空 | 考试开放截止时间
+is_required | tinyint | 默认 1 | 是否必考：1 - 是 0 - 否
+status | tinyint | 非空 | 状态：0 - 草稿 1 - 已发布
+2 - 已关闭
+
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+rel_id | bigint | 主键、自
+增 | 关联关系唯一 ID
+course_id | bigint | 非空 | 关联课程 ID
+position_id | bigint | 可空 | 岗位 ID，为空表示全
+岗位适用
+job_level | varchar(32) | 可空 | 职级编码，为空表示全
+职级适用
+course_attr | tinyint | 非空 | 课程属性：1 - 必修课
+2 - 选修课
+
+主键 /
+字段名 数据类型 字段说明
+约束
+是否职级晋升必备：1
+is_promotion_required tinyint 非空
+- 是 0 - 否
+4. 培训规划管理模块
+培训需求表
+表名：t_training_demand
+主键 /
+字段名 数据类型 字段说明
+约束
+主键、
+demand_id bigint 需求唯一标识 ID
+自增
+demand_title varchar(128) 非空 需求标题
+需求来源：1 - 员工自主申报
+demand_source tinyint 非空 2 - 部门批量申报 3 - 绩效
+短板触发 4 - 年度调研问卷
+proposer_id bigint 非空 申报人 ID
+dept_id bigint 非空 申报部门 ID
+demand_content text 非空 需求详细内容与期望
+expect_course varchar(255) 可空 期望培训课程 / 方向
+expect_time date 可空 期望开展时间
+可空、 关联生成的培训计划 ID，审
+plan_id bigint
+外键 批通过转化计划后回填
+审批状态：0 - 待审批 1 -
+approve_status tinyint 非空 审批通过 2 - 审批驳回 3 -
+已撤销
+current_approver bigint 可空 当前审批人 ID
+approve_remark varchar(255) 可空 审批意见
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+is_promotion_required | tinyint | 非空 | 是否职级晋升必备：1
+- 是 0 - 否
+
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+demand_id | bigint | 主键、
+自增 | 需求唯一标识 ID
+demand_title | varchar(128) | 非空 | 需求标题
+demand_source | tinyint | 非空 | 需求来源：1 - 员工自主申报
+2 - 部门批量申报 3 - 绩效
+短板触发 4 - 年度调研问卷
+proposer_id | bigint | 非空 | 申报人 ID
+dept_id | bigint | 非空 | 申报部门 ID
+demand_content | text | 非空 | 需求详细内容与期望
+expect_course | varchar(255) | 可空 | 期望培训课程 / 方向
+expect_time | date | 可空 | 期望开展时间
+plan_id | bigint | 可空、
+外键 | 关联生成的培训计划 ID，审
+批通过转化计划后回填
+approve_status | tinyint | 非空 | 审批状态：0 - 待审批 1 -
+审批通过 2 - 审批驳回 3 -
+已撤销
+current_approver | bigint | 可空 | 当前审批人 ID
+approve_remark | varchar(255) | 可空 | 审批意见
+
+培训计划表
+表名：t_training_plan
+主键
+字段名 数据类型 / 约 字段说明
+束
+主
+plan_id bigint 键、 计划唯一标识 ID
+自增
+plan_name varchar(128) 非空 计划名称
+计划类型：1 - 公司年度总计
+划 2 - 部门专项计划 3 - 月
+plan_type tinyint 非空
+度执行计划 4 - 季度执行计划
+5 - 临时专项计划
+plan_year int 非空 计划所属年度
+计划周期（月度 / 季度填具体
+plan_period varchar(32) 可空
+区间）
+dept_id bigint 非空 责任部门 ID
+plan_desc text 可空 计划内容说明
+course_ids varchar(500) 可空 关联课程 ID 集合，逗号分隔
+lecturer_ids varchar(255) 可空 关联讲师 ID 集合
+train_place varchar(128) 可空 培训场地 / 线上平台
+plan_start_time datetime 非空 计划开始时间
+plan_end_time datetime 非空 计划结束时间
+budget_amount decimal(12,2) 可空 计划预算金额
+target_scope varchar(255) 可空 参训人员范围说明
+计划状态：0 - 草稿 1 - 已发
+status tinyint 非空 布 2 - 执行中 3 - 已完成 4
+- 已取消
+字段名 | 数据类型 | 主键
+/ 约
+束 | 字段说明
+plan_id | bigint | 主
+键、
+自增 | 计划唯一标识 ID
+plan_name | varchar(128) | 非空 | 计划名称
+plan_type | tinyint | 非空 | 计划类型：1 - 公司年度总计
+划 2 - 部门专项计划 3 - 月
+度执行计划 4 - 季度执行计划
+5 - 临时专项计划
+plan_year | int | 非空 | 计划所属年度
+plan_period | varchar(32) | 可空 | 计划周期（月度 / 季度填具体
+区间）
+dept_id | bigint | 非空 | 责任部门 ID
+plan_desc | text | 可空 | 计划内容说明
+course_ids | varchar(500) | 可空 | 关联课程 ID 集合，逗号分隔
+lecturer_ids | varchar(255) | 可空 | 关联讲师 ID 集合
+train_place | varchar(128) | 可空 | 培训场地 / 线上平台
+plan_start_time | datetime | 非空 | 计划开始时间
+plan_end_time | datetime | 非空 | 计划结束时间
+budget_amount | decimal(12,2) | 可空 | 计划预算金额
+target_scope | varchar(255) | 可空 | 参训人员范围说明
+status | tinyint | 非空 | 计划状态：0 - 草稿 1 - 已发
+布 2 - 执行中 3 - 已完成 4
+- 已取消
+
+5. 我的培训（员工端）模块
+员工学习记录表
+表名：t_employee_learning_record
+主键 /
+字段名 数据类型 字段说明
+约束
+主键、
+record_id bigint 学习记录唯一 ID
+自增
+emp_id bigint 非空 员工 ID
+关联培训计划 ID，自主报
+plan_id bigint 可空
+名为空
+course_id bigint 非空 关联课程 ID
+课程属性：1 - 必修课 2
+course_attr tinyint 非空
+- 选修课
+分配来源：1 - 系统自动
+assign_source tinyint 非空 分配（按岗位职级） 2 -
+计划推送 3 - 自主报名
+start_time datetime 可空 首次开始学习时间
+latest_learn_time datetime 可空 最近一次学习时间
+total_learn_duration int 默认 0 累计学习时长（分钟）
+学习进度（百分比，0-
+progress_rate decimal(5,2) 默认 0
+100）
+防挂机校验状态：1 - 正
+anti_cheat_status tinyint 默认 0
+常 0 - 异常
+是否完成学习：1 - 已完
+is_finished tinyint 非空
+成 0 - 未完成
+finish_time datetime 可空 学习完成时间
+deadline datetime 可空 学习截止时间
+记录状态：1 - 学习中 2
+status tinyint 非空
+- 已完成 3 - 已逾期
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+record_id | bigint | 主键、
+自增 | 学习记录唯一 ID
+emp_id | bigint | 非空 | 员工 ID
+plan_id | bigint | 可空 | 关联培训计划 ID，自主报
+名为空
+course_id | bigint | 非空 | 关联课程 ID
+course_attr | tinyint | 非空 | 课程属性：1 - 必修课 2
+- 选修课
+assign_source | tinyint | 非空 | 分配来源：1 - 系统自动
+分配（按岗位职级） 2 -
+计划推送 3 - 自主报名
+start_time | datetime | 可空 | 首次开始学习时间
+latest_learn_time | datetime | 可空 | 最近一次学习时间
+total_learn_duration | int | 默认 0 | 累计学习时长（分钟）
+progress_rate | decimal(5,2) | 默认 0 | 学习进度（百分比，0-
+100）
+anti_cheat_status | tinyint | 默认 0 | 防挂机校验状态：1 - 正
+常 0 - 异常
+is_finished | tinyint | 非空 | 是否完成学习：1 - 已完
+成 0 - 未完成
+finish_time | datetime | 可空 | 学习完成时间
+deadline | datetime | 可空 | 学习截止时间
+status | tinyint | 非空 | 记录状态：1 - 学习中 2
+- 已完成 3 - 已逾期
+
+员工考试成绩表
+表名：t_employee_exam_score
+主键 /
+字段名 数据类型 字段说明
+约束
+主键、
+score_id bigint 成绩记录唯一 ID
+自增
+learn_record_id bigint 非空 关联学习记录 ID
+emp_id bigint 非空 员工 ID
+course_id bigint 非空 课程 ID
+考试类型：1 - 线上闭卷 2 -
+exam_type tinyint 非空
+线下实操 3 - 补考
+第几次考试（用于补考次数限
+exam_times tinyint 默认 1
+制）
+exam_score decimal(5,2) 非空 考试得分
+full_score decimal(5,2) 非空 满分
+pass_score decimal(5,2) 非空 及格分数线
+是否合格：1 - 合格 0 - 不
+is_pass tinyint 非空
+合格
+exam_time datetime 非空 考试时间
+remark varchar(255) 可空 考核备注
+6. 培训档案管理表
+表名：t_employee_training_archive
+主键 /
+字段名 数据类型 字段说明
+约束
+主键、
+archive_id bigint 档案唯一 ID
+自增
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+score_id | bigint | 主键、
+自增 | 成绩记录唯一 ID
+learn_record_id | bigint | 非空 | 关联学习记录 ID
+emp_id | bigint | 非空 | 员工 ID
+course_id | bigint | 非空 | 课程 ID
+exam_type | tinyint | 非空 | 考试类型：1 - 线上闭卷 2 -
+线下实操 3 - 补考
+exam_times | tinyint | 默认 1 | 第几次考试（用于补考次数限
+制）
+exam_score | decimal(5,2) | 非空 | 考试得分
+full_score | decimal(5,2) | 非空 | 满分
+pass_score | decimal(5,2) | 非空 | 及格分数线
+is_pass | tinyint | 非空 | 是否合格：1 - 合格 0 - 不
+合格
+exam_time | datetime | 非空 | 考试时间
+remark | varchar(255) | 可空 | 考核备注
+
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+archive_id | bigint | 主键、
+自增 | 档案唯一 ID
+
+主键 /
+字段名 数据类型 字段说明
+约束
+emp_id bigint 非空 员工 ID
+员工姓名（冗余存储便于
+emp_name varchar(64) 非空
+查询）
+dept_id bigint 非空 所属部门 ID
+position_id bigint 非空 岗位 ID
+archive_year int 非空 档案年度
+annual_total_hour decimal(8,2) 默认 0 年度累计参训学时
+annual_total_credit decimal(8,2) 默认 0 年度累计获得学分
+total_course_count int 默认 0 年度参训课程总数
+pass_course_count int 默认 0 年度考核合格课程数
+年度学时是否达标：1 -
+is_hour_standard tinyint 非空
+达标 0 - 未达标
+参训明细（JSON 格式存储
+archive_detail text 可空
+课程、成绩、时间摘要）
+特殊履历：带教 / 外派 /
+special_record varchar(255) 可空
+外出研学记录
+7. 认证管理模块
+认证项目表
+表名：t_certification_project
+主键 /
+字段名 数据类型 字段说明
+约束
+主键、
+cert_project_id bigint 认证项目唯一 ID
+自增
+cert_name varchar(128) 非空 认证名称
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+emp_id | bigint | 非空 | 员工 ID
+emp_name | varchar(64) | 非空 | 员工姓名（冗余存储便于
+查询）
+dept_id | bigint | 非空 | 所属部门 ID
+position_id | bigint | 非空 | 岗位 ID
+archive_year | int | 非空 | 档案年度
+annual_total_hour | decimal(8,2) | 默认 0 | 年度累计参训学时
+annual_total_credit | decimal(8,2) | 默认 0 | 年度累计获得学分
+total_course_count | int | 默认 0 | 年度参训课程总数
+pass_course_count | int | 默认 0 | 年度考核合格课程数
+is_hour_standard | tinyint | 非空 | 年度学时是否达标：1 -
+达标 0 - 未达标
+archive_detail | text | 可空 | 参训明细（JSON 格式存储
+课程、成绩、时间摘要）
+special_record | varchar(255) | 可空 | 特殊履历：带教 / 外派 /
+外出研学记录
+
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+cert_project_id | bigint | 主键、
+自增 | 认证项目唯一 ID
+cert_name | varchar(128) | 非空 | 认证名称
+
+主键 /
+字段名 数据类型 字段说明
+约束
+认证等级：初级 / 中级 / 高
+cert_level varchar(32) 非空
+级等
+认证类型：1 - 内部岗位认证
+cert_type tinyint 非空
+2 - 外部职业资格
+apply_condition text 可空 报考条件说明
+pre_course_ids varchar(500) 可空 前置培训课程 ID 集合
+exam_standard text 可空 理论 + 实操考核标准
+证书有效期（单位：月），0
+valid_period int 非空
+表示永久有效
+issue_org varchar(128) 可空 发证机构
+status tinyint 非空 状态：1 - 启用 0 - 停用
+认证报名表
+表名：t_certification_apply
+主键 /
+字段名 数据类型 字段说明
+约束
+主键、
+apply_id bigint 报名申请唯一 ID
+自增
+emp_id bigint 非空 申请人 ID
+cert_project_id bigint 非空 关联认证项目 ID
+apply_time datetime 非空 申请时间
+material_url varchar(255) 可空 报考材料附件地址
+报考资质自动校验结果：
+qualification_check tinyint 非空
+1 - 通过 0 - 不通过
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+cert_level | varchar(32) | 非空 | 认证等级：初级 / 中级 / 高
+级等
+cert_type | tinyint | 非空 | 认证类型：1 - 内部岗位认证
+2 - 外部职业资格
+apply_condition | text | 可空 | 报考条件说明
+pre_course_ids | varchar(500) | 可空 | 前置培训课程 ID 集合
+exam_standard | text | 可空 | 理论 + 实操考核标准
+valid_period | int | 非空 | 证书有效期（单位：月），0
+表示永久有效
+issue_org | varchar(128) | 可空 | 发证机构
+status | tinyint | 非空 | 状态：1 - 启用 0 - 停用
+
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+apply_id | bigint | 主键、
+自增 | 报名申请唯一 ID
+emp_id | bigint | 非空 | 申请人 ID
+cert_project_id | bigint | 非空 | 关联认证项目 ID
+apply_time | datetime | 非空 | 申请时间
+material_url | varchar(255) | 可空 | 报考材料附件地址
+qualification_check | tinyint | 非空 | 报考资质自动校验结果：
+1 - 通过 0 - 不通过
+
+主键 /
+字段名 数据类型 字段说明
+约束
+审批状态：0 - 待审批 1
+approve_status tinyint 非空 - 审批通过 2 - 审批驳
+回
+approver_id bigint 可空 最终审批人 ID
+approve_remark varchar(255) 可空 审批意见
+认证证书表
+表名：t_certification_certificate
+主键 /
+字段名 数据类型 字段说明
+约束
+主键、
+cert_id bigint 证书唯一 ID
+自增
+emp_id bigint 非空 持证人员工 ID
+cert_project_id bigint 非空 关联认证项目 ID
+cert_no varchar(64) 可空 证书编号
+cert_file_url varchar(255) 可空 证书电子附件存储地址
+证书来源：1 - 外部上传 0
+is_external tinyint 非空
+- 内部颁发
+issue_date date 非空 发证日期
+expire_date date 可空 到期日期
+last_review_date date 可空 最近一次复审日期
+next_review_date date 可空 下次复审日期
+复审状态：0 - 未到期 1 -
+review_status tinyint 非空 待复审 2 - 已复审 3 - 已
+过期
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+approve_status | tinyint | 非空 | 审批状态：0 - 待审批 1
+- 审批通过 2 - 审批驳
+回
+approver_id | bigint | 可空 | 最终审批人 ID
+approve_remark | varchar(255) | 可空 | 审批意见
+
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+cert_id | bigint | 主键、
+自增 | 证书唯一 ID
+emp_id | bigint | 非空 | 持证人员工 ID
+cert_project_id | bigint | 非空 | 关联认证项目 ID
+cert_no | varchar(64) | 可空 | 证书编号
+cert_file_url | varchar(255) | 可空 | 证书电子附件存储地址
+is_external | tinyint | 非空 | 证书来源：1 - 外部上传 0
+- 内部颁发
+issue_date | date | 非空 | 发证日期
+expire_date | date | 可空 | 到期日期
+last_review_date | date | 可空 | 最近一次复审日期
+next_review_date | date | 可空 | 下次复审日期
+review_status | tinyint | 非空 | 复审状态：0 - 未到期 1 -
+待复审 2 - 已复审 3 - 已
+过期
+
+主键 /
+字段名 数据类型 字段说明
+约束
+证书状态：1 - 有效 2 - 已
+status tinyint 非空
+过期 3 - 已失效
+表间核心关联关系总览
+1. 课程主表 ↔ 讲师表：通过 main_lecturer_id 关联主讲讲师
+2. 课程 - 岗位职级关联表 ↔ 课程主表：通过 course_id 绑定，支撑系
+统自动分配课程
+3. 学习记录表 ↔ 员工表、课程表、计划表：串联「人 - 课 - 计划」三
+者关系
+4. 考试成绩表 ↔ 学习记录表：通过 learn_record_id 关联，一门课程
+可对应多次考试 / 补考
+5. 培训档案表 ↔ 学习、考试、证书表：聚合数据生成年度正式档案
+6. 认证证书表 ↔ 员工表、认证项目表：实现人员与认证体系的绑定
+字段名 | 数据类型 | 主键 /
+约束 | 字段说明
+status | tinyint | 非空 | 证书状态：1 - 有效 2 - 已
+过期 3 - 已失效
+

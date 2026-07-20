@@ -1,0 +1,157 @@
+HR 系统员工培训模块数据库命名规
+范文档
+1. 总则
+1.1 规范目的
+统一HR系统员工培训模块所有数据表、字段、关联关系的命名规则，保证数据
+库结构语义清晰、格式统一、易于维护、可扩展性强，适配企业级HR培训业务迭代
+需求，降低开发、交接、运维成本。
+1.2 适用范围
+本文档适用于HR系统员工培训模块全部业务数据表、字段、索引、关联关系、
+扩展属性的命名设计，包含讲师管理、课程管理、培训规划、员工学习、培训档案、
+认证管理六大业务模块。
+1.3 通用基础原则
+• 全局统一采用小写蛇形命名法（单词下划线分隔），禁止大写、驼峰、拼音、歧义
+缩写；
+• 所有命名语义化、见名知意，精准匹配业务含义，无冗余、无歧义；
+• 同类字段、表结构命名全局统一，保持规则一致性；
+• 严格区分时间、状态、类型、标识、资源类字段的固定命名后缀。
+2. 数据表命名规范
+2.1 基础命名格式
+所有业务表统一格式：t_业务域_表含义，前缀 t_ 固定代表业务数据表。
+2.2 模块表名规则
+• 培训核心业务表：以 t_training_xxx 为前缀，适配培训全流程业务；
+• 多对多关联中间表：固定后缀 _rel，格式为 t_主体_关联客体_rel，专门用于解耦
+多对多业务关系；
+• 员工私有业务表：以 t_employee_xxx 为前缀，归属员工个人学习、档案、成绩
+业务域；
+• 认证专项业务表：以 t_certification_xxx 为前缀，归属培训认证体系业务域。
+2.3 表名落地示例
+• 业务主表：t_training_lecturer（讲师管理表）、t_training_course（课程主表）、
+t_training_plan（培训计划表）
+• 关联中间表：t_course_lecturer_rel（课程-讲师关联表）、t_course_position_rel
+（课程-岗位职级关联表）
+• 员工业务表：t_employee_learning_record（员工学习记录表）、
+t_employee_exam_score（员工考试成绩表）
+• 认证业务表：t_certification_project（认证项目表）、t_certification_certificate（认
+证证书表）
+3. 通用字段命名规范
+3.1 固定后缀命名规则（全局统一）
+所有业务字段采用固定后缀区分字段属性，全模块统一标准，无特例：
+固定后缀 字段用途 示例字段
+_id 唯一标识ID、外键关联 lecturer_id、course_id、
+ID emp_id
+_time 精确时分秒的时间字段 create_time、
+（datetime类型） exam_time、
+plan_start_time
+_date 仅年月日的日期字段 issue_date、
+（date类型） expire_date、
+expect_time
+_type 业务类型、分类枚举字段 lecturer_type、
+course_type、exam_type
+固定后缀 | 字段用途 | 示例字段
+_id | 唯一标识ID、外键关联
+ID | lecturer_id、course_id、
+emp_id
+_time | 精确时分秒的时间字段
+（datetime类型） | create_time、
+exam_time、
+plan_start_time
+_date | 仅年月日的日期字段
+（date类型） | issue_date、
+expire_date、
+expect_time
+_type | 业务类型、分类枚举字段 | lecturer_type、
+course_type、exam_type
+
+_status 状态、审批、启用停用类 status、
+字段 approve_status、
+review_status
+_num 排序、序号类字段 sort_num、exam_times
+_url 文件、课件、资源存储地 courseware_url、
+址 file_url、material_url
+_no 业务编号类字段 contract_no、cert_no
+_desc 说明、描述、版本备注类 version_desc、plan_desc
+字段
+3.2 主键字段命名规范
+• 命名规则：单表主键统一为 表核心含义_id，自增bigint类型；
+• 示例：讲师表主键lecturer_id、课程表主键course_id、关联表主键rel_id、档案
+表主键archive_id；
+• 所有主键统一自增、唯一，命名与业务主体强绑定。
+3.3 外键关联字段命名规范
+• 所有关联外键字段与主表主键命名完全一致，保证关联关系直观可辨；
+• 关联关系明确标注对应主表，禁止自定义别名；
+• 示例：课程章节表关联课程字段course_id（对应课程主表course_id）、学习记录
+表关联员工字段emp_id（对应员工主表emp_id）。
+4. 公共字段命名规范（全局统一）
+模块所有业务数据表，统一复用5个公共审计、逻辑删除字段，命名、类型、含
+义全局固定，无自定义修改：
+字段名 固定数据类型 字段说明
+create_by bigint 创建人ID
+create_time datetime 数据创建时间
+_status | 状态、审批、启用停用类
+字段 | status、
+approve_status、
+review_status
+_num | 排序、序号类字段 | sort_num、exam_times
+_url | 文件、课件、资源存储地
+址 | courseware_url、
+file_url、material_url
+_no | 业务编号类字段 | contract_no、cert_no
+_desc | 说明、描述、版本备注类
+字段 | version_desc、plan_desc
+
+字段名 | 固定数据类型 | 字段说明
+create_by | bigint | 创建人ID
+create_time | datetime | 数据创建时间
+
+update_by bigint 更新人ID
+update_time datetime 数据更新时间
+is_deleted tinyint 逻辑删除标记（0-未删
+除、1-已删除）
+5. 业务枚举字段命名规范
+5.1 基础规则
+所有状态、类型、分类字段统一使用 tinyint数字枚举 命名，禁用字符串存储，
+数字编码语义全局统一。
+5.2 通用枚举语义规范
+• 启用/有效类：1=启用/有效/是，0=停用/失效/否；
+• 完成状态类：1=已完成，0=未完成；
+• 必修选修类：1=必修，0=选修；
+• 删除状态类：0=未删除，1=已删除。
+5.3 业务枚举字段命名示例
+• 人员类型：lecturer_type（1-内部讲师、2-外部讲师）
+• 课程形式：course_type（1-线上、2-线下、3-混合式）
+• 审批状态：approve_status（0-待审批、1-通过、2-驳回、3-已撤销）
+6. 特殊字段命名规范
+6.1 排序字段
+所有需要前端自定义排序的业务表，统一使用 sort_num 字段，int类型、默认值
+0，统一管控展示顺序。
+6.2 布尔标识字段
+是否类判断字段统一以 is_ 前缀开头，tinyint类型，如is_required（是否必修）、
+is_finished（是否完成）、is_external（是否外部证书）。
+update_by | bigint | 更新人ID
+update_time | datetime | 数据更新时间
+is_deleted | tinyint | 逻辑删除标记（0-未删
+除、1-已删除）
+
+6.3 扩展配置字段
+灵活配置、结构化扩展数据，统一使用长文本字段存储，命名贴合业务：防作弊
+配置anti_cheat_config、档案明细archive_detail，采用JSON格式存储，无需固定表
+结构。
+6.4 批量关联字段
+多ID批量关联字段，统一命名为 xxx_ids，varchar长文本、逗号分隔存储，如
+course_ids（关联课程ID集合）、lecturer_ids（关联讲师ID集合）、pre_course_ids
+（前置课程ID集合）。
+7. 数据类型配套命名规范
+命名与数据类型强绑定，统一适配规则，杜绝类型混用：
+• ID类字段：全部使用bigint，适配大数据量、避免溢出；
+• 名称、短描述字段：varchar(32/64/128)，根据内容长度分级；
+• 详情、大纲、正文字段：text/mediumtext长文本类型；
+• 学分、价格、分数精度数值：decimal(固定精度)；
+• 状态、类型、开关枚举：tinyint；
+• 精准操作时间：datetime，纯日期场景：date。
+8. 禁止性命名规范
+• 禁止使用中文、拼音、拼音首字母命名表和字段；
+• 禁止大小写混用、下划线滥用、无意义缩写；
+• 禁止同类业务字段不同名、同名字段不同语义；
+• 禁止自定义公共字段、修改公共字段命名和类型；
+• 禁止状态、类型字段使用字符串存储，统一使用tinyint数字枚举。

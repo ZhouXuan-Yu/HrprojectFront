@@ -1,0 +1,776 @@
+"""Demand service: CRUD + approval flow + status state machine.
+
+Status transitions:
+  draft(0) -> approval(1) -> open(2) / rejected(3)
+  open(2) -> closed(4) or fulfilled
+  Any -> cancelled(5)
+
+Validations:
+  - Cannot delete/close a demand with active interviews or pending offers
+  - Closing auto-releases linked candidates
+"""
+import logging
+from app.utils.response import AppError
+from app.utils.enums import DemandStatus, DemandUrgency
+
+log = logging.getLogger(__name__)
+
+
+def _mock_enabled():
+    from app.utils.response import should_mock_fallback
+    return should_mock_fallback()
+
+
+STATUS_LABELS = {0: '草稿', 1: '审批中', 2: '招聘中', 3: '已驳回', 4: '已关闭', 5: '已取消'}
+STATUS_TYPES = {0: 'draft', 1: 'warn', 2: 'progress', 3: 'reject', 4: 'draft', 5: 'draft'}
+URGENCY_LABELS = {'very': '非常紧急', 'high': '紧急', 'normal': '普通'}
+URGENCY_TYPES = {'very': 'reject', 'high': 'warn', 'normal': 'draft'}
+
+# Allowed status transitions
+DEMAND_TRANSITIONS = {
+    0: [1, 5],       # draft -> approval / cancelled
+    1: [2, 3, 5],    # approval -> open / rejected / cancelled
+    2: [4, 5],       # open -> closed / cancelled
+    3: [0, 5],       # rejected -> draft / cancelled
+    4: [],           # closed: terminal
+    5: [],           # cancelled: terminal
+}
+
+# Mapping from dept_id/position_id/user_id -> Chinese names
+DEPT_NAMES = {1: '技术部', 2: '产品部', 3: '运营部', 4: '数据部', 5: '财务部'}
+POS_NAMES = {1: '高级Java工程师', 2: '前端工程师', 3: '产品经理', 4: '运营总监', 5: '数据分析师'}
+USER_NAMES = {1: '刘博', 2: '张HR', 3: '陈总', 4: '周博', 5: '李面试官', 6: '王面试官', 7: '赵博'}
+
+EDU_LEVEL_LABELS = {1: '大专', 2: '本科', 3: '硕士', 4: '博士'}
+
+
+def _validate_demand_transition(demand, target_status):
+    """Validate demand status transition. Raises AppError on invalid transition."""
+    allowed = DEMAND_TRANSITIONS.get(demand.demand_status, [])
+    if target_status not in allowed:
+        current_label = STATUS_LABELS.get(demand.demand_status, '未知')
+        target_label = STATUS_LABELS.get(target_status, '未知')
+        raise AppError(
+            'INVALID_STATE',
+            f'需求状态"{current_label}"({demand.demand_status})不允许切换到"{target_label}"({target_status})'
+        )
+
+
+def _has_active_interviews_or_offers(demand_id):
+    """Check if a demand has active interviews (scheduled/evaluating) or pending offers.
+
+    Returns True if active engagements exist.
+    """
+    try:
+        from app.models.interview import InterviewBook
+        from app.models.process import RecruitProcess
+
+        # Check for active interviews linked via demand_id
+        active_books = InterviewBook.query.filter(
+            InterviewBook.demand_id == demand_id,
+            InterviewBook.is_deleted == 0,
+        ).count()
+        if active_books > 0:
+            return True
+
+        # Check for processes that are in interview/offer stages
+        active_process = RecruitProcess.query.filter(
+            RecruitProcess.demand_id == demand_id,
+            RecruitProcess.process_status.in_([2, 3, 5]),  # interviewing or pending offer
+            RecruitProcess.is_deleted == 0,
+        ).count()
+        if active_process > 0:
+            return True
+
+        return False
+    except Exception as exc:
+        log.warning("Failed to check active interviews: %s", exc)
+        return False  # If check fails, allow
+
+
+def _release_linked_candidates(demand_id):
+    """Release all candidates linked to this demand by setting their process status to 'released'."""
+    released = 0
+    try:
+        from app.models.process import RecruitProcess
+        from app.extensions import db
+
+        processes = RecruitProcess.query.filter(
+            RecruitProcess.demand_id == demand_id,
+            RecruitProcess.is_deleted == 0,
+        ).all()
+
+        for p in processes:
+            p.process_status = 7  # giveup/released
+            released += 1
+
+        if released > 0:
+            db.session.commit()
+            log.info("Released %d linked candidates for demand %s", released, demand_id)
+    except Exception as exc:
+        log.warning("Failed to release linked candidates: %s", exc)
+    return released
+
+
+def _auto_fulfill_if_complete(demand):
+    """Check if demand's headcount is fully filled and auto-close."""
+    try:
+        if demand.filled_count and demand.plan_headcount and demand.filled_count >= demand.plan_headcount:
+            demand.demand_status = 4  # closed
+            demand.closed_at = __import__('datetime').datetime.now()
+            log.info("Demand %s auto-fulfilled: filled %d/%d", demand.demand_no, demand.filled_count, demand.plan_headcount)
+            return True
+    except Exception as exc:
+        log.warning("Failed to auto-fulfill demand: %s", exc)
+    return False
+
+
+# ── Core API ──
+
+def _extract_skills_from_jd(jd_content):
+    """Extract skill-like phrases from JD content for requiredSkills/plusSkills."""
+    if not jd_content:
+        return [], []
+    import re
+    parts = re.split(r'[，,、；;、\n]', jd_content)
+    parts = [p.strip().strip('·-*') for p in parts if len(p.strip()) > 2]
+    tech_hints = [
+        'Java', 'Spring', 'MySQL', 'Kubernetes', 'K8s', 'React', 'Vue',
+        'Python', 'Go', 'Golang', 'Docker', 'Redis', 'MQ', '消息队列',
+        '分布式', '微服务', '架构', '设计', '开发', '管理', '部署', '调优',
+        '运维', 'DevOps', 'CI', 'CD', '容器化', '敏捷', 'Scrum',
+        'SQL', 'NoSQL', 'MongoDB', 'Elasticsearch', 'Flask', 'Django',
+        '前端', '后端', '全栈', '测试', '产品', '运营', '数据分析',
+    ]
+    skills = [p for p in parts if any(h in p for h in tech_hints)]
+    if not skills:
+        skills = [p for p in parts if len(p) > 4 and '。' not in p]
+    if not skills:
+        return [], []
+    mid = max(1, len(skills) // 2)
+    return skills[:mid], skills[mid:]
+
+
+def _demand_to_dict(d):
+    """Convert a RecruitDemand ORM object to API dict."""
+    pos_name = POS_NAMES.get(d.position_id, str(d.position_id))
+    dept_name = DEPT_NAMES.get(d.dept_id, str(d.dept_id))
+    submitter = USER_NAMES.get(d.creator_id, str(d.creator_id))
+
+    st = d.demand_status
+    result = {
+        'id': d.demand_no,
+        'position': pos_name,
+        'dept': dept_name,
+        'hc': d.plan_headcount,
+        'urgency': d.urgency or 'normal',
+        'urgencyLabel': URGENCY_LABELS.get(d.urgency, '普通'),
+        'urgencyType': URGENCY_TYPES.get(d.urgency, 'draft'),
+        'submitter': submitter,
+        'status': {0: 'draft', 1: 'approval', 2: 'open', 3: 'rejected', 4: 'closed', 5: 'cancelled'}.get(st, 'draft'),
+        'statusLabel': STATUS_LABELS.get(st, '草稿'),
+        'statusType': STATUS_TYPES.get(st, 'draft'),
+        'linkedCount': 0,
+    }
+
+    if d.audit_flow:
+        result['approvalNodes'] = d.audit_flow
+    else:
+        result['approvalNodes'] = _default_approval_nodes(st)
+
+    if st == 2:  # open
+        result.update({
+            'directApply': d.internal_searched or 0,
+            'systemRecommend': d.resume_searched or 0,
+            'internalMatch': 0,
+            'internalNames': [],
+            'interviewing': 0,
+        })
+
+    return result
+
+
+def _default_approval_nodes(status):
+    if status == 0:  # draft
+        return []
+    nodes = [
+        {'label': '部门负责人', 'state': 'done'},
+        {'label': 'HR', 'state': 'pending'},
+        {'label': '财务总监', 'state': 'pending'},
+    ]
+    if status == 2:  # approved/open
+        nodes[0]['state'] = 'done'
+        nodes[1]['state'] = 'done'
+        nodes[2]['state'] = 'done'
+    elif status == 1:  # approval
+        nodes[0]['state'] = 'current'
+    return nodes
+
+
+def submit_for_approval(demand_id):
+    """Submit a draft demand for approval — draft(0) -> approval(1).
+
+    Creates approval nodes via approval_service.init_approval().
+    """
+    from app.models.demand import RecruitDemand
+    from app.extensions import db
+
+    d = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
+    if not d:
+        raise AppError('NOT_FOUND', f'需求 {demand_id} 不存在')
+
+    _validate_demand_transition(d, 1)  # draft -> approval
+
+    d.demand_status = 1  # approval
+
+    # Initialize approval records
+    from app.services.approval_service import init_approval
+    init_approval(d.id)
+
+    # Build audit_flow snapshot
+    from app.services.approval_service import get_approval_progress
+    d.audit_flow = get_approval_progress(d.id)
+
+    db.session.commit()
+    log.info("需求提交审批: %s", demand_id)
+
+    return {'submitted': True, 'id': demand_id, 'status': 'approval'}
+
+
+def list_demands(params):
+    """Return paginated demand list — DB-level filters with SQL pagination."""
+    page = max(1, int(params.get('page', 1)))
+    page_size = min(100, max(1, int(params.get('pageSize', 20))))
+    search = params.get('search', '').strip()
+    status = params.get('status', 'all')
+    urgency = params.get('urgency', 'all')
+
+    try:
+        from app.models.demand import RecruitDemand
+        q = RecruitDemand.query.filter(RecruitDemand.is_deleted == 0)
+
+        if search:
+            sl = f'%{search}%'
+            q = q.filter(RecruitDemand.demand_no.contains(search))
+        if status and status != 'all':
+            status_map = {'approval': 1, 'open': 2, 'draft': 0, 'closed': 4, 'rejected': 3, 'cancelled': 5}
+            q = q.filter(RecruitDemand.demand_status == status_map.get(status))
+        if urgency and urgency != 'all':
+            q = q.filter(RecruitDemand.urgency == urgency)
+
+        total = q.count()
+        rows = q.order_by(RecruitDemand.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        if rows:
+            demands = [_demand_to_dict(d) for d in rows]
+            return demands, total
+    except Exception as exc:
+        log.error("DB query failed in list_demands: %s", exc, exc_info=True)
+    return _mock_list_demands(params) if _mock_enabled() else ([], 0)
+
+
+def _mock_list_demands(params):
+    search = params.get('search', '').strip()
+    status = params.get('status', 'all')
+    urgency = params.get('urgency', 'all')
+
+    all_demands = [
+        {
+            'id': 'DM2026070006', 'position': '运营总监', 'dept': '运营部', 'hc': 1,
+            'urgency': 'very', 'urgencyLabel': '非常紧急', 'urgencyType': 'reject',
+            'submitter': '陈总', 'status': 'approval', 'statusLabel': '审批中', 'statusType': 'warn',
+            'approvalNodes': [
+                {'label': '部门负责人', 'state': 'current'},
+                {'label': 'HR', 'state': 'pending'},
+                {'label': '财务总监', 'state': 'pending'},
+            ],
+            'linkedCount': 0, 'directApply': 0, 'systemRecommend': 0,
+            'internalMatch': 0, 'internalNames': [], 'interviewing': 0,
+        },
+        {
+            'id': 'DM2026070004', 'position': '产品经理', 'dept': '产品部', 'hc': 1,
+            'urgency': 'normal', 'urgencyLabel': '普通', 'urgencyType': 'draft',
+            'submitter': '周博', 'status': 'approval', 'statusLabel': '审批中', 'statusType': 'warn',
+            'approvalNodes': [
+                {'label': '部门负责人', 'state': 'done'},
+                {'label': 'HR', 'state': 'current'},
+                {'label': '财务总监', 'state': 'pending'},
+            ],
+            'linkedCount': 0, 'directApply': 0, 'systemRecommend': 0,
+            'internalMatch': 0, 'internalNames': [], 'interviewing': 0,
+        },
+        {
+            'id': 'DM2026070005', 'position': '高级Java工程师', 'dept': '技术部', 'hc': 2,
+            'urgency': 'high', 'urgencyLabel': '紧急', 'urgencyType': 'warn',
+            'submitter': '刘博', 'status': 'open', 'statusLabel': '招聘中', 'statusType': 'progress',
+            'approvalNodes': [
+                {'label': '部门负责人', 'state': 'done'},
+                {'label': 'HR', 'state': 'done'},
+                {'label': '财务总监', 'state': 'done'},
+            ],
+            'directApply': 4, 'systemRecommend': 5, 'internalMatch': 2,
+            'internalNames': ['王工·92', '赵工·42'],
+            'interviewing': 5, 'linkedCount': 0,
+        },
+        {
+            'id': 'DM2026070003', 'position': '运营总监', 'dept': '运营部', 'hc': 1,
+            'urgency': 'very', 'urgencyLabel': '非常紧急', 'urgencyType': 'reject',
+            'submitter': '陈总', 'status': 'open', 'statusLabel': '招聘中', 'statusType': 'progress',
+            'approvalNodes': [
+                {'label': '部门负责人', 'state': 'done'},
+                {'label': 'HR', 'state': 'done'},
+                {'label': '财务总监', 'state': 'done'},
+            ],
+            'directApply': 1, 'systemRecommend': 0, 'internalMatch': 0,
+            'internalNames': [], 'interviewing': 0, 'linkedCount': 0,
+        },
+        {
+            'id': 'DM2026070002', 'position': '前端工程师', 'dept': '技术部', 'hc': 3,
+            'urgency': 'high', 'urgencyLabel': '紧急', 'urgencyType': 'warn',
+            'submitter': '刘博', 'status': 'closed', 'statusLabel': '已关闭', 'statusType': 'draft',
+            'approvalNodes': [
+                {'label': '部门负责人', 'state': 'done'},
+                {'label': 'HR', 'state': 'done'},
+                {'label': '财务总监', 'state': 'done'},
+            ],
+            'linkedCount': 0,
+        },
+        {
+            'id': 'DM2026070001', 'position': '数据分析师', 'dept': '数据部', 'hc': 1,
+            'urgency': 'normal', 'urgencyLabel': '普通', 'urgencyType': 'draft',
+            'submitter': '陈博', 'status': 'draft', 'statusLabel': '草稿', 'statusType': 'draft',
+            'approvalNodes': [],
+            'linkedCount': 0,
+        },
+    ]
+
+    if search:
+        search_lower = search.lower()
+        all_demands = [d for d in all_demands
+                       if search_lower in d['position'].lower()
+                       or search_lower in d['dept'].lower()
+                       or search_lower in d['id'].lower()]
+    if status != 'all':
+        all_demands = [d for d in all_demands if d['status'] == status]
+    if urgency != 'all':
+        all_demands = [d for d in all_demands if d['urgency'] == urgency]
+
+    return all_demands, len(all_demands)
+
+
+def create_demand(data):
+    """Create a new demand — writes to DB with mock fallback."""
+    try:
+        from app.models.demand import RecruitDemand
+        from app.extensions import db
+        from datetime import datetime
+
+        now = datetime.now()
+        prefix = f"DM{now.strftime('%Y%m')}"
+        latest = RecruitDemand.query.filter(
+            RecruitDemand.demand_no.like(f'{prefix}%'),
+            RecruitDemand.is_deleted == 0,
+        ).order_by(RecruitDemand.demand_no.desc()).first()
+
+        seq = int(latest.demand_no[-4:]) + 1 if latest else 1
+        demand_no = f"{prefix}{seq:04d}"
+
+        d = RecruitDemand(
+            demand_no=demand_no,
+            dept_id=data.get('deptId') or 1,
+            position_id=data.get('positionId') or 1,
+            recruit_type=data.get('recruitType') or 1,
+            plan_headcount=data.get('hc') or data.get('planHeadcount') or 1,
+            demand_status=0,  # draft
+            urgency=data.get('urgency') or 'normal',
+            creator_id=data.get('creatorId') or 1,
+            hr_owner_id=data.get('hrOwnerId') or 1,
+            jd_content=data.get('description', ''),
+            salary_range=data.get('salary', ''),
+            work_city=data.get('workCity', ''),
+            edu_min=data.get('eduMin', ''),
+            exp_min=data.get('expMin'),
+            required_skills=data.get('requiredSkills'),
+            plus_skills=data.get('plusSkills'),
+        )
+        db.session.add(d)
+        db.session.flush()
+
+        # Initialize approval records (even though still draft — ready for submit)
+        from app.services.approval_service import init_approval
+        init_approval(d.id)
+
+        db.session.commit()
+        return {'id': demand_no, 'created': True, 'demandId': d.id}
+    except Exception as exc:
+        log.error("DB write failed in create_demand: %s", exc, exc_info=True)
+        if not _mock_enabled():
+            raise
+
+    return {'id': 'DM2026070007', 'created': True, '_fallback': True}
+
+
+def update_demand(demand_id, data):
+    """Partial update demand — writes to DB."""
+    updated = False
+    try:
+        from app.models.demand import RecruitDemand
+        from app.extensions import db
+        d = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
+        if not d:
+            raise AppError('NOT_FOUND', f'需求 {demand_id} 不存在')
+
+        # Cannot update a closed/cancelled demand
+        if d.demand_status in (4, 5):
+            raise AppError('INVALID_STATE', f'需求已{STATUS_LABELS.get(d.demand_status, "关闭")}，无法编辑')
+
+        if 'urgency' in data:
+            d.urgency = data['urgency']
+        if 'position' in data:
+            d.position_name = data['position']
+        if 'description' in data:
+            d.jd_content = data['description']
+        if 'salary' in data:
+            d.salary_range = data['salary']
+        db.session.commit()
+        updated = True
+    except AppError:
+        raise
+    except Exception as exc:
+        log.error("DB write failed in update_demand: %s", exc, exc_info=True)
+        if not _mock_enabled():
+            raise
+    return {'updated': updated}
+
+
+def close_demand(demand_id):
+    """Close a demand — open(2) -> closed(4).
+
+    Validates no active interviews or pending offers before closing.
+    Auto-releases all linked candidates.
+    """
+    try:
+        from app.models.demand import RecruitDemand
+        from app.extensions import db
+        from datetime import datetime
+
+        d = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
+        if not d:
+            raise AppError('NOT_FOUND', f'需求 {demand_id} 不存在')
+
+        _validate_demand_transition(d, 4)  # open -> closed
+
+        # Check active engagements
+        if _has_active_interviews_or_offers(d.id):
+            raise AppError('HAS_ACTIVE_ENGAGEMENTS', '需求存在进行中的面试或Offer，无法关闭')
+
+        d.demand_status = 4  # closed
+        d.closed_at = datetime.now()
+
+        # Auto-release all linked candidates
+        _release_linked_candidates(d.id)
+
+        db.session.commit()
+        log.info("需求已关闭: %s", demand_id)
+        return {'closed': True, 'releasedCandidates': True}
+    except AppError:
+        raise
+    except Exception as exc:
+        log.error("DB write failed in close_demand: %s", exc, exc_info=True)
+    return {'closed': False}
+
+
+def delete_demand(demand_id):
+    """Soft-delete a demand. Only allowed for draft(0) or rejected(3) status."""
+    try:
+        from app.models.demand import RecruitDemand
+        from app.extensions import db
+
+        d = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
+        if not d:
+            raise AppError('NOT_FOUND', f'需求 {demand_id} 不存在')
+
+        if d.demand_status not in (0, 3, 5):
+            raise AppError('INVALID_STATE', f'需求状态为{STATUS_LABELS.get(d.demand_status, "未知")}，不允许删除')
+
+        if _has_active_interviews_or_offers(d.id):
+            raise AppError('HAS_ACTIVE_ENGAGEMENTS', '需求存在进行中的面试或Offer，无法删除')
+
+        d.soft_delete()
+        db.session.commit()
+        log.info("需求已删除: %s", demand_id)
+        return {'deleted': True}
+    except AppError:
+        raise
+    except Exception as exc:
+        log.error("DB delete failed in delete_demand: %s", exc, exc_info=True)
+        return {'deleted': False}
+
+
+def get_demand_detail(demand_id):
+    """Return demand detail with approval nodes — DB first, mock fallback."""
+    try:
+        from app.models.demand import RecruitDemand
+        d = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
+        if d:
+            pos_name = POS_NAMES.get(d.position_id, str(d.position_id))
+            dept_name = DEPT_NAMES.get(d.dept_id, str(d.dept_id))
+            submitter = USER_NAMES.get(d.creator_id, str(d.creator_id))
+
+            req_skills = d.required_skills or []
+            plus_skills = d.plus_skills or []
+            if not req_skills and not plus_skills and d.jd_content:
+                req_skills, plus_skills = _extract_skills_from_jd(d.jd_content)
+
+            # Resolve approval progress
+            from app.services.approval_service import get_approval_progress
+            approval_nodes = d.audit_flow or get_approval_progress(d.id)
+
+            detail = {
+                'id': d.demand_no,
+                'position': pos_name,
+                'dept': dept_name,
+                'hc': d.plan_headcount,
+                'urgency': URGENCY_LABELS.get(d.urgency, '普通'),
+                'salary': d.salary_range or '面议',
+                'date': d.expect_entry_date.strftime('%Y-%m-%d') if d.expect_entry_date else '',
+                'submitter': submitter,
+                'submitDate': d.created_at.strftime('%Y-%m-%d') if d.created_at else '',
+                'channels': d.publishing_channels or ['Boss直聘', '猎聘', '邮箱采集'],
+                'progress': {
+                    'hired': d.filled_count or 0,
+                    'total': d.plan_headcount,
+                    'pct': round((d.filled_count or 0) / d.plan_headcount * 100) if d.plan_headcount else 0,
+                },
+                'description': d.jd_content or '',
+                'requiredSkills': req_skills,
+                'plusSkills': plus_skills,
+                'approvalNodes': approval_nodes or [],
+            }
+
+            return detail
+    except Exception as exc:
+        log.error("DB query failed in get_demand_detail: %s", exc, exc_info=True)
+
+    if not _mock_enabled():
+        raise AppError('NOT_FOUND', f'需求 {demand_id} 不存在于数据库')
+    return _mock_demand_detail()
+
+
+def _mock_demand_detail():
+    return {
+        'id': 'DM2026070005',
+        'position': '高级Java工程师', 'dept': '技术部', 'hc': 2,
+        'urgency': '紧急', 'salary': '¥15K - ¥25K / 月', 'date': '2026-08-01',
+        'submitter': '刘博', 'submitDate': '2026-07-12',
+        'channels': ['Boss直聘', '猎聘', '邮箱采集'],
+        'progress': {'hired': 1, 'total': 2, 'pct': 50},
+        'description': ('负责公司电商中台核心服务的架构设计与开发，主导微服务拆分和容器化改造，'
+                        '参与技术选型和 code review，指导初中级工程师成长。直接汇报给技术总监，有转管理通道。'),
+        'requiredSkills': ['Java · 5年以上', 'Spring Boot/Cloud', 'MySQL 调优', 'Kubernetes', '微服务架构设计', '分布式系统'],
+        'plusSkills': ['团队管理经验', 'DevOps/CI-CD', '多语言（Go/Python）', '技术博客/开源贡献'],
+        'approvalNodes': [
+            {'actor': '刘博', 'role': '部门负责人', 'status': '已通过', 'date': '2026-07-12 14:30'},
+            {'actor': '张HR', 'role': 'HR', 'status': '已通过', 'date': '2026-07-13 09:15'},
+            {'actor': '陈总', 'role': '财务总监', 'status': '已通过', 'date': '2026-07-13 16:00'},
+        ],
+    }
+
+
+def list_demand_candidates(demand_id, params):
+    """Return candidates linked to this demand — DB first, mock fallback."""
+    db_success = False
+    try:
+        from app.models.process import RecruitProcess
+        from app.models.candidate import Candidate
+        from app.models.demand import RecruitDemand
+        from app.extensions import db
+
+        demand = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
+        if demand:
+            processes = RecruitProcess.query.filter(
+                RecruitProcess.demand_id == demand.id,
+                RecruitProcess.is_deleted == 0,
+            ).all()
+
+            if processes:
+                candidates_db = []
+                for p in processes:
+                    cand = Candidate.query.filter_by(id=p.candidate_id, is_deleted=0).first()
+                    if not cand:
+                        continue
+
+                    edu_label = EDU_LEVEL_LABELS.get(cand.edu_level, '—')
+                    years_label = _compute_years_label(cand.work_years)
+
+                    source_ch = cand.source_channel or 'pool'
+                    source_type = {'邮箱': 'direct', 'Boss': 'direct', '猎聘': 'direct', '内推': 'internal', '内部推荐': 'internal'}.get(source_ch, 'external')
+                    source_label_map = {'direct': '直接投递', 'external': '人才库检索', 'pool': '人才库检索', 'internal': '内部员工'}
+
+                    ps_map = {
+                        0: ('available', '待筛选'), 1: ('available', '已邀约'),
+                        2: ('interviewing', '面试中'), 3: ('interviewing', '面试中'),
+                        4: ('available', '已淘汰'), 5: ('offer', '待Offer'),
+                        6: ('offer', '已接受'), 7: ('available', '已放弃'), 8: ('onboard', '已入职'),
+                    }
+                    status, status_label = ps_map.get(p.process_status, ('available', '可联系'))
+
+                    candidates_db.append({
+                        'id': cand.candidate_no or str(cand.id),
+                        'name': cand.candidate_name,
+                        'profileScore': int(cand.static_ability_score) if cand.static_ability_score else None,
+                        'profileGrade': _compute_grade(cand.static_ability_score),
+                        'matchScore': None,
+                        'ageDays': (__import__('datetime').datetime.now() - p.created_at).days if p.created_at else 0,
+                        'source': source_type,
+                        'sourceLabel': source_label_map.get(source_type, '人才库检索'),
+                        'status': status,
+                        'statusLabel': status_label,
+                        'notRecReason': None,
+                        'edu': edu_label,
+                        'years': years_label,
+                        'isEmployee': False,
+                    })
+
+                if candidates_db:
+                    db_success = True
+                    from app.services.match_service import calc_match_score
+                    for c in candidates_db:
+                        try:
+                            match = calc_match_score(str(c['id']), str(demand.id), c.get('profileScore') or 50)
+                            c['matchScore'] = match['score']
+                        except Exception:
+                            c['matchScore'] = None
+
+                    source_filter = params.get('source', 'all')
+                    if source_filter != 'all':
+                        candidates_db = [c for c in candidates_db if c['source'] == source_filter]
+                    return candidates_db
+    except Exception as exc:
+        log.error("DB query failed in list_demand_candidates: %s", exc, exc_info=True)
+        if db_success:
+            return []
+
+    candidates = _mock_list_demand_candidates()
+    source = params.get('source', 'all')
+    if source != 'all':
+        candidates = [c for c in candidates if c['source'] == source]
+    return candidates
+
+
+def _compute_years_label(work_years):
+    if work_years is None:
+        return '—'
+    if work_years >= 5:
+        return '5+'
+    if work_years >= 3:
+        return '3-5'
+    if work_years >= 1:
+        return '1-3'
+    return 'fresh'
+
+
+def _compute_grade(score):
+    if not score:
+        return 'C'
+    s = float(score)
+    return 'A' if s >= 85 else 'B+' if s >= 75 else 'B' if s >= 60 else 'C+'
+
+
+def _mock_list_demand_candidates():
+    return [
+        {'name': '张三', 'profileScore': 88, 'profileGrade': 'A', 'matchScore': 92, 'ageDays': 4,
+         'source': 'direct', 'sourceLabel': '直接投递', 'status': 'interviewing', 'statusLabel': '面试中',
+         'notRecReason': None, 'edu': '本科', 'years': '5+'},
+        {'name': '孙九', 'profileScore': 68, 'profileGrade': 'B', 'matchScore': 72, 'ageDays': 3,
+         'source': 'direct', 'sourceLabel': '直接投递', 'status': 'available', 'statusLabel': '可联系',
+         'notRecReason': None, 'edu': '本科', 'years': '5+'},
+        {'name': '刘八', 'profileScore': 48, 'profileGrade': 'C', 'matchScore': None, 'ageDays': 2,
+         'source': 'direct', 'sourceLabel': '直接投递', 'status': 'available', 'statusLabel': '可联系',
+         'notRecReason': '学历不符（大专）', 'edu': '大专', 'years': '1-3'},
+        {'name': '王五', 'profileScore': 80, 'profileGrade': 'B+', 'matchScore': 86, 'ageDays': 4,
+         'source': 'external', 'sourceLabel': '人才库检索', 'status': 'available', 'statusLabel': '可联系',
+         'notRecReason': None, 'edu': '硕士', 'years': '3-5'},
+        {'name': '李四', 'profileScore': 76, 'profileGrade': 'B+', 'matchScore': 85, 'ageDays': 5,
+         'source': 'external', 'sourceLabel': '人才库检索', 'status': 'available', 'statusLabel': '可联系',
+         'notRecReason': None, 'edu': '硕士', 'years': '3-5'},
+        {'name': '周明', 'profileScore': 72, 'profileGrade': 'B', 'matchScore': 81, 'ageDays': 36,
+         'source': 'external', 'sourceLabel': '人才库检索', 'status': 'available', 'statusLabel': '可联系',
+         'notRecReason': '匹配分超期 36 天', 'edu': '本科', 'years': '5+'},
+        {'name': '吴六', 'profileScore': 78, 'profileGrade': 'B+', 'matchScore': 82, 'ageDays': 7,
+         'source': 'external', 'sourceLabel': '人才库检索', 'status': 'available', 'statusLabel': '可联系',
+         'notRecReason': None, 'edu': '本科', 'years': '5+'},
+        {'name': '赵十', 'profileScore': 65, 'profileGrade': 'B', 'matchScore': 70, 'ageDays': 12,
+         'source': 'external', 'sourceLabel': '人才库检索', 'status': 'available', 'statusLabel': '可联系',
+         'notRecReason': None, 'edu': '本科', 'years': '3-5'},
+        {'name': '陈二', 'profileScore': 56, 'profileGrade': 'C+', 'matchScore': 62, 'ageDays': 7,
+         'source': 'external', 'sourceLabel': '人才库检索', 'status': 'available', 'statusLabel': '可联系',
+         'notRecReason': None, 'edu': '本科', 'years': '1-3'},
+        {'name': '钱七', 'profileScore': 55, 'profileGrade': 'C+', 'matchScore': 52, 'ageDays': 15,
+         'source': 'external', 'sourceLabel': '人才库检索', 'status': 'available', 'statusLabel': '可联系',
+         'notRecReason': '经验不足 6 个月', 'edu': '本科', 'years': 'fresh'},
+        {'name': '孙八', 'profileScore': 68, 'profileGrade': 'B', 'matchScore': None, 'ageDays': 60,
+         'source': 'external', 'sourceLabel': '人才库检索', 'status': 'available', 'statusLabel': '可联系',
+         'notRecReason': '未在检索范围', 'edu': '硕士', 'years': '5+'},
+        {'name': '郑七', 'profileScore': 50, 'profileGrade': 'C', 'matchScore': None, 'ageDays': 45,
+         'source': 'external', 'sourceLabel': '人才库检索', 'status': 'available', 'statusLabel': '可联系',
+         'notRecReason': '学历不符（大专）', 'edu': '大专', 'years': '3-5'},
+        {'name': '王工', 'profileScore': 92, 'profileGrade': 'A', 'matchScore': 92, 'ageDays': 1278,
+         'source': 'internal', 'sourceLabel': '内部员工', 'status': 'available', 'statusLabel': '可调岗',
+         'notRecReason': None, 'edu': '硕士', 'years': '3-5', 'isEmployee': True},
+        {'name': '钱工', 'profileScore': 95, 'profileGrade': 'A+', 'matchScore': 88, 'ageDays': 1780,
+         'source': 'internal', 'sourceLabel': '内部员工', 'status': 'available', 'statusLabel': '可调岗',
+         'notRecReason': None, 'edu': '硕士', 'years': '5+', 'isEmployee': True},
+        {'name': '赵工', 'profileScore': 65, 'profileGrade': 'B', 'matchScore': 42, 'ageDays': 760,
+         'source': 'internal', 'sourceLabel': '内部员工', 'status': 'available', 'statusLabel': '不可调',
+         'notRecReason': '入职不满 2 年', 'edu': '硕士', 'years': '1-3', 'isEmployee': True},
+    ]
+
+
+def link_candidate_to_demand(demand_id, name):
+    """Link a candidate to demand by looking up candidate name in DB."""
+    try:
+        from app.models.candidate import Candidate
+        from app.models.process import RecruitProcess
+        from app.models.demand import RecruitDemand
+        from app.extensions import db
+        from datetime import datetime
+
+        demand = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
+        if not demand:
+            log.warning("link_candidate_to_demand: demand %s not found", demand_id)
+            return {'linked': False, 'linkedCount': 0, '_fallback': True}
+
+        candidate = Candidate.query.filter(
+            Candidate.candidate_name == name,
+            Candidate.is_deleted == 0,
+        ).first()
+
+        if not candidate:
+            log.warning("link_candidate_to_demand: candidate '%s' not found", name)
+            return {'linked': False, 'linkedCount': 0, '_fallback': True}
+
+        now = datetime.now()
+        process_no = f"RP{now.strftime('%Y%m%d%H%M%S')}"
+
+        process = RecruitProcess(
+            process_no=process_no,
+            demand_id=demand.id,
+            resume_id=0,
+            candidate_id=candidate.id,
+            process_status=0,  # pending screening
+        )
+        db.session.add(process)
+        db.session.commit()
+
+        log.info("Linked candidate '%s' (id=%s) to demand '%s'", name, candidate.id, demand_id)
+
+        linked_count = RecruitProcess.query.filter(
+            RecruitProcess.demand_id == demand.id,
+            RecruitProcess.is_deleted == 0,
+        ).count()
+
+        return {'linked': True, 'linkedCount': linked_count}
+
+    except Exception as exc:
+        log.error("DB write failed in link_candidate_to_demand: %s", exc, exc_info=True)
+        return {'linked': False, 'linkedCount': 0, '_fallback': True}

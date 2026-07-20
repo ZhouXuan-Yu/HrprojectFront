@@ -1,0 +1,211 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>招聘系统 · 5 色状态规范</title><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Microsoft YaHei','Inter',sans-serif;background:#e8ecf1;color:#1a1f36;font-size:14px;line-height:1.6}
+.slide{width:1100px;margin:40px auto;background:#fff;border-radius:2px;box-shadow:0 2px 16px rgba(0,0,0,0.08);padding:60px 72px;page-break-after:always}
+.slide-number{font-size:11px;color:#94a3b8;text-align:right;margin-bottom:8px}
+.slide h1{font-size:28px;font-weight:800;color:#0a1628;margin-bottom:6px}
+.slide h1 span{color:#0050cc}
+.slide h2{font-size:20px;font-weight:700;color:#0050cc;margin:32px 0 14px;padding-bottom:8px;border-bottom:2px solid #e5e7eb}
+.slide h3{font-size:16px;font-weight:700;color:#1a1f36;margin:20px 0 8px}
+.subtitle{font-size:14px;color:#64748b;margin-bottom:32px}
+.divider{height:1px;background:#e5e7eb;margin:28px 0}
+.row{display:flex;gap:24px}
+.col{flex:1}
+.grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+.color-card{border-radius:8px;border:1px solid #e5e7eb;overflow:hidden;background:#fff}
+.color-swatch{height:80px;display:flex;align-items:flex-end;padding:12px 16px;color:#fff;font-weight:700;font-size:13px}
+.color-body{padding:14px 16px}
+.color-body .name{font-size:15px;font-weight:700;margin-bottom:2px}
+.color-body .hex{font-size:12px;color:#64748b;font-family:monospace;margin-bottom:8px}
+.color-body .semantics{font-size:11px;color:#475569;line-height:1.8}
+.tag-row{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.tag{display:inline-block;padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{text-align:left;padding:10px 14px;background:#f8fafc;color:#475569;font-weight:600;font-size:12px;border-bottom:1px solid #e5e7eb}
+td{padding:10px 14px;border-bottom:1px solid #f1f5f9}
+.footnote{font-size:11px;color:#94a3b8;margin-top:24px;padding-top:12px;border-top:1px solid #f1f5f9}
+@media print{body{background:#fff}.slide{box-shadow:none;margin:0;width:100%;padding:40px 56px}}
+</style></head><body>
+
+<!-- ===== Slide 1: Overview ===== -->
+<div class="slide">
+  <div class="slide-number">智能招聘系统 · 设计规范 / 01</div>
+  <h1>招聘系统 <span>5 色状态规范</span></h1>
+  <div class="subtitle">版本 v1.0 · 2026-07-14 · 全页面统一执行</div>
+
+  <div class="grid-5" style="margin-top:20px">
+    <div class="color-card">
+      <div class="color-swatch" style="background:#F53F3F">拒绝 / 危险</div>
+      <div class="color-body"><div class="name">🔴 警示红</div><div class="hex">#F53F3F</div><div class="semantics">驳回 · 删除 · 黑名单<br>不可调岗 · 永久屏蔽</div></div>
+    </div>
+    <div class="color-card">
+      <div class="color-swatch" style="background:#FF9500">待办 / 预警</div>
+      <div class="color-body"><div class="name">🟠 提醒橙</div><div class="hex">#FF9500</div><div class="semantics">待审批 · 待安排 · 逾<br>期预警 · 待评价</div></div>
+    </div>
+    <div class="color-card">
+      <div class="color-swatch" style="background:#007FFF">进行中</div>
+      <div class="color-body"><div class="name">🔵 进程蓝</div><div class="hex">#007FFF</div><div class="semantics">招聘中 · 已安排<br>面试进行中 · 审批中</div></div>
+    </div>
+    <div class="color-card">
+      <div class="color-swatch" style="background:#00B42A">完成 / 通过</div>
+      <div class="color-body"><div class="name">🟢 成功绿</div><div class="hex">#00B42A</div><div class="semantics">已完成 · 已通过<br>可调岗 · Offer已发</div></div>
+    </div>
+    <div class="color-card">
+      <div class="color-swatch" style="background:#86909C">失效 / 归档</div>
+      <div class="color-body"><div class="name">⚪ 中性灰</div><div class="hex">#86909C</div><div class="semantics">草稿 · 已关闭 · 过期<br>已封存 · 已归档</div></div>
+    </div>
+  </div>
+
+  <div style="margin-top:24px;padding:16px 20px;background:#f8fafc;border-radius:8px;border:1px solid #e5e7eb;font-size:13px">
+    <b>❓ 为什么是 5 色而非 4 色？</b><br>
+    若只保留红/橙/绿/灰四色，橙色将同时承载「待审批(等待)」和「招聘中(执行中)」两种不同语义，造成混淆。新增蓝色后：<b>🟠 橙 = 等待动作（待审批/待安排/待评价）</b>，<b>🔵 蓝 = 正在执行（审批中/招聘中/已安排）</b>，语义不再混淆。
+  </div>
+  <div style="margin-top:12px;padding:12px 16px;background:#FFF7ED;border-radius:8px;border:1px solid #fed7aa;font-size:12px">
+    <b>⚠️ 易混淆点：</b>「待审批」和「审批中」是两个不同的状态——<b>待审批</b> = 审批节点到达某人，该人需要操作（🟠 橙色）；<b>审批中</b> = 审批流正在流转中，但当前节点还未到达当前用户（🔵 蓝色）。同理，「待评价」= 面试官需要填评价（🟠 橙色），「已安排」= 面试时间已定但还没到（🔵 蓝色）。
+  </div>
+
+  <div class="footnote">全页面统一 · 禁止零散自定义配色 · Hover/禁用态均使用对应色系 20% 透明度变体</div>
+</div>
+
+<!-- ===== Slide 2: Tag Examples ===== -->
+<div class="slide">
+  <div class="slide-number">智能招聘系统 · 设计规范 / 02</div>
+  <h1>状态标签 <span>标准样式</span></h1>
+  <div class="subtitle">所有页面统一使用，禁止自定义状态色</div>
+
+  <h2>🔴 红色系 — 拒绝 / 危险 / 不可操作</h2>
+  <div class="tag-row">
+    <span class="tag" style="background:#FEF2F2;color:#cb1a1a;border:1px solid #fecaca">已拒绝</span>
+    <span class="tag" style="background:#FEF2F2;color:#cb1a1a;border:1px solid #fecaca">不通过</span>
+    <span class="tag" style="background:#FEF2F2;color:#cb1a1a;border:1px solid #fecaca">黑名单</span>
+    <span class="tag" style="background:#FEF2F2;color:#cb1a1a;border:1px solid #fecaca">不可调岗</span>
+    <span class="tag" style="background:#FEF2F2;color:#cb1a1a;border:1px solid #fecaca">已驳回</span>
+    <span class="tag" style="background:#FEF2F2;color:#cb1a1a;border:1px solid #fecaca">高危</span>
+  </div>
+
+  <h2>🟠 橙色系 — 待办 / 需行动 / 预警</h2>
+  <div class="tag-row">
+    <span class="tag" style="background:#FFF7ED;color:#c25d00;border:1px solid #fed7aa">待审批</span>
+    <span class="tag" style="background:#FFF7ED;color:#c25d00;border:1px solid #fed7aa">待安排</span>
+    <span class="tag" style="background:#FFF7ED;color:#c25d00;border:1px solid #fed7aa">待评价</span>
+    <span class="tag" style="background:#FFF7ED;color:#c25d00;border:1px solid #fed7aa">逾期预警</span>
+    <span class="tag" style="background:#FFF7ED;color:#c25d00;border:1px solid #fed7aa">注意</span>
+  </div>
+
+  <h2>🔵 蓝色系 — 进行中 / 运行中 / 活跃</h2>
+  <div class="tag-row">
+    <span class="tag" style="background:#EFF6FF;color:#0050cc;border:1px solid #bfdbfe">招聘中</span>
+    <span class="tag" style="background:#EFF6FF;color:#0050cc;border:1px solid #bfdbfe">审批中</span>
+    <span class="tag" style="background:#EFF6FF;color:#0050cc;border:1px solid #bfdbfe">已安排</span>
+    <span class="tag" style="background:#EFF6FF;color:#0050cc;border:1px solid #bfdbfe">进行中</span>
+    <span class="tag" style="background:#EFF6FF;color:#0050cc;border:1px solid #bfdbfe">面试中</span>
+    <span class="tag" style="background:#EFF6FF;color:#0050cc;border:1px solid #bfdbfe">锁定</span>
+  </div>
+
+  <h2>🟢 绿色系 — 成功 / 完成 / 正向</h2>
+  <div class="tag-row">
+    <span class="tag" style="background:#F0FDF4;color:#008a20;border:1px solid #bbf7d0">已完成</span>
+    <span class="tag" style="background:#F0FDF4;color:#008a20;border:1px solid #bbf7d0">已通过</span>
+    <span class="tag" style="background:#F0FDF4;color:#008a20;border:1px solid #bbf7d0">可调岗</span>
+    <span class="tag" style="background:#F0FDF4;color:#008a20;border:1px solid #bbf7d0">Offer已发</span>
+    <span class="tag" style="background:#F0FDF4;color:#008a20;border:1px solid #bbf7d0">正常</span>
+    <span class="tag" style="background:#F0FDF4;color:#008a20;border:1px solid #bbf7d0">已入职</span>
+  </div>
+
+  <h2>⚪ 灰色系 — 失效 / 归档 / 非活跃</h2>
+  <div class="tag-row">
+    <span class="tag" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0">草稿</span>
+    <span class="tag" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0">已关闭</span>
+    <span class="tag" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0">已封存</span>
+    <span class="tag" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0">已过期</span>
+    <span class="tag" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0">已归档</span>
+    <span class="tag" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0">禁用</span>
+  </div>
+  <div class="footnote">CSS 变量：--c-reject: #F53F3F / --c-warn: #FF9500 / --c-progress: #007FFF / --c-done: #00B42A / --c-draft: #86909C</div>
+</div>
+
+<!-- ===== Slide 3: Usage Matrix ===== -->
+<div class="slide">
+  <div class="slide-number">智能招聘系统 · 设计规范 / 03</div>
+  <h1>全页面 <span>状态色映射表</span></h1>
+  <div class="subtitle">每个业务对象的状态 → 对应标准色，开发时严格对照，禁止自造</div>
+
+  <table>
+    <thead><tr><th>业务对象</th><th style="width:100px">状态</th><th style="width:70px">颜色</th><th>使用场景</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="4"><b>招聘需求</b></td><td>草稿</td><td>⚪ 灰</td><td>HR 创建未提交</td></tr>
+      <tr><td>审批中</td><td>🔵 蓝</td><td>已提交，审批流进行中</td></tr>
+      <tr><td>招聘中</td><td>🔵 蓝</td><td>审批通过，岗位发布中</td></tr>
+      <tr><td>已关闭</td><td>⚪ 灰</td><td>招满/冻结/取消</td></tr>
+      <tr><td rowspan="3"><b>候选人</b></td><td>可联系</td><td>🟢 绿</td><td>简历有效，可发起联系</td></tr>
+      <tr><td>锁定(面试中)</td><td>🔵 蓝</td><td>已有面试流程</td></tr>
+      <tr><td>黑名单</td><td>🔴 红</td><td>永久屏蔽</td></tr>
+      <tr><td rowspan="4"><b>面试</b></td><td>待安排</td><td>🟠 橙</td><td>需要 HR 操作</td></tr>
+      <tr><td>已安排</td><td>🔵 蓝</td><td>面试时间已确认</td></tr>
+      <tr><td>待评价</td><td>🟠 橙</td><td>面试完成，等面试官打分</td></tr>
+      <tr><td>已完成</td><td>🟢 绿</td><td>评价已提交</td></tr>
+      <tr><td rowspan="3"><b>面试结果</b></td><td>通过</td><td>🟢 绿</td><td>进入 Offer 流程</td></tr>
+      <tr><td>不通过</td><td>🔴 红</td><td>回流人才库</td></tr>
+      <tr><td>待定</td><td>🟠 橙</td><td>需二面/加试</td></tr>
+      <tr><td rowspan="3"><b>Offer</b></td><td>已发送</td><td>🔵 蓝</td><td>等待候选人回复</td></tr>
+      <tr><td>已接受</td><td>🟢 绿</td><td>进入入职流程</td></tr>
+      <tr><td>已拒绝/过期</td><td>🔴 红</td><td>关闭</td></tr>
+      <tr><td rowspan="2"><b>内部员工</b></td><td>可调岗</td><td>🟢 绿</td><td>满足调岗条件</td></tr>
+      <tr><td>不可调岗</td><td>🔴 红</td><td>不满足条件</td></tr>
+      <tr><td rowspan="2"><b>邮件连接</b></td><td>正常</td><td>🟢 绿</td><td>同步正常</td></tr>
+      <tr><td>异常</td><td>🟠 橙</td><td>连接失败/需人工介入</td></tr>
+      <tr><td rowspan="3"><b>AI 评分</b></td><td>≥80 分</td><td>🟢 绿</td><td>高分候选人</td></tr>
+      <tr><td>60-79 分</td><td>🟠 橙</td><td>中等候选人</td></tr>
+      <tr><td>&lt;60 分</td><td>⚪ 灰</td><td>自动过滤</td></tr>
+    </tbody>
+  </table>
+  <div class="footnote">原则：橙 = 需要人行动 / 蓝 = 系统运行中 / 绿 = 正向结果 / 红 = 负向结果 / 灰 = 非活跃</div>
+</div>
+
+<!-- ===== Slide 4: Before/After ===== -->
+<div class="slide">
+  <div class="slide-number">智能招聘系统 · 设计规范 / 04</div>
+  <h1>整改前后 <span>对比</span></h1>
+
+  <div class="row">
+    <div class="col">
+      <h3 style="color:#cb1a1a">❌ 整改前（混乱）</h3>
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;font-size:12px;line-height:2.2">
+        · 招聘中 = 绿色（和"完成"撞色）<br>
+        · 审批中 = 橙色（和"待办"同色）<br>
+        · 待评价 = 蓝色（语义不明）<br>
+        · 已关闭 = 红色（过度警示）<br>
+        · 各页面自定义颜色，6 种绿色<br>
+        · 卡片彩色左边框 + 渐变 + 阴影<br>
+        · 进度条独立大色块，视觉割裂
+      </div>
+    </div>
+    <div class="col">
+      <h3 style="color:#008a20">✅ 整改后（统一）</h3>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;font-size:12px;line-height:2.2">
+        · 招聘中 = 蓝色（进行中）<br>
+        · 审批中 = 蓝色（进行中）<br>
+        · 待评价 = 橙色（需行动）<br>
+        · 已关闭 = 灰色（非活跃）<br>
+        · 全系统仅 5 种状态色<br>
+        · 卡片 8px 圆角 + #eee 细边框<br>
+        · 单行极简进度指示器
+      </div>
+    </div>
+  </div>
+
+  <h2>典型示例：面试计划操作按钮</h2>
+  <table>
+    <thead><tr><th>面试状态</th><th>操作按钮</th><th>按钮类型</th><th>原因</th></tr></thead>
+    <tbody>
+      <tr><td>待安排 🟠</td><td><span style="background:#007FFF;color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600">发起面试</span></td><td>主按钮·深蓝</td><td>核心操作</td></tr>
+      <tr><td>已安排 🔵</td><td><span style="border:1px solid #007FFF;color:#007FFF;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600">评价</span></td><td>边框按钮·浅蓝</td><td>常规操作</td></tr>
+      <tr><td>待评价 🟠</td><td><span style="background:#007FFF;color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600">填评价</span></td><td>主按钮·深蓝</td><td>需要行动</td></tr>
+      <tr><td>已通过 🟢</td><td><span style="background:#00B42A;color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600">发Offer</span> <span style="border:1px solid #007FFF;color:#007FFF;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;margin-left:4px">查看评价</span></td><td>主按钮·绿 + 边框·蓝</td><td>正向结果</td></tr>
+      <tr><td>不通过 🔴</td><td><span style="color:#86909C;padding:4px 10px;border-radius:4px;font-size:11px">查看评价</span></td><td>灰色·查看</td><td>流程结束</td></tr>
+    </tbody>
+  </table>
+  <div class="footnote">总结：5 色体系覆盖系统全部状态 20+ 种，无遗漏、无歧义、全页面统一</div>
+</div>
+
+</body></html>

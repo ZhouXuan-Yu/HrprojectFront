@@ -1,6 +1,39 @@
-node_modules/
-dist/
-playwright-report/
-test-results/
+# --- Dependencies ---
+frontend/node_modules/
 
+# --- Build output ---
+frontend/dist/
+
+# --- Playwright test artifacts ---
+frontend/playwright-report/
+frontend/test-results/
+.playwright-mcp/
+frontend/.playwright-mcp/
+
+# --- Python ---
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.venv/
+backend/venv/
+backend/*.pyc
+backend/**/*.pyc
+
+# --- Database ---
+backend/instance/
+backend/*.db
+
+# --- Logs ---
+backend/logs/
 *.log
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Claude internal state ---
+.claude/.auto-push-counter
+.claude/.needs-remote-setup

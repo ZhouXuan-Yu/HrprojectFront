@@ -1,73 +1,50 @@
-# 智能招聘系统 · Recruitment System
+# 智能招聘系统 · README
 
 > Python Flask + Vue 3 · 邮箱收简历 → AI 解析画像 → 人岗匹配 → 面试(飞书) → Offer → 入职
 
----
+## 快速启动
+
+```bash
+cd backend/ && pip install -r requirements.txt && python app.py  # :5000
+cd frontend/ && npm run dev                                      # :5173
+cd frontend/ && npm test                                         # 33 E2E
+```
+
+浏览器打开 `http://127.0.0.1:5173/login`
 
 ## 项目结构
 
 ```
-hr-web/                         ← 前后端代码
-├── frontend/                   ← 前端（原型 HTML+CSS+JS，未来迁移 Vue 3）
-│   ├── css/style.css           ← 全局样式（浅柔商务蓝 #4080FF）
-│   ├── js/app.js               ← 核心逻辑（角色权限/抽屉组件/评分系统）
-│   └── *.html × 8              ← 功能页面
-│
-└── backend/                    ← Flask 后端（待开发）
-    └── app.py                  ← 入口 & 架构说明
-
-docs/                           ← 设计文档
-├── SUMMARY.md                  ← 全部对话总结 & 决策记录（Day 1~11）
-├── PRD_FINAL.md                ← 标准化产品方案（6 角色/全流程权限）
-├── 数据库表/                    ← 27 张表设计（确定.docx 为终版）
-├── 流程设计/                    ← 流程图 7.png 为最新版本
-└── 设计规范/                    ← spec-status-colors.html / spec-dashboard-fix.html
-
-hr-master/                      ← IAM 组织管理参考项目（Java Spring Boot）
+hr-web/
+├── frontend/          Vue 3 + Vite (9 页面, 8 API 模块)
+├── backend/           Flask (50 .py, 45+ 端点, 27 表)
+│   ├── app/api/       9 个 Blueprint
+│   ├── app/services/  13 个业务服务
+│   ├── app/models/    27 张表
+│   └── tasks/         Celery 异步
+└── docs/              设计文档
 ```
-
-## 4 大模块
-
-| 模块 | 职责 | 状态 |
-|------|------|:--:|
-| ① 招聘需求管理 | 需求单→审批→生成岗位→内外部并行搜索 | 原型完成 |
-| ② 人才库 | 外部候选人 + 内部员工库，画像+标签+黑名单 | 原型完成 |
-| ③ 招聘流程 | 匹配打分→面试(飞书)→Offer→入职同步 | 原型完成 |
-| ④ 招聘数据报表 | 全链路数据聚合（AI 中心二期） | 待开发 |
-
-## 6 类角色
-
-管理员 / HR 专员 / 常规面试官 / 临时面试官 / 部门负责人 / 普通员工
-
-## Phase 规划
-
-| Phase | 内容 | 优先级 |
-|-------|------|:--:|
-| P1 | 外部人才库：邮箱采集 → AI 解析 → 候选人入库 | P0 |
-| P2 | 招聘流程：需求→审批→匹配→面试→Offer 闭环 | P0 |
-| P3 | 内部人才库 + 6 角色 RBAC 落地 | P1 |
-| P4 | 飞书集成：建会 + 通知 + 日历同步 | P1 |
-| P5 | AI 智能自动化中心 | P2 |
-| P6 | 入职同步 + 全链路报表 + 审批流引擎 | P2 |
-
-**v0.1 = P1 + P2（核心招聘闭环）**
-
-## 关键设计决策
-
-- **三个分**：画像分（人，静态规则） / 匹配分（岗，Dify AI） / 综合推荐分（画像×10% + 匹配×90% × 衰减系数）
-- **Dify 调用**：后端代理转发，前端不直连（3 个工作流：简历解析/人岗匹配/面试问题生成）
-- **审批流程**：v0.1 硬编码三步（部门负责人→HR→财务总监），v0.2 引擎化
-- **IAM 对接**：v0.1 定时同步本地缓存，v0.2 API + webhook
-- **飞书集成**：v0.1 建会+消息通知（3 个触发节点），v0.2 日历同步
-- **部署**：独立 Flask → 并入公司时微前端 + SSO
 
 ## 技术栈
 
-| 层 | 技术 | 备注 |
-|----|------|------|
-| 前端 | Vue 3（当前原型 HTML+JS） | 公司技术栈确认 |
-| 后端 | Python Flask | RESTful API |
-| 数据 | MySQL + SQLAlchemy | 27 张业务表 + IAM 3 张底座表 |
-| AI | Dify 工作流 | 后端代理转发 |
-| 异步 | Celery + Redis | 邮件同步/批量匹配/通知 |
-| 集成 | 飞书 Open API | 建会/消息卡片/日历 |
+| 层 | 选型 |
+|----|------|
+| 前端 | Vue 3 + Vite + Vue Router + Three.js |
+| 后端 | Flask + SQLAlchemy + Celery |
+| 数据库 | SQLite(dev) / MySQL(prod) |
+| AI | DeepSeek API + ai_engine 降级 |
+| 集成 | 飞书 CLI + Boss CLI |
+| 测试 | Playwright 33 E2E |
+
+## 7 轮完成记录
+
+〇 环境 → 一 骨架 → 二 联调 → 三 业务 → 四 验收 → 五 数据库 → 六 DeepSeek → 七 Boss ✅
+
+## 跟踪文档
+
+| 文件 | 作用 |
+|------|------|
+| `Memory.md` | 进度 + 下一步 |
+| `Learning.md` | 复盘 + 规则 |
+| `Wiki.md` | 业务口径 + 架构 |
+| `README.md` | (本文件) 概览 |

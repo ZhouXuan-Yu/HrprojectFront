@@ -1,0 +1,397 @@
+t_core_dept 组织表
+t_core_position 岗位表
+t_core_user 用户表
+t_hr_employee 内部在职员工档案
+files 全局附件统一存储
+t_hr_dept_hc
+t_hr_recruit_channel
+t_hr_recruit_demand
+t_hr_demand_approval 审批流水
+t_hr_candidate 外部候选人主档案
+t_hr_resume 外部简历文件表（存放简历原始文件、解析数据）
+t_hr_recruit_process 简历投递流程（一人多岗位）
+t_hr_score_rule
+t_hr_resume_match
+t_hr_internal_match_log
+t_hr_search_log
+t_hr_interview_slot
+t_hr_interview_book
+t_hr_interview_record
+t_hr_hire_event
+t_hr_offer
+t_hr_entry
+t_hr_recruit_mail_account
+t_hr_chat_log
+t_hr_tag_dict
+t_hr_candidate_tag_rel
+t_hr_employee_tag_rel
+
+=== TABLES ===
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 主键
+user_id | BIGINT UNSIGNED | FK t_core_user.id, UNIQUE | 绑定登录账号
+dept_id | BIGINT UNSIGNED | FK t_core_dept.id | 当前部门
+pos_id | BIGINT UNSIGNED | FK t_core_position.id | 当前岗位
+work_year | INT |  | 总工作年限
+perf_score | DECIMAL(3,1) |  | 绩效分
+last_promote_date | DATE |  | 上次晋升时间
+can_transfer | TINYINT | NOT NULL DEFAULT 0 | 0 不可调 1 可调
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 录入员工档案人力
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 最后修改档案人力
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 文件主键
+file_name | VARCHAR(256) | NOT NULL | 原始文件名
+file_url | VARCHAR(512) | NOT NULL | 文件存储地址
+file_ext | VARCHAR(16) |  | 后缀 pdf/doc/png
+file_size | BIGINT UNSIGNED |  | 文件大小字节
+biz_type | VARCHAR(64) |  | 业务类型 resume/offer/audio
+created_at | DATETIME(3) | NOT NULL | 上传时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 上传文件操作人
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 最后修改附件操作人
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 主键
+dept_id | BIGINT UNSIGNED | FK t_core_dept.id, NOT NULL | 部门
+plan_year | SMALLINT NOT NULL |  | 编制年份 2026
+total_hc | INT NOT NULL |  | 年度总编制
+used_hc | INT NOT NULL DEFAULT 0 |  | 已占用
+available_hc | INT NOT NULL DEFAULT 0 |  | 剩余可用
+operate_json | JSON |  | 编制变动流水快照
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 创建编制配置人力
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 最后修改编制人力
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 渠道 ID
+channel_name | VARCHAR(50) | NOT NULL | 渠道名称
+channel_type | TINYINT NOT NULL |  | 1 官网 2 第三方 3 内推
+status | TINYINT NOT NULL DEFAULT 1 |  | 1 启用 0 停用
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 新增渠道管理员
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 最后修改渠道管理员
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 需求 ID
+demand_no | VARCHAR(32) | UNIQUE NOT NULL | 业务单号 DM2026070001
+dept_id | BIGINT UNSIGNED | FK t_core_dept.id, NOT NULL | 发起部门
+pos_id | BIGINT UNSIGNED | FK t_core_position.id, NOT NULL | 招聘岗位
+recruit_type | TINYINT | NOT NULL | 1 社招 2 校招 3 实习 4 内推
+plan_hc | INT | NOT NULL | 计划招聘人数
+filled_count | INT NOT NULL DEFAULT 0 |  | 已入职人数
+expect_entry | DATE |  | 期望到岗
+jd_content | TEXT |  | JD 全文
+edu_min | VARCHAR(64) |  | 最低学历要求
+exp_min | INT |  | 最低工作年限
+work_city | VARCHAR(64) |  | 工作城市
+publishing_channels | JSON |  | 渠道 ID 数组
+demand_status | TINYINT | NOT NULL DEFAULT 0 | 0 草稿 1 审批中 2 审批通过 3 驳回 4 正常完结 5 需求取消
+cancel_at | DATETIME(3) |  | 需求取消时间
+cancel_reason | VARCHAR(512) |  | 取消原因（项目暂停 / 编制收回 / 业务撤销等）
+audit_flow | JSON |  | 审批节点数组，前端展示快照
+hc_reserve_json | JSON |  | HC 占用快照
+creator_id | BIGINT UNSIGNED | FK t_core_user.id, NOT NULL | 发起人
+hr_owner_id | BIGINT UNSIGNED | FK t_core_user.id | 跟进 HR
+internal_searched | TINYINT NOT NULL DEFAULT 0 |  | 是否检索内部员工库
+resume_searched | TINYINT NOT NULL DEFAULT 0 |  | 是否检索外部简历库
+approved_at | DATETIME(3) |  | 审批通过时间
+closed_at | DATETIME(3) |  | 需求关闭时间
+give_up_internal | TINYINT | NOT NULL DEFAULT 0 | 0 = 未处理内部匹配 / 存在可用内部人才；1 = 无匹配人才 OR 人工确认放弃内部人才，允许对外发布
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 创建本条需求 HR
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 最后修改需求 HR
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 主键
+demand_id | BIGINT UNSIGNED | FK t_hr_recruit_demand.id, NOT NULL | 关联招聘需求
+approve_user_id | BIGINT UNSIGNED | FK t_core_user.id | 审批人
+approve_level | TINYINT |  | 审批层级
+approve_result | TINYINT NOT NULL |  | 1 待审 2 通过 3 驳回
+approve_opinion | VARCHAR(512) |  | 审批意见
+approve_time | DATETIME(3) |  | 审批操作时间
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 新增审批记录操作人
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 最后修改审批记录操作人
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 主键
+candidate_no | VARCHAR(32) | UNIQUE NOT NULL | 候选人业务编号
+candidate_name | VARCHAR(30) NOT NULL |  | 候选人姓名
+mobile | VARCHAR(20) |  | 手机号，加密存储，取消唯一约束
+mobile_hash | VARCHAR(64) | UNIQUE NOT NULL | SHA256 哈希，用于简历去重
+email | VARCHAR(100) |  | 邮箱
+black_flag | TINYINT NOT NULL DEFAULT 0 |  | 0 正常 1 黑名单
+black_type | TINYINT | NULL | 1 简历造假 2 多次爽约 3 薪资虚高
+black_add_at | DATETIME(3) | NULL | 拉黑操作时间
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 录入候选人 HR / 系统自动
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 最后修改候选人 HR
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 简历 ID
+candidate_id | BIGINT UNSIGNED | FK t_hr_candidate.id, NOT NULL | 关联候选人
+resume_file_id | BIGINT UNSIGNED | FK files.id | 简历附件
+storage_time | DATETIME(3) NOT NULL |  | 简历入库时间
+base_score | DECIMAL(4,1) NOT NULL DEFAULT 0 |  | 时效分
+work_exp_text | TEXT |  | 工作经历摘要
+extract_json | JSON |  | 系统自动解析简历完整结构化数据
+touch_json | JSON |  | 触达，邀约，储备记录
+source_channel_id | BIGINT UNSIGNED | FK t_hr_recruit_channel.id | 来源渠道
+mail_account_id | BIGINT UNSIGNED | FK t_hr_recruit_mail_account.id | 采集邮箱
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 上传简历 HR / 系统自动
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 最后修改简历 HR
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 主键
+process_no | VARCHAR(32) | UNIQUE NOT NULL | 流程编号
+demand_id | BIGINT UNSIGNED | FK t_hr_recruit_demand.id, NOT NULL | 所属招聘需求
+resume_id | BIGINT UNSIGNED | FK t_hr_resume.id, NOT NULL | 对应外部简历
+candidate_id | BIGINT UNSIGNED | FK t_hr_candidate.id, NOT NULL | 对应候选人
+process_status | TINYINT NOT NULL DEFAULT 0 |  | 0 待筛 1 邀约 2 一面 3 二面 4 淘汰 5 待 Offer 6 接受 7 放弃 8 入职
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 创建流程 HR / 系统自动
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 最后修改流程 HR
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 主键
+score_scene | TINYINT NOT NULL |  | 1 时效分规则 2 岗位匹配规则
+weight_json | JSON NOT NULL |  | 时效衰减 + 两套分数线
+pool_min_score | DECIMAL(4,1) |  | 存量简历准入最低分
+auto_invite_min | DECIMAL(4,1) |  | 自动邀约分数线
+status | TINYINT NOT NULL DEFAULT 1 |  | 1 启用 0 停用
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 配置打分规则管理员
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 最后修改规则管理员
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 匹配 ID
+resume_id | BIGINT UNSIGNED | FK t_hr_resume.id, NOT NULL | 外部简历
+demand_id | BIGINT UNSIGNED | FK t_hr_recruit_demand.id, NOT NULL | 招聘需求
+match_score | DECIMAL(4,1) NOT NULL |  | 岗位匹配核心分
+score_detail | JSON |  | 各维度打分明细
+calc_time | DATETIME(3) NOT NULL |  | 打分时间
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 生成匹配记录（系统账号）
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 手动修改打分 HR
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 主键
+match_no | VARCHAR(32) | UNIQUE NOT NULL | 匹配流水编号
+demand_id | BIGINT UNSIGNED | FK t_hr_recruit_demand.id, NOT NULL | 需求
+employee_id | BIGINT UNSIGNED | FK t_hr_employee.id, NOT NULL | 内部员工
+match_score | DECIMAL(4,1) |  | 内部匹配分
+match_status | TINYINT NOT NULL |  | 10 待确认 20 已调配 30 忽略
+operator_user_id | BIGINT UNSIGNED | FK t_core_user.id | 操作 HR
+matched_at | DATETIME(3) NOT NULL |  | 匹配时间
+created_at | DATETIME(3) | NOT NULL | 记录时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 触发匹配 HR / 系统账号
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改匹配状态 HR
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 自增主键
+demand_id | BIGINT UNSIGNED | FK t_hr_recruit_demand.id, NOT NULL | 关联需求
+search_type | TINYINT NOT NULL |  | 1 内部员工库 2 外部简历库
+search_at | DATETIME(3) NOT NULL |  | 检索执行时间
+match_total | INT NOT NULL |  | 本次合格匹配人数
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 检索操作 HR
+remark | VARCHAR(512) |  | 筛选条件、分数线备注
+created_at | DATETIME(3) | NOT NULL | 记录生成时间
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改检索备注 HR
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 时段 ID
+interviewer_id | BIGINT UNSIGNED | FK t_core_user.id, NOT NULL | 面试官
+demand_id | BIGINT UNSIGNED | FK t_hr_recruit_demand.id | 绑定专属需求，NULL 通用
+start_dt | DATETIME(3) NOT NULL |  | 时段开始
+end_dt | DATETIME(3) NOT NULL |  | 时段结束
+is_booked | TINYINT NOT NULL DEFAULT 0 |  | 0 空闲 1 占用
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 新建时段面试官 / HR
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改时段操作人
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 预约 ID
+demand_id | BIGINT UNSIGNED | FK t_hr_recruit_demand.id, NOT NULL | 需求
+resume_id | BIGINT UNSIGNED | FK t_hr_resume.id, NOT NULL | 外部简历
+process_id | BIGINT UNSIGNED | FK t_hr_recruit_process.id, NOT NULL | 招聘流程
+slot_id | BIGINT UNSIGNED | FK t_hr_interview_slot.id, NOT NULL | 占用时段
+interview_round | TINYINT NOT NULL |  | 1 一面 2 二面
+interview_type | TINYINT NOT NULL |  | 1 飞书、2 腾讯会议、3 其他线上、4 线下
+meeting_code | VARCHAR(32) |  | 会议号码
+meeting_pwd | VARCHAR(16) |  | 入会密码
+address | VARCHAR(200) |  | 线下地址
+book_time | DATETIME(3) NOT NULL |  | 预约操作时间
+invite_json | JSON |  | 邀约记录
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 预约面试 HR
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改预约 HR
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 评价 ID
+book_id | BIGINT UNSIGNED | FK t_hr_interview_book.id, NOT NULL | 关联预约单
+process_id | BIGINT UNSIGNED | FK t_hr_recruit_process.id, NOT NULL | 招聘流程
+interviewer_ids | JSON NOT NULL |  | 本场所有面试官 id
+submit_interviewer_id | BIGINT UNSIGNED | FK t_core_user.id, NOT NULL | 提交评价人
+is_arrive | TINYINT NOT NULL DEFAULT 0 |  | 0 未到 1 已到
+interview_result | TINYINT NOT NULL |  | 0 不通过 1 通过
+evaluate_text | TEXT |  | 评价
+score_json | JSON |  | 多维度分项打分
+audio_url | VARCHAR(255) |  | 录音文件地址
+end_time | DATETIME(3) |  | 面试结束时间
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 提交面试评价面试官
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改评价面试官
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 主键
+event_no | VARCHAR(32) | UNIQUE NOT NULL | 事件编号
+process_id | BIGINT UNSIGNED | FK t_hr_recruit_process.id | 外部招聘流程，内调 NULL
+employee_id | BIGINT UNSIGNED | FK t_hr_employee.id | 内部调岗人员，外招 NULL
+offer_id | BIGINT UNSIGNED | FK t_hr_offer.id | 外招 Offer，内调 NULL
+hire_type | TINYINT NOT NULL |  | 1 外部 Offer 录用 2 内部调岗 3 离职返聘
+event_status | TINYINT NOT NULL DEFAULT 0 |  | 0 待办理 1 已生成入职单 2 作废
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 发起录用 HR
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改录用 HR
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | Offer ID
+offer_no | VARCHAR(32) | UNIQUE NOT NULL | Offer 业务编号
+resume_id | BIGINT UNSIGNED | FK t_hr_resume.id, NOT NULL | 外部简历
+process_id | BIGINT UNSIGNED | FK t_hr_recruit_process.id, NOT NULL | 招聘流程
+demand_id | BIGINT UNSIGNED | FK t_hr_recruit_demand.id, NOT NULL | 需求
+last_interview_id | BIGINT UNSIGNED | FK t_hr_interview_record.id | 最后一轮面试
+offer_content | TEXT |  | Offer 正文
+salary_json | JSON |  | 薪资补贴试用期结构化数据
+valid_deadline | DATETIME(3) NOT NULL |  | 截止时间
+offer_status | TINYINT NOT NULL DEFAULT 0 |  | 0 待接收 1 已接受 2 放弃 3 过期
+send_user_id | BIGINT UNSIGNED | FK t_core_user.id, NOT NULL | 发放 HR
+send_time | DATETIME(3) NOT NULL |  | 发放时间
+offer_file_id | BIGINT UNSIGNED | FK files.id | Offer 附件
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 创建 OfferHR
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改 OfferHR
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 入职 ID
+entry_no | VARCHAR(32) | UNIQUE NOT NULL | 入职业务编号
+event_id | BIGINT UNSIGNED | FK t_hr_hire_event.id, NOT NULL | 录用事件
+resume_id | BIGINT UNSIGNED | FK t_hr_resume.id, NOT NULL | 外部简历
+dept_id | BIGINT UNSIGNED | FK t_core_dept.id, NOT NULL | 入职部门
+pos_id | BIGINT UNSIGNED | FK t_core_position.id, NOT NULL | 入职岗位
+entry_date | DATE NOT NULL |  | 实际入职日期
+checklist_json | JSON |  | 入职待办、转正记录快照
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 录入入职 HR
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改入职 HR
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 邮箱账号 ID
+account_name | VARCHAR(64) NOT NULL |  | 账号别名
+email_address | VARCHAR(128) UNIQUE NOT NULL |  | 收简历邮箱地址
+imap_host | VARCHAR(128) |  | IMAP 服务器
+imap_port | INT |  | 端口
+owner_user_id | BIGINT UNSIGNED | FK t_core_user.id | 负责人 HR
+status | TINYINT NOT NULL DEFAULT 1 |  | 1 启用 0 停用
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 新增邮箱配置人
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改配置人
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 日志 ID
+resume_id | BIGINT UNSIGNED | FK t_hr_resume.id | 外部简历
+demand_id | BIGINT UNSIGNED | FK t_hr_recruit_demand.id | 对应需求
+chat_type | TINYINT NOT NULL |  | 1AI 自动对话 2 人工 HR 对话
+chat_content | TEXT NOT NULL |  | 完整对话内容
+operate_time | DATETIME(3) NOT NULL |  | 对话发生时间
+created_at | DATETIME(3) | NOT NULL | 记录创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 发起对话 HR / 系统
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改对话记录 HR
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 自增主键
+tag_code | VARCHAR(64) | UNIQUE NOT NULL | 标签唯一编码
+tag_name | VARCHAR(64) | NOT NULL | 前端展示标签名
+tag_category | VARCHAR(32) | NOT NULL | 一级分类：edu/school/skill/industry/cert/exp
+tag_sub_category | VARCHAR(32) |  | 二级细分分类
+match_weight | DECIMAL(5,2) | NOT NULL DEFAULT 1.00 | JD 匹配权重
+support_target | TINYINT | NOT NULL | 1 仅简历 2 仅员工 3 通用
+sort_num | INT | NOT NULL DEFAULT 0 | 前端排序
+remark | VARCHAR(512) |  | 标签备注、系统解析匹配规则
+status | TINYINT | NOT NULL DEFAULT 1 | 1 启用 0 停用
+created_at | DATETIME(3) | NOT NULL | 创建时间
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 维护标签管理员
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改标签管理员
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 主键
+candidate_id | BIGINT UNSIGNED | FK t_hr_candidate.id, NOT NULL | 外部候选人 ID
+tag_id | BIGINT UNSIGNED | FK t_hr_tag_dict.id, NOT NULL | 标签 ID
+tag_source | TINYINT | NOT NULL | 1 系统自动解析简历 2HR 手动打标 3JD 自动匹配
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 打标操作人 / 系统
+valid_end | DATE |  | 证书 / 技能过期时间
+created_at | DATETIME(3) | NOT NULL | 绑定时间
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改标签操作人
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+
+字段 | 类型 | 约束 | 说明
+id | BIGINT UNSIGNED | PK | 主键
+employee_id | BIGINT UNSIGNED | FK t_hr_employee.id, NOT NULL | 内部员工 ID
+tag_id | BIGINT UNSIGNED | FK t_hr_tag_dict.id, NOT NULL | 标准标签 ID
+tag_source | TINYINT | NOT NULL | 1 入职档案同步 2 人力手动标记 3 内部匹配生成
+created_by | BIGINT UNSIGNED | FK t_core_user.id | 打标操作人
+tag_related_score | DECIMAL(3,1) |  | 标签附带绩效分，内部匹配排序用
+valid_end | DATE |  | 荣誉 / 临时标签过期时间
+created_at | DATETIME(3) | NOT NULL | 绑定时间
+updated_at | DATETIME(3) | NOT NULL | 更新时间
+updated_by | BIGINT UNSIGNED | FK t_core_user.id | 修改标签操作人
+is_deleted | TINYINT | NOT NULL DEFAULT 0 | 逻辑删除
+

@@ -1,0 +1,1 @@
+# Celery app placeholder (will be configured when Redis is available)
