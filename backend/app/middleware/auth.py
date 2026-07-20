@@ -9,8 +9,8 @@ AUTH_WHITELIST = {
     'auth.login',
     'static',
     'health.health_check',
-    # Boss endpoints — used for browser automation, auth is via boss-cli session
-    'boss.login',
+    # Boss endpoints — auth is via boss-cli Puppeteer session, not JWT
+    'boss.boss_login',
     'boss.get_status',
     'boss.list_positions',
     'boss.get_position_detail',

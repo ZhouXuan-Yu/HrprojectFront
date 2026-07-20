@@ -340,6 +340,23 @@ async function loadAll() {
 
 onMounted(() => { loadAll(); });
 
+// ── API Keys ──
+async function saveApiKey(keyInfo) {
+  if (!keyInfo.inputValue || keyInfo.inputValue === keyInfo.masked) return;
+  keyInfo.saving = true;
+  try {
+    await saveApiKeys({ [keyInfo.key_name]: keyInfo.inputValue });
+    toast.success(`${keyInfo.label} 已保存`);
+    keyInfo.inputValue = '';
+    keyInfo.showInput = false;
+    await loadAll();
+  } catch (e) {
+    toast.error('保存失败: ' + e.message);
+  } finally {
+    keyInfo.saving = false;
+  }
+}
+
 // ── Email ──
 function openAddEmail() {
   editingEmail.value = null;
@@ -539,4 +556,39 @@ async function submitTemplate() {
 .save-msg.error { color: var(--c-reject); }
 .form-group textarea { font-family: inherit; }
 .permission-bar { font-size: 12px; color: var(--c-sub); padding: 6px 0; margin-bottom: 8px; border-bottom: 1px solid var(--c-border-light); }
+
+.secret-key-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--c-border-light);
+}
+.secret-key-row:last-child { border-bottom: none; }
+.secret-key-info { flex: 1; min-width: 0; }
+.secret-key-label { font-size: 14px; font-weight: 650; color: var(--c-text); margin-bottom: 2px; }
+.secret-key-desc { font-size: 12px; color: var(--c-sub); }
+.secret-key-input-group { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.secret-key-field {
+  width: 260px;
+  padding: 8px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-family: monospace;
+  background: var(--c-card);
+  color: var(--c-text);
+}
+.secret-key-field::placeholder { color: var(--c-sub); font-family: monospace; }
+.secret-key-field:focus { outline: none; border-color: var(--c-primary); }
+.secret-key-toggle { font-size: 12px; color: var(--c-sub); cursor: pointer; white-space: nowrap; }
+.secret-key-note {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--c-warn);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.secret-key-saving { opacity: .6; pointer-events: none; }
 </style>

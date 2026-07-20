@@ -20,3 +20,5 @@ export async function updateNotifyTemplate(id,d){const r = await api.put(`/confi
 export async function fetchRolePermissions()  { const r = await api.get('/config/role-permissions'); return r.data; }
 export async function fetchAuditLogs()        { const r = await api.get('/config/audit-logs'); return r.data; }
 export async function fetchAiCapabilities()   { const r = await api.get('/ai/capabilities'); return r.data; }
+export async function fetchApiKeys()          { const r = await api.get('/config/api-keys'); return r.data; }
+export async function saveApiKeys(d)          { const r = await api.put('/config/api-keys', d); return r.data; }
