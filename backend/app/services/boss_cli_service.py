@@ -50,10 +50,7 @@ def is_available() -> bool:
     if not _get_enabled():
         log.info("boss-cli disabled via BOSS_CLI_ENABLED config")
         return False
-    path = shutil.which("boss")
-    if path and path.lower().endswith('.cmd'):
-        return True
-    return path is not None
+    return shutil.which("boss") is not None
 
 
 def login() -> dict:
@@ -89,8 +86,9 @@ def is_logged_in() -> dict:
         return {"ok": False, "logged_in": False, "error": "unavailable"}
     try:
         # boss list is a lightweight read — if it works, we're logged in
-        result = _run(["list"], timeout=15)
-        return {"ok": True, "logged_in": result.returncode == 0, "output": (result.stdout or "")[:200]}
+        result = _run(["list", "--count", "1"], timeout=30, check=False)
+        ok = result.returncode == 0 and "ERR" not in (result.stderr or "")[:50]
+        return {"ok": True, "logged_in": ok, "output": (result.stdout or "")[:200]}
     except Exception:
         return {"ok": False, "logged_in": False, "error": "check failed"}
 

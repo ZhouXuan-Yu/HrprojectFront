@@ -49,11 +49,18 @@ def boss_login():
 @bp.route("/status")
 def get_status():
     """Check if boss-cli is installed, enabled, and logged in."""
-    available = boss.is_available()
+    import shutil
+    available = shutil.which("boss") is not None
+    if not _get_enabled():
+        available = False
+
     logged_in = False
     if available:
-        login_status = boss.is_logged_in()
-        logged_in = login_status.get("logged_in", False)
+        try:
+            login_status = boss.is_logged_in()
+            logged_in = login_status.get("logged_in", False)
+        except Exception:
+            logged_in = False
 
     return success({
         "available": available,
@@ -61,6 +68,14 @@ def get_status():
         "status": "connected" if logged_in else ("need_login" if available else "unavailable"),
         "message": "BOSS 已连接" if logged_in else ("boss-cli 可用但未登录" if available else "boss-cli 未安装或未启用"),
     })
+
+
+def _get_enabled():
+    try:
+        from config import Config
+        return Config.BOSS_CLI_ENABLED
+    except Exception:
+        return True
 
 
 # ===========================================================================
