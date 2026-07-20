@@ -46,3 +46,6 @@ Thumbs.db
 # --- Codebase memory artifacts ---
 .codebase-memory/
 frontend/.codebase-memory/
+
+# --- Docs with secrets (dev plan contains keys) ---
+docs/DEVELOPMENT_PLAN.md

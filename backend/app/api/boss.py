@@ -29,25 +29,21 @@ bp = Blueprint("boss", __name__)
 def boss_login():
     """Launch ``boss login`` to open the BOSS login page in a browser.
 
-    This command returns immediately after opening the browser; it does
-    NOT wait for or poll the login result.  Call ``GET /api/boss/status``
-    afterwards to verify whether login was completed.
+    boss-cli uses Puppeteer persistent browser profile (~/.boss-cli-browser/)
+    so login state survives across restarts — user only needs to login once.
     """
     result = boss.login()
     if result.get("ok"):
         return success({
             "login_url": result.get("login_url", "https://www.zhipin.com/web/user/"),
-            "instruction": "请在打开的浏览器窗口中扫码登录，完成后前端调用 GET /api/boss/status 验证",
+            "instruction": "请在打开的浏览器窗口中扫码登录，完成后调用 GET /api/boss/status 验证",
+            "persistence": "登录状态持久化在 ~/.boss-cli-browser/ 目录",
         })
     return error("BOSS_LOGIN_FAILED", result.get("error", "启动登录页面失败"), status_code=502)
 
 
 # ===========================================================================
-# GET /api/boss/status — check boss-cli availability + login state
-# ===========================================================================
-
-# ===========================================================================
-# GET /api/boss/status — check boss-cli availability + login state + session
+# GET /api/boss/status — check boss-cli availability + login state + session persistence
 # ===========================================================================
 
 @bp.route("/status")
@@ -55,8 +51,7 @@ def get_status():
     """Check if boss-cli is installed, enabled, and logged in.
 
     boss-cli uses Puppeteer with persistent user data (~/.boss-cli-browser/)
-    so login state survives across process restarts — user only needs to
-    login once via ``boss login`` (POST /api/boss/login).
+    so login state survives across process restarts.
     """
     return success(boss.check_session())
 
