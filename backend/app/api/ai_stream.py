@@ -7,6 +7,7 @@ with graceful fallback to the blocking ai.engine when streaming fails.
 
 import json
 import logging
+import re
 
 from flask import Blueprint, request, Response, current_app
 
@@ -200,6 +201,9 @@ def _parse_accumulated_json(text: str) -> dict | None:
             cleaned = cleaned[:-3]
 
     cleaned = cleaned.strip()
+
+    # Tolerate common LLM JSON glitches: trailing commas before } or ]
+    cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
 
     try:
         return json.loads(cleaned)

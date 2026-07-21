@@ -629,17 +629,33 @@ def list_demand_candidates(demand_id, params):
                         'edu': edu_label,
                         'years': years_label,
                         'isEmployee': False,
+                        '_cid': cand.id,
+                        '_resumeId': p.resume_id,
                     })
 
                 if candidates_db:
                     db_success = True
+                    # 优先使用真实的 JD 匹配打分（t_hr_resume_match），没有再退回确定性估算
+                    from app.models.process import ResumeMatch
                     from app.services.match_service import calc_match_score
                     for c in candidates_db:
                         try:
-                            match = calc_match_score(str(c['id']), str(demand.id), c.get('profileScore') or 50)
-                            c['matchScore'] = match['score']
+                            real = None
+                            if c.get('_resumeId'):
+                                rm = (ResumeMatch.query
+                                      .filter_by(resume_id=c['_resumeId'], demand_id=demand.id, is_deleted=0)
+                                      .order_by(ResumeMatch.calculate_time.desc()).first())
+                                if rm and rm.match_score is not None:
+                                    real = float(rm.match_score)
+                            if real is not None:
+                                c['matchScore'] = round(real, 1)
+                            else:
+                                match = calc_match_score(str(c['id']), str(demand.id), c.get('profileScore') or 50)
+                                c['matchScore'] = match['score']
                         except Exception:
                             c['matchScore'] = None
+                        c.pop('_cid', None)
+                        c.pop('_resumeId', None)
 
                     source_filter = params.get('source', 'all')
                     if source_filter != 'all':
@@ -783,7 +799,8 @@ def link_candidate_to_demand(demand_id, name):
         resume_id = resume.id if resume else 0
 
         now = datetime.now()
-        process_no = f"RP{now.strftime('%Y%m%d%H%M%S')}{candidate.id % 100:02d}"
+        import random as _rnd
+        process_no = f"RP{now.strftime('%Y%m%d%H%M%S')}{candidate.id % 100:02d}{_rnd.randint(100, 999)}"
 
         process = RecruitProcess(
             process_no=process_no,

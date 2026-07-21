@@ -1,9 +1,16 @@
 <template>
   <div data-slot="ai-workspace">
-    <div data-slot="ai-conversation">
+    <AiConversation>
       <AiChatMessage role="ai" status="complete">
         <p>根据候选人信息和沟通场景，AI 生成沟通话术草稿和建议。所有联系动作必须由 HR 人工确认后执行。</p>
       </AiChatMessage>
+      <AiThinking
+        v-if="chatProcHasRun"
+        :steps="chatProcSteps"
+        :active="chatProcActive"
+        title="处理过程"
+        done-text="处理完成 · 点击展开"
+      />
       <AiChatMessage v-if="chatLoading" role="ai" status="loading" />
       <AiChatMessage v-if="chatError && !chatLoading" role="ai" status="error">
         <template #error>{{ chatError }}</template>
@@ -15,7 +22,7 @@
         </AiChatMessage>
         <AiDisclaimer />
       </template>
-    </div>
+    </AiConversation>
     <div data-slot="ai-input-area">
       <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
         <select v-model="chatForm.candidateId" style="flex:1;min-width:130px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;background:var(--c-card);color:var(--c-body)" aria-label="选择候选人">
@@ -41,11 +48,14 @@
 
 <script setup>
 import { ref, reactive, inject } from 'vue';
+import AiConversation from '../../components/ai/AiConversation.vue';
+import AiThinking from '../../components/ai/AiThinking.vue';
 import AiChatMessage from '../../components/ai/AiChatMessage.vue';
 import AiSkeleton from '../../components/ai/AiSkeleton.vue';
 import AiDisclaimer from '../../components/ai/AiDisclaimer.vue';
 import { runCommunicationDraft } from '../../api/ai.js';
 import { useClipboard } from '../../composables/useClipboard.js';
+import { useProcessingSteps } from '../../composables/useProcessingSteps.js';
 
 const showToast = inject('showToast');
 const { copy, copied } = useClipboard();
@@ -60,12 +70,22 @@ const chatResult = ref(null);
 const chatLoading = ref(false);
 const chatError = ref('');
 
+// 分步处理过程（诚实标注为「处理过程」，非真实 AI 思考链）
+const {
+  steps: chatProcSteps,
+  active: chatProcActive,
+  hasRun: chatProcHasRun,
+  start: chatProcStart,
+  finish: chatProcFinish,
+} = useProcessingSteps(['读取候选人信息', '分析沟通场景', '生成话术草稿', '校验语气措辞']);
+
 async function generateDraft() {
   if (!chatForm.candidateId || !chatForm.channel || !chatForm.purpose) return;
   chatError.value = ''; chatLoading.value = true;
+  chatProcStart();
   try { const c = candidates.value.find(x => x.id === chatForm.candidateId); chatResult.value = await runCommunicationDraft({ candidate_name: c?.name || '', channel: chatForm.channel, purpose: chatForm.purpose, context: chatForm.context }); showToast('话术生成完成'); }
   catch (e) { chatError.value = e.message || '话术生成失败，请重试'; showToast(chatError.value); }
-  finally { chatLoading.value = false; }
+  finally { chatProcFinish(); chatLoading.value = false; }
 }
 </script>
 

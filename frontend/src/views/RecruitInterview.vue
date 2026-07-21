@@ -636,7 +636,12 @@ function onScheduleSuccess(result) {
 }
 
 function onOfferSuccess(result) {
-  toast.success('已发送Offer给 ' + (result?.name || '候选人') + '，Offer编号: ' + (result?.id || '') + '，系统将通过邮件/飞书发送Offer函');
+  const base = '已发送Offer给 ' + (result?.name || '候选人') + '，Offer编号: ' + (result?.id || '');
+  if (result?.emailSent) {
+    toast.success(base + '，确认邮件已发送至候选人邮箱');
+  } else {
+    toast.success(base + (result?.emailMsg ? '（邮件未发送：' + result.emailMsg + '）' : ''));
+  }
   loadFromApi();
 }
 </script>

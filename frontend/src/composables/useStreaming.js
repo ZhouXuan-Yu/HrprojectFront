@@ -33,21 +33,40 @@ export function useStreaming() {
 
     controller = new AbortController();
 
-    try {
-      const role = localStorage.getItem('hr_role') || 'admin';
-      const url = `${baseUrl}/${workflow}?role=${role}`;
+    // Initial connection gets long-backoff retries to ride out transient 502s
+    // (backend dev-server reloader restarts). Mid-stream failures are not retried.
+    const CONNECT_RETRY_DELAYS = [3000, 6000];
+    let response = null;
+    for (let attempt = 0; attempt <= CONNECT_RETRY_DELAYS.length; attempt++) {
+      try {
+        const role = localStorage.getItem('hr_role') || 'admin';
+        const url = `${baseUrl}/${workflow}?role=${role}`;
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
-        signal: controller.signal,
-      });
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params),
+          signal: controller.signal,
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          const err = new Error(`HTTP ${response.status}`);
+          err.status = response.status;
+          throw err;
+        }
+        break;
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        const transient = (e.status >= 500 && e.status < 600) || e.message === 'Failed to fetch';
+        if (transient && attempt < CONNECT_RETRY_DELAYS.length) {
+          await new Promise(r => setTimeout(r, CONNECT_RETRY_DELAYS[attempt]));
+          continue;
+        }
+        throw e;
       }
+    }
 
+    try {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';

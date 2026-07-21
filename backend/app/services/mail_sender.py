@@ -11,7 +11,7 @@ import smtplib
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import formataddr
+from email.utils import formataddr, formatdate, make_msgid
 
 log = logging.getLogger(__name__)
 
@@ -60,13 +60,38 @@ def _pick_sender_account(account_id=None):
              .order_by(RecruitMailAccount.id).first())
 
 
+def _log_mail(account, to, subject, mail_type, ok, message):
+    """外发邮件落日志（best-effort，绝不影响发送主流程）。"""
+    try:
+        from app.models.auxiliary import MailLog
+        from app.extensions import db
+        db.session.add(MailLog(
+            sender_account_id=getattr(account, 'id', None),
+            sender_email=getattr(account, 'email_address', None) or '(未配置)',
+            recipient=to,
+            subject=subject[:250],
+            mail_type=mail_type,
+            status=1 if ok else 0,
+            error_msg=None if ok else str(message)[:500],
+        ))
+        db.session.commit()
+    except Exception as exc:
+        log.warning("mail log persist failed: %s", exc)
+        try:
+            from app.extensions import db
+            db.session.rollback()
+        except Exception:
+            pass
+
+
 def send_mail(to, subject, html_body, text_body=None, account_id=None,
-              sender_name='招聘中心'):
+              sender_name='招聘中心', mail_type='other'):
     """Send an HTML email via the configured recruit mailbox.
 
     Returns (ok: bool, message: str). Never raises — callers treat
     notification delivery as best-effort.
     """
+    account = None
     try:
         account = _pick_sender_account(account_id)
         if not account:
@@ -83,6 +108,9 @@ def send_mail(to, subject, html_body, text_body=None, account_id=None,
         msg['From'] = formataddr((str(Header(sender_name, 'utf-8')), account.email_address))
         msg['To'] = to
         msg['Subject'] = Header(subject, 'utf-8')
+        # 缺 Date/Message-ID 的邮件在收件箱里时间显示为空、排序沉底，易被当成"没收到"
+        msg['Date'] = formatdate(localtime=True)
+        msg['Message-ID'] = make_msgid('hr-recruit')
         if text_body:
             msg.attach(MIMEText(text_body, 'plain', 'utf-8'))
         msg.attach(MIMEText(html_body, 'html', 'utf-8'))
@@ -102,10 +130,13 @@ def send_mail(to, subject, html_body, text_body=None, account_id=None,
                 pass
 
         log.info("Mail sent via %s to %s: %s", account.email_address, to, subject)
+        _log_mail(account, to, subject, mail_type, True, '发送成功')
         return True, '发送成功'
     except smtplib.SMTPAuthenticationError as exc:
         log.error("SMTP auth failed: %s", exc)
+        _log_mail(account, to, subject, mail_type, False, exc)
         return False, f'发件认证失败，请检查邮箱授权码: {exc}'
     except Exception as exc:
         log.error("SMTP send failed: %s", exc, exc_info=True)
+        _log_mail(account, to, subject, mail_type, False, exc)
         return False, f'发送失败: {exc}'

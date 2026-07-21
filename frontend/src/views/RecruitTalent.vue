@@ -24,8 +24,10 @@
     <!-- 资产统计卡 -->
     <StatCardRow :cards="statCards" :active-key="statActiveKey" clickable @select="onStatSelect" />
 
+    <!-- 简历处理管道 + 系统邮件看板：左右各占一半 -->
+    <div class="pp-row">
     <!-- 简历处理管道：邮箱收取 → 附件识别 → AI 解析 → 入库 全过程可视 -->
-    <section class="pipeline-panel" aria-label="简历处理管道">
+    <section class="pipeline-panel pp-half" aria-label="简历处理管道">
       <div class="pp-header">
         <div>
           <div class="pp-title">简历处理管道</div>
@@ -67,23 +69,57 @@
       <!-- 最近入库记录 -->
       <div class="pp-log">
         <div class="pp-log-title">最近入库</div>
-        <table v-if="ingestLog.length" class="pp-table">
-          <thead>
-            <tr><th>候选人</th><th>编号</th><th>来源</th><th>解析引擎</th><th>入库时间</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in ingestLog" :key="item.resumeId">
-              <td style="font-weight:600">{{ item.candidate }}</td>
-              <td>{{ item.candidateNo }}</td>
-              <td>{{ item.source }}</td>
-              <td><span class="pp-engine">{{ item.engine }}</span></td>
-              <td>{{ item.storageTime }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-else class="pp-empty-line">暂无入库记录，点击右侧「刷新邮箱简历」或上方「上传简历」开始</div>
+        <div class="pp-scroll">
+          <table v-if="ingestLog.length" class="pp-table">
+            <thead>
+              <tr><th>候选人</th><th>编号</th><th>来源</th><th>解析引擎</th><th>入库时间</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in ingestLog" :key="item.resumeId">
+                <td style="font-weight:600">{{ item.candidate }}</td>
+                <td>{{ item.candidateNo }}</td>
+                <td>{{ item.source }}</td>
+                <td><span class="pp-engine">{{ item.engine }}</span></td>
+                <td>{{ item.storageTime }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="pp-empty-line">暂无入库记录，点击右侧「刷新邮箱简历」或上方「上传简历」开始</div>
+        </div>
       </div>
     </section>
+
+    <!-- 系统邮件看板：哪个邮箱发了哪些邮件到哪些邮箱 -->
+    <section class="pipeline-panel pp-half" aria-label="系统邮件看板">
+      <div class="pp-header">
+        <div>
+          <div class="pp-title">系统邮件看板</div>
+          <div class="pp-sub">面试邀请 / 录用通知 / 入职指引，发件箱 → 收件箱全记录</div>
+        </div>
+        <button class="mail-collapse-btn" @click="mailCollapsed = !mailCollapsed" :aria-expanded="!mailCollapsed">
+          {{ mailCollapsed ? '展开 ▾' : '折叠 ▴' }}
+        </button>
+      </div>
+      <div v-show="!mailCollapsed" class="ml-body">
+        <div v-if="mailLog.length" class="pp-scroll">
+          <div v-for="m in mailLog" :key="m.id" class="ml-item">
+            <div class="ml-line1">
+              <span class="ml-type" :class="{ fail: !m.ok }">{{ m.ok ? m.typeLabel : '发送失败' }}</span>
+              <span class="ml-subject" :title="m.subject">{{ m.subject }}</span>
+              <span class="ml-time">{{ m.time }}</span>
+            </div>
+            <div class="ml-line2">
+              <span class="ml-addr">{{ m.sender }}</span>
+              <span class="ml-arrow">→</span>
+              <span class="ml-addr">{{ m.recipient }}</span>
+            </div>
+            <div v-if="m.error" class="ml-error" :title="m.error">{{ m.error }}</div>
+          </div>
+        </div>
+        <div v-else class="pp-empty-line">暂无系统外发邮件记录，约面 / 发 Offer 后自动记录在这里</div>
+      </div>
+    </section>
+    </div>
 
     <!-- 3 Tabs -->
     <div class="tabs" role="tablist">
@@ -358,7 +394,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { EXT_DATA, INT_DATA, BLACKLIST_DATA, DEMAND_OPTIONS } from '../data/talent.js';
-import { fetchTalent, updateTalentNote, fetchMatchResults, linkTalentToDemand, uploadResumeFile, fetchIngestLog } from '../api/talent.js';
+import { fetchTalent, updateTalentNote, fetchMatchResults, linkTalentToDemand, uploadResumeFile, fetchIngestLog, fetchMailLog } from '../api/talent.js';
 import { syncAllEmailAccounts } from '../api/config.js';
 import { useToast } from '../composables/useToast.js';
 import { useAppError } from '../composables/useAppError.js';
@@ -428,6 +464,19 @@ const mailSyncing = ref(false);
 const syncProcess = ref(null);   // 本次同步的逐账号/逐邮件处理明细
 const lastSyncText = ref('');
 const ingestLog = ref([]);       // 最近入库记录（DB）
+const mailLog = ref([]);         // 系统外发邮件看板（DB）
+const mailCollapsed = ref(false); // 邮件看板折叠态
+
+async function loadMailLog() {
+  try {
+    const res = await fetchMailLog(50);
+    const r = (res && res.data) ? res.data : res;
+    mailLog.value = (r && r.items) || [];
+  } catch (e) {
+    console.warn('Failed to load mail log:', e);
+    mailLog.value = [];
+  }
+}
 
 async function loadIngestLog() {
   try {
@@ -726,6 +775,7 @@ onMounted(() => {
   document.addEventListener('click', onDocClick);
   loadFromApi();
   loadIngestLog();
+  loadMailLog();
 });
 onUnmounted(() => document.removeEventListener('click', onDocClick));
 </script>
@@ -786,4 +836,32 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
 .pp-table td { padding: 6px 10px; border-bottom: 1px solid var(--c-border); color: var(--c-body); font-variant-numeric: tabular-nums; }
 .pp-table tr:last-child td { border-bottom: none; }
 .pp-engine { font-size: 11px; font-weight: 600; color: var(--c-primary); background: var(--c-primary-subtle); padding: 1px 7px; border-radius: 99px; }
+
+/* ── 管道 + 邮件看板 半宽并排 ── */
+.pp-row { display: flex; gap: 14px; align-items: stretch; }
+.pp-half { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
+.pp-scroll { overflow-y: auto; max-height: 260px; }
+.pp-scroll::-webkit-scrollbar { width: 4px; }
+.pp-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+@media (max-width: 1100px) { .pp-row { flex-direction: column; } }
+
+/* ── 系统邮件看板 ── */
+.mail-collapse-btn {
+  border: 1px solid var(--c-border); background: var(--c-bg); color: var(--c-sub);
+  font-size: 12px; font-weight: 600; padding: 3px 12px; border-radius: 99px; cursor: pointer;
+  white-space: nowrap; transition: all .15s;
+}
+.mail-collapse-btn:hover { color: var(--c-text); border-color: var(--c-sub); }
+.ml-body { margin-top: 12px; border-top: 1px dashed var(--c-border); padding-top: 10px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ml-item { padding: 8px 4px; border-bottom: 1px solid var(--c-border); }
+.ml-item:last-child { border-bottom: none; }
+.ml-line1 { display: flex; align-items: center; gap: 8px; }
+.ml-type { font-size: 11px; font-weight: 700; color: var(--c-primary); background: var(--c-primary-subtle); padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+.ml-type.fail { color: var(--c-warn); background: rgba(245,158,11,0.12); }
+.ml-subject { font-size: 13px; font-weight: 600; color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.ml-time { font-size: 11px; color: var(--c-sub); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ml-line2 { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.ml-addr { font-size: 12px; color: var(--c-sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ml-arrow { font-size: 11px; color: var(--c-primary); font-weight: 700; }
+.ml-error { margin-top: 3px; font-size: 11px; color: var(--c-warn); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

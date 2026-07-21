@@ -134,6 +134,7 @@ async function request(path, options = {}) {
     // Remove non-fetch properties
     delete config.timeout
     delete config.params
+    delete config.silent
 
     return fetch(finalUrl, config)
       .finally(() => clearTimeout(timeoutId))
@@ -146,7 +147,7 @@ async function request(path, options = {}) {
       // Create a promise that this request will resolve to
       const requestPromise = (async () => {
         const resp = await doFetch(attempt)
-        const json = await handleResponse(resp, method, path)
+        const json = await handleResponse(resp, method, path, options)
 
         // On successful mutation, invalidate cache
         invalidateCache(method, path)
@@ -199,7 +200,8 @@ async function request(path, options = {}) {
 }
 
 // ── Response handler ──────────────────────────────────────────────────────
-async function handleResponse(resp, method, path) {
+async function handleResponse(resp, method, path, options = {}) {
+  const silent = options.silent === true
   // 401 / 403 — clear stale token on real auth error
   if ((resp.status === 401 || resp.status === 403) && localStorage.getItem('hr_token')) {
     if (resp.status === 401) {
@@ -209,7 +211,7 @@ async function handleResponse(resp, method, path) {
     const err = new Error(message)
     err.code = resp.status === 401 ? 'UNAUTHORIZED' : 'FORBIDDEN'
     err.status = resp.status
-    dispatchApiError(err)
+    if (!silent) dispatchApiError(err)
     throw err
   }
 
@@ -227,20 +229,22 @@ async function handleResponse(resp, method, path) {
       const err = new Error(`请求失败 (${resp.status})`)
       err.code = 'PARSE_ERROR'
       err.status = resp.status
-      dispatchApiError(err)
+      if (!silent) dispatchApiError(err)
       throw err
     }
     return { success: true, raw: true }
   }
 
   if (!resp.ok) {
-    // 502 from boss-cli — extract backend error message
+    // 502 — only boss-cli endpoints get the boss-cli hint; others are generic gateway errors
     if (resp.status === 502) {
-      const msg = json?.error?.message || json?.message || json?.error || '服务暂不可用，请检查 boss-cli 安装状态'
+      const isBoss = path.includes('/boss')
+      const msg = json?.error?.message || json?.message || json?.error
+        || (isBoss ? '服务暂不可用，请检查 boss-cli 安装状态' : '服务暂时不可用，请稍后重试')
       const err = new Error(msg)
-      err.code = 'BOSS_UNAVAILABLE'
+      err.code = isBoss ? 'BOSS_UNAVAILABLE' : 'GATEWAY_ERROR'
       err.status = 502
-      dispatchApiError(err)
+      if (!silent) dispatchApiError(err)
       throw err
     }
     const message = json?.error?.message || json?.message || `请求失败 (${resp.status})`
@@ -248,7 +252,7 @@ async function handleResponse(resp, method, path) {
     const err = new Error(message)
     err.code = code
     err.status = resp.status
-    dispatchApiError(err)
+    if (!silent) dispatchApiError(err)
     throw err
   }
 

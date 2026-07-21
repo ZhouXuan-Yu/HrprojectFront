@@ -104,22 +104,19 @@
             <td><span style="font-size:12px" :style="{color: c.notRecReason ? 'var(--c-draft)' : 'var(--c-body)'}">{{ c.notRecReason || c.statusLabel }}</span></td>
             <td style="white-space:nowrap">
               <button class="btn btn-outline btn-sm" @click="openDrawer(c)">查看</button>
-              <template v-if="c.isEmployee && !c.notRecReason">
-                <button class="btn btn-outline btn-sm" @click="openCommModal(c)">联系</button>
-                <button class="btn btn-primary btn-sm" @click="openScheduleModal(c)">发起面试</button>
-              </template>
-              <template v-else-if="!c.isEmployee && !c.notRecReason && c.matchScore && c.matchScore >= 60 && c.status !== 'interviewing'">
-                <button class="btn btn-outline btn-sm" @click="openCommModal(c)">联系</button>
-                <button class="btn btn-primary btn-sm" @click="openScheduleModal(c)">约面</button>
-              </template>
-              <template v-else-if="c.status === 'interviewing'">
+              <template v-if="c.status === 'interviewing'">
                 <span style="font-size:11px;color:var(--c-sub)">面试中</span>
               </template>
-              <template v-else-if="c.notRecReason">
-                <span style="font-size:11px;color:var(--c-draft)">{{ c.notRecReason }}</span>
-              </template>
               <template v-else>
-                <span style="font-size:11px;color:var(--c-draft)">匹配分不足</span>
+                <!-- 匹配分只是推荐度建议，不阻断联系和约面 -->
+                <button class="btn btn-outline btn-sm" @click="openCommModal(c)">联系</button>
+                <button class="btn btn-primary btn-sm" @click="openScheduleModal(c)">{{ c.isEmployee ? '发起面试' : '约面' }}</button>
+                <span v-if="c.notRecReason"
+                      style="font-size:11px;color:var(--c-warn);margin-left:2px"
+                      :title="c.notRecReason">建议不推荐</span>
+                <span v-else-if="c.matchScore != null && c.matchScore < 60"
+                      style="font-size:11px;color:var(--c-warn);margin-left:2px"
+                      title="匹配分较低，建议谨慎评估后再推进">建议不推荐</span>
               </template>
             </td>
           </tr>

@@ -1,9 +1,16 @@
 <template>
   <div data-slot="ai-workspace">
-    <div data-slot="ai-conversation">
+    <AiConversation>
       <AiChatMessage role="ai" status="complete">
         <p>AI 分析招聘数据，标注异常趋势和关键洞察，并给出改进建议。选择报表类型开始分析。</p>
       </AiChatMessage>
+      <AiThinking
+        v-if="reportProcHasRun"
+        :steps="reportProcSteps"
+        :active="reportProcActive"
+        title="处理过程"
+        done-text="处理完成 · 点击展开"
+      />
       <AiChatMessage v-if="reportLoading" role="ai" status="loading" />
       <AiChatMessage v-if="reportError && !reportLoading" role="ai" status="error">
         <template #error>{{ reportError }}</template>
@@ -17,7 +24,7 @@
         </AiChatMessage>
         <AiDisclaimer />
       </template>
-    </div>
+    </AiConversation>
     <div data-slot="ai-input-area">
       <div style="display:flex;gap:8px;margin-bottom:8px">
         <select v-model="reportForm.type" style="flex:1;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;background:var(--c-card);color:var(--c-body)" aria-label="报告类型">
@@ -34,11 +41,14 @@
 
 <script setup>
 import { ref, reactive, inject } from 'vue';
+import AiConversation from '../../components/ai/AiConversation.vue';
+import AiThinking from '../../components/ai/AiThinking.vue';
 import AiChatMessage from '../../components/ai/AiChatMessage.vue';
 import AiSkeleton from '../../components/ai/AiSkeleton.vue';
 import AiDisclaimer from '../../components/ai/AiDisclaimer.vue';
 import { runReportAnalysis } from '../../api/ai.js';
 import { useClipboard } from '../../composables/useClipboard.js';
+import { useProcessingSteps } from '../../composables/useProcessingSteps.js';
 
 const showToast = inject('showToast');
 const { copy, copied } = useClipboard();
@@ -52,11 +62,21 @@ const reportResult = ref(null);
 const reportLoading = ref(false);
 const reportError = ref('');
 
+// 分步处理过程（诚实标注为「处理过程」，非真实 AI 思考链）
+const {
+  steps: reportProcSteps,
+  active: reportProcActive,
+  hasRun: reportProcHasRun,
+  start: reportProcStart,
+  finish: reportProcFinish,
+} = useProcessingSteps(['汇总招聘数据', '计算转化指标', '识别异常趋势', '生成分析建议']);
+
 async function generateReport() {
   reportError.value = ''; reportLoading.value = true;
+  reportProcStart();
   try { reportResult.value = await runReportAnalysis({ type: reportForm.type, params: {} }); showToast('分析报告生成完成'); }
   catch (e) { reportError.value = e.message || '报告生成失败，请重试'; showToast(reportError.value); }
-  finally { reportLoading.value = false; }
+  finally { reportProcFinish(); reportLoading.value = false; }
 }
 </script>
 

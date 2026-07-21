@@ -140,6 +140,31 @@ def get_ingest_log():
     return success({'items': _log(limit)})
 
 
+_TYPE_LABELS = {'invite': '面试邀请', 'offer': '录用通知', 'entry': '入职指引',
+                'test': '测试邮件', 'other': '系统邮件'}
+
+
+@bp.route('/mail-log')
+def get_mail_log():
+    """GET /api/talent/mail-log — 系统外发邮件看板：哪个邮箱发了哪些邮件到哪些邮箱。"""
+    from app.models.auxiliary import MailLog
+    limit = min(int(request.args.get('limit', 50)), 200)
+    rows = (MailLog.query.filter_by(is_deleted=0)
+            .order_by(MailLog.id.desc()).limit(limit).all())
+    items = [{
+        'id': r.id,
+        'sender': r.sender_email,
+        'recipient': r.recipient,
+        'subject': r.subject,
+        'type': r.mail_type,
+        'typeLabel': _TYPE_LABELS.get(r.mail_type, '系统邮件'),
+        'ok': bool(r.status),
+        'error': r.error_msg,
+        'time': r.created_at.strftime('%m-%d %H:%M') if r.created_at else '',
+    } for r in rows]
+    return success({'items': items})
+
+
 @bp.route('/candidate/<candidate_id>/contact-info')
 def get_candidate_contact_info(candidate_id):
     """GET /api/talent/candidate/<id>/contact-info — full mobile/email for contact action."""

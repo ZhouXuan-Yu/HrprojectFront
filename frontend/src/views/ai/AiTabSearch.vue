@@ -1,9 +1,16 @@
 <template>
   <div data-slot="ai-workspace">
-    <div data-slot="ai-conversation">
+    <AiConversation>
       <AiChatMessage role="ai" status="complete">
         <p>用自然语言描述你需要的候选人，系统解析语义后在人才库中搜索匹配简历。不用拼关键词，直接描述即可。</p>
       </AiChatMessage>
+      <AiThinking
+        v-if="searchProcHasRun"
+        :steps="searchProcSteps"
+        :active="searchProcActive"
+        title="处理过程"
+        done-text="处理完成 · 点击展开"
+      />
       <AiChatMessage v-if="searchLoading" role="ai" status="loading" />
       <AiChatMessage v-if="searchError && !searchLoading" role="ai" status="error">
         <template #error>{{ searchError }}</template>
@@ -34,12 +41,11 @@
       <AiChatMessage v-if="!searchLoading && searchResults.length === 0 && searchAttempted" role="ai" status="complete">
         <p style="color:var(--c-sub)">未找到匹配的候选人，尝试调整搜索描述</p>
       </AiChatMessage>
-    </div>
+    </AiConversation>
     <div data-slot="ai-input-area">
       <AiPromptInput
         v-model="searchQuery"
         :status="searchStatus"
-        :disabled="!searchQuery.trim()"
         placeholder="描述你想要的候选人，例如：5年Java 大厂背景 做过微服务架构 熟悉K8s..."
         hint="Enter 快速搜索"
         layout="compact"
@@ -52,10 +58,13 @@
 
 <script setup>
 import { ref, computed, watch, inject } from 'vue';
+import AiConversation from '../../components/ai/AiConversation.vue';
+import AiThinking from '../../components/ai/AiThinking.vue';
 import AiChatMessage from '../../components/ai/AiChatMessage.vue';
 import AiPromptInput from '../../components/ai/AiPromptInput.vue';
 import AiSkeleton from '../../components/ai/AiSkeleton.vue';
 import { runResumeSearch } from '../../api/ai.js';
+import { useProcessingSteps } from '../../composables/useProcessingSteps.js';
 
 const showToast = inject('showToast');
 
@@ -66,14 +75,24 @@ const searchError = ref('');
 const searchAttempted = ref(false);
 const searchStatus = computed(() => searchLoading.value ? 'submitted' : (searchError.value ? 'error' : 'ready'));
 
+// 分步处理过程（诚实标注为「处理过程」，非真实 AI 思考链）
+const {
+  steps: searchProcSteps,
+  active: searchProcActive,
+  hasRun: searchProcHasRun,
+  start: searchProcStart,
+  finish: searchProcFinish,
+} = useProcessingSteps(['理解搜索需求', '解析语义条件', '检索人才库', '排序匹配结果']);
+
 watch(searchQuery, () => { if (searchError.value) { searchError.value = ''; searchAttempted.value = false; } });
 
 async function searchResume() {
   if (!searchQuery.value.trim()) return;
   searchError.value = ''; searchLoading.value = true; searchAttempted.value = true;
+  searchProcStart();
   try { const r = await runResumeSearch({ query: searchQuery.value, limit: 10 }); searchResults.value = r.results || []; showToast('找到 ' + searchResults.value.length + ' 位候选人'); }
   catch (e) { searchError.value = e.message || '搜索失败，请重试'; showToast(searchError.value); }
-  finally { searchLoading.value = false; }
+  finally { searchProcFinish(); searchLoading.value = false; }
 }
 function viewResume(id) { showToast('查看简历: ' + id); }
 </script>

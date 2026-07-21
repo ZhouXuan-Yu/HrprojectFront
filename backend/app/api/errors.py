@@ -38,4 +38,7 @@ def handle_405(e):
 
 @errors_bp.app_errorhandler(500)
 def handle_500(e):
+    import logging
+    logging.getLogger('app.error').error(
+        'Unhandled 500: %s', getattr(e, 'original_exception', e), exc_info=True)
     return err_resp('INTERNAL_ERROR', '服务器内部错误', 500)

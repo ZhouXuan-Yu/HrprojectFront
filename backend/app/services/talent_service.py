@@ -12,7 +12,8 @@ def _mock_enabled():
     return should_mock_fallback()
 
 STATUS_LABELS = {
-    'available': '可联系', 'locked': '面试中(锁定)', 'reserve': '储备', 'archived': '已封存'
+    'available': '可联系', 'locked': '面试中(锁定)', 'reserve': '储备', 'archived': '已封存',
+    'hired': '已入职',
 }
 EDU_LABELS = {1: '大专', 2: '本科', 3: '硕士', 4: '博士'}
 YEARS_LABELS = {0: '应届', 1: '1-3年', 3: '3-5年', 5: '5年+'}

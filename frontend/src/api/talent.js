@@ -48,6 +48,11 @@ export async function fetchIngestLog(limit = 10) {
   return r.data;
 }
 
+export async function fetchMailLog(limit = 50) {
+  const r = await api.get(`/talent/mail-log?limit=${limit}`);
+  return r.data;
+}
+
 export async function batchContactCandidates(names, method = '系统记录') {
   const r = await api.post('/talent/contact', { names, method });
   return r.data;

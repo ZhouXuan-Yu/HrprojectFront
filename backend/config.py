@@ -19,6 +19,14 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # SQLite 并发加固：Web 进程与 Celery 邮件同步任务共用同一个 sqlite 文件，
+    # 同步任务长时间写库时 Web 请求直接 500（database is locked）。
+    # busy_timeout 让写请求排队等待而不是立刻报错；WAL 允许读写并发。
+    if SQLALCHEMY_DATABASE_URI.startswith('sqlite'):
+        SQLALCHEMY_ENGINE_OPTIONS = {
+            'connect_args': {'timeout': 30},  # busy_timeout = 30s
+        }
+
     # Redis / Celery
     CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0')
     CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0')

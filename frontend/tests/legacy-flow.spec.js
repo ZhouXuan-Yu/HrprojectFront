@@ -514,14 +514,21 @@ test('demand detail — batch schedule opens ScheduleInterviewModal for first ch
   await expect(page.locator('.schedule-modal')).not.toBeVisible({ timeout: 3000 });
 });
 
-test('demand detail — low match score candidates show "匹配分不足"', async ({ page }) => {
+test('demand detail — low match score candidates show advisory "建议不推荐" and stay actionable', async ({ page }) => {
   await page.goto('/recruit-demand-detail');
   await page.waitForSelector('#candidateTable', { timeout: 10000 });
   await page.locator('#filterScore').selectOption('60');
   await page.waitForTimeout(500);
-  const lowMatch = page.getByText('匹配分不足');
-  if (await lowMatch.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await expect(lowMatch.first()).toBeVisible();
+  // 新规则：不存在"匹配分不足"阻断态，低分只提示"建议不推荐"，联系/约面按钮仍可用
+  await expect(page.getByText('匹配分不足')).toHaveCount(0);
+  const table = page.locator('#candidateTable');
+  await expect(table).toBeVisible();
+  const advisory = page.getByText('建议不推荐');
+  if (await advisory.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await expect(advisory.first()).toBeVisible();
+    // 同一行仍可约面/联系
+    const row = advisory.first().locator('xpath=ancestor::tr[1]');
+    await expect(row.getByRole('button', { name: /约面|发起面试/ })).toBeVisible();
   }
 });
 
@@ -592,4 +599,53 @@ test('demand detail — sequential modal open/close does not break', async ({ pa
     await page.keyboard.press('Escape');
     await page.waitForTimeout(500);
   }
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// 招聘辅助中心：思考过程面板 + 对话容器（AiThinking / AiConversation）
+// ════════════════════════════════════════════════════════════════════════════
+
+test('recruit-ai conversation area exposes role=log and back-to-bottom contract', async ({ page }) => {
+  await page.goto('/recruit-ai');
+  const conv = page.locator('[data-slot="ai-conversation"]').first();
+  await expect(conv).toBeVisible();
+  await expect(conv).toHaveAttribute('role', 'log');
+  // 回到底部按钮存在于 DOM，初始为 hidden 状态（无溢出）
+  const scrollBtn = conv.locator('[data-slot="ai-conversation-scroll-bottom"]');
+  await expect(scrollBtn).toBeAttached();
+  await expect(scrollBtn).toHaveAttribute('data-state', 'hidden');
+});
+
+test('recruit-ai JD tab shows thinking panel and structured result after generate', async ({ page }) => {
+  await page.goto('/recruit-ai');
+  // 填写 JD 表单并提交
+  await page.locator('[data-slot="ai-input-area"] input[aria-label="岗位名称"]').fill('高级后端工程师');
+  await page.locator('[data-slot="ai-input-area"] select[aria-label="部门"]').selectOption('技术部');
+  await page.locator('[data-slot="prompt-input-textarea"]').fill('5年Java经验，熟悉微服务架构');
+  await page.locator('[data-slot="prompt-input-send"]').click();
+  // 思考过程面板在生成期间可见
+  const thinking = page.locator('[data-slot="ai-thinking"]').first();
+  await expect(thinking).toBeVisible({ timeout: 5000 });
+  await expect(thinking.locator('[data-slot="ai-thinking-header"]')).toContainText('思考过程');
+  // 结构化结果最终渲染（流式缺失时由阻塞式 API 兜底，mock fallback 保证必有内容）
+  await expect(page.locator('[data-slot="ai-jd-result"]')).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('[data-slot="ai-jd-result"] [data-slot="ai-jd-skill-row"]').first()).toBeVisible();
+  // 职责区块不再是占位符
+  await expect(page.locator('[data-slot="ai-jd-result"]')).not.toContainText('请查看上方 Markdown');
+  // 完成后思考面板收起为摘要
+  await expect(thinking.locator('[data-slot="ai-thinking-header"]')).toContainText('思考完成', { timeout: 10000 });
+});
+
+test('recruit-ai blocking tabs show honest processing steps', async ({ page }) => {
+  await page.goto('/recruit-ai');
+  await page.getByRole('tab', { name: '② 语义简历搜索' }).click();
+  await page.locator('[data-slot="prompt-input-textarea"]').fill('5年Java 大厂背景 微服务');
+  await page.locator('[data-slot="prompt-input-send"]').click();
+  // 阻塞式工作流显示分步「处理过程」（非 AI 思考）
+  const thinking = page.locator('[data-slot="ai-thinking"]').first();
+  await expect(thinking).toBeVisible({ timeout: 5000 });
+  await expect(thinking).toContainText('处理');
+  await expect(thinking.locator('[data-slot="ai-thinking-step"]').first()).toBeVisible();
+  // 搜索结果最终渲染
+  await expect(page.locator('[data-slot="ai-conversation"] table').first()).toBeVisible({ timeout: 15000 });
 });

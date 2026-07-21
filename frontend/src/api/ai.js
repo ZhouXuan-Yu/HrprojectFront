@@ -23,20 +23,40 @@ function delay(ms) {
 }
 
 // Wrap API call with mock fallback — simulate async for realistic UX
+// Transient gateway errors (backend dev-server restart / cold start) get a few
+// long-backoff retries before falling back to mock, so a brief 502 window does
+// not silently swap real AI results for mock data.
+const AI_RETRY_DELAYS = [3000, 6000];
+
+function isTransientGatewayError(e) {
+  return (e.status >= 500 && e.status < 600) || !e.status || e.code === 'NETWORK_ERROR' || e.code === 'TIMEOUT';
+}
+
 async function aiPost(workflow, params, mockData, mockDelay = 600) {
-  try {
-    const r = await api.post(`/ai/run/${workflow}`, params);
-    const data = r.data || r;
-    // Surface fallback warnings to the user
-    if (data._fallback) {
-      console.warn(`[AI API] ${workflow} returned fallback data:`, data._fallback_reason || 'unknown reason');
+  let lastError = null;
+  for (let attempt = 0; attempt <= AI_RETRY_DELAYS.length; attempt++) {
+    try {
+      // silent: AI workflows surface their own fallback UI, no global error toast
+      const r = await api.post(`/ai/run/${workflow}`, params, { silent: true });
+      const data = r.data || r;
+      // Surface fallback warnings to the user
+      if (data._fallback) {
+        console.warn(`[AI API] ${workflow} returned fallback data:`, data._fallback_reason || 'unknown reason');
+      }
+      return data;
+    } catch (e) {
+      lastError = e;
+      if (isTransientGatewayError(e) && attempt < AI_RETRY_DELAYS.length) {
+        console.warn(`[AI API] ${workflow} transient error (${e.message}), retrying in ${AI_RETRY_DELAYS[attempt] / 1000}s...`);
+        await delay(AI_RETRY_DELAYS[attempt]);
+        continue;
+      }
+      break;
     }
-    return data;
-  } catch (e) {
-    console.warn(`[AI API] ${workflow} failed, using mock data:`, e.message);
-    await delay(mockDelay);
-    return { ...mockData, _fallback: true, _fallback_reason: e.message };
   }
+  console.warn(`[AI API] ${workflow} failed, using mock data:`, lastError.message);
+  await delay(mockDelay);
+  return { ...mockData, _fallback: true, _fallback_reason: lastError.message };
 }
 
 export async function runJdGenerate(params) {

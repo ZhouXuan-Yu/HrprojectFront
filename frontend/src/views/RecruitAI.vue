@@ -144,8 +144,8 @@ async function loadBackendData() {
         status: d.status || d.demand_status || '—',
       }));
     }
-    if (talentRes.data) {
-      const tl = talentRes.data;
+    if (talentRes.ext && talentRes.ext.length) {
+      const tl = talentRes.ext;
       candidates.value = tl.map(c => ({
         id: c.id,
         name: c.name || c.candidate_name,

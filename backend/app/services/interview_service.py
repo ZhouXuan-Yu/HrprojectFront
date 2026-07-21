@@ -99,7 +99,7 @@ def _ensure_process_for_interview(resume_id, demand_id, interview_round):
         if not process:
             now = datetime.now()
             process = RecruitProcess(
-                process_no=f"RP{now.strftime('%Y%m%d%H%M%S')}{candidate.id % 100:02d}",
+                process_no=f"RP{now.strftime('%Y%m%d%H%M%S')}{candidate.id % 100:02d}{random.randint(100, 999)}",
                 demand_id=demand_id,
                 resume_id=resume_id or 0,
                 candidate_id=candidate.id,
@@ -722,6 +722,18 @@ def confirm_onboard(book_id):
         if process:
             process.process_status = 8  # onboard
 
+    # 联动人才库：入职后候选人状态置为 hired
+    try:
+        from app.models.candidate import Candidate
+        cid = _candidate_id_for_resume(book.resume_id)
+        if cid:
+            cand = Candidate.query.filter_by(id=cid, is_deleted=0).first()
+            if cand:
+                cand.status = 'hired'
+                log.info("候选人已入职: id=%s name=%s", cand.id, cand.candidate_name)
+    except Exception as exc:
+        log.warning("set hired status failed (best-effort): %s", exc)
+
     db.session.commit()
     log.info("入职确认: book_id=%s", book_id)
     return {'confirmed': True}
@@ -754,7 +766,7 @@ def cancel_interview(book_id, reason=None):
         if process:
             process.process_status = 4  # rejected
 
-    _release_candidate_lock(book.resume_id, None)
+    _release_lock_for_resume(book.resume_id)
 
     db.session.commit()
     log.info("面试已取消: book_id=%s, reason=%s", book_id, reason or '无原因')

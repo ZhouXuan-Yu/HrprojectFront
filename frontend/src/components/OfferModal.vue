@@ -179,6 +179,25 @@ async function handleSubmit() {
     };
     const resp = await api.post('/hire/offer/create', payload);
     const data = resp.data || {};
+    // 创建只是草稿，紧接着调用 send 才真正发出（含候选人确认邮件）
+    if (data.id) {
+      try {
+        const sendResp = await api.post(`/hire/offer/${encodeURIComponent(data.id)}/send`);
+        const sd = sendResp.data || {};
+        submitting.value = false;
+        emit('success', { id: data.id, name: props.candidate?.name, emailSent: sd.emailSent, emailMsg: sd.emailMsg });
+        resetForm();
+        return;
+      } catch (sendErr) {
+        console.warn('[OfferModal] send failed:', sendErr);
+        submitting.value = false;
+        // Offer 已存在为草稿，明确告知用户后续在哪里继续
+        toast.warning(`Offer 已保存为草稿（${data.id}），但发送失败：${sendErr.message || '未知错误'}。可在 Offer 列表中重新发送`);
+        emit('close');
+        resetForm();
+        return;
+      }
+    }
     submitting.value = false;
     emit('success', { id: data.id, name: props.candidate?.name });
     resetForm();

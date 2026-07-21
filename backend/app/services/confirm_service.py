@@ -74,6 +74,23 @@ def _candidate_contact(resume_id):
     return cand.candidate_name, cand.email, cand
 
 
+def _sender_account_id(resume_id):
+    """发件邮箱 = 招聘基础配置中采集该简历的邮箱（Resume.mail_account_id）。
+
+    约面邀请 / Offer / 入职包邮件统一从"接收该简历的邮箱"发出。
+    查不到时返回 None，由 mail_sender 回退到第一个启用的邮箱账号，
+    保证发件方始终是招聘配置里的邮箱而不是其他来源。
+    """
+    try:
+        from app.models.candidate import Resume
+        r = Resume.query.filter_by(id=resume_id, is_deleted=0).first()
+        if r and r.mail_account_id:
+            return r.mail_account_id
+    except Exception:
+        pass
+    return None
+
+
 def _position_label(demand_id):
     from app.models.demand import RecruitDemand
     d = RecruitDemand.query.filter_by(id=demand_id, is_deleted=0).first()
@@ -240,7 +257,8 @@ def send_interview_invite_email(book):
       <p style="color:#999;font-size:12px">如按钮无法点击，请复制链接到浏览器打开：{url}</p>
     </div>"""
 
-    ok, msg = send_mail(email, f'【面试邀请】{position} - {time_str}', html)
+    ok, msg = send_mail(email, f'【面试邀请】{position} - {time_str}', html,
+                        account_id=_sender_account_id(book.resume_id), mail_type='invite')
     _record_invite_sent(book, ok, msg, email)
     return ok, msg
 
@@ -272,7 +290,8 @@ def send_offer_email(offer):
       <p style="color:#999;font-size:12px">如按钮无法点击，请复制链接到浏览器打开：{url}</p>
     </div>"""
 
-    return send_mail(email, f'【录用通知】{position} Offer', html)
+    return send_mail(email, f'【录用通知】{position} Offer', html,
+                     account_id=_sender_account_id(offer.resume_id), mail_type='offer')
 
 
 # ===========================================================================
@@ -333,7 +352,8 @@ def _send_entry_pack_email(offer, pack):
       <ul style="line-height:2">{items_html}</ul>
       <p>{pack.get('notes', '')}</p>
     </div>"""
-    return send_mail(email, f'【入职指引】{pack.get("position", "")} 入职材料清单', html)
+    return send_mail(email, f'【入职指引】{pack.get("position", "")} 入职材料清单', html,
+                     account_id=_sender_account_id(offer.resume_id), mail_type='entry')
 
 
 def _record_invite_sent(book, ok, msg, email):

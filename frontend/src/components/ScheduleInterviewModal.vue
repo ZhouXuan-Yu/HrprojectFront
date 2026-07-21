@@ -228,16 +228,39 @@ const selectedDemandNo = ref('');
 async function loadOptions() {
   try {
     const [t, d] = await Promise.all([fetchTalent(), fetchDemands()]);
-    candidateOptions.value = (t && t.data) || [];
+    // fetchTalent 返回 { ext: [...], total }，不是 { data }
+    candidateOptions.value = (t && (t.ext || t.data)) || [];
     demandOptions.value = ((d && d.data) || []).filter(x => x.status !== 'closed');
-    // 若调用方已带候选人/岗位名称（如从列表行发起），预选匹配项
-    if (props.candidate?.name) {
-      const hit = candidateOptions.value.find(c => c.name === props.candidate.name);
-      if (hit) selectedCandidateNo.value = hit.id;
+
+    // 预选：优先按 id（候选人编号/需求编号）精确匹配，再按名称兜底
+    if (props.candidate?.id || props.candidate?.name) {
+      let hit = props.candidate.id
+        ? candidateOptions.value.find(c => c.id === props.candidate.id) : null;
+      if (!hit && props.candidate.name) {
+        hit = candidateOptions.value.find(c => c.name === props.candidate.name);
+      }
+      if (hit) {
+        selectedCandidateNo.value = hit.id;
+      } else if (props.candidate.id || props.candidate.name) {
+        // 列表里查不到（如分页/筛选缺失）时直接注入当前候选人，确保约面对象就是本人
+        const injected = { id: props.candidate.id || props.candidate.name, name: props.candidate.name || props.candidate.id };
+        candidateOptions.value = [injected, ...candidateOptions.value];
+        selectedCandidateNo.value = injected.id;
+      }
     }
-    if (props.demand?.position) {
-      const hit = demandOptions.value.find(x => x.position === props.demand.position);
-      if (hit) selectedDemandNo.value = hit.id;
+    if (props.demand?.id || props.demand?.position) {
+      let hit = props.demand.id
+        ? demandOptions.value.find(x => x.id === props.demand.id) : null;
+      if (!hit && props.demand.position) {
+        hit = demandOptions.value.find(x => x.position === props.demand.position);
+      }
+      if (hit) {
+        selectedDemandNo.value = hit.id;
+      } else if (props.demand.id || props.demand.position) {
+        const injected = { id: props.demand.id || props.demand.position, position: props.demand.position || props.demand.id };
+        demandOptions.value = [injected, ...demandOptions.value];
+        selectedDemandNo.value = injected.id;
+      }
     }
   } catch (e) {
     console.warn('[ScheduleInterviewModal] loadOptions failed:', e);

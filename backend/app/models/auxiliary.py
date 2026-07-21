@@ -20,6 +20,19 @@ class RecruitMailAccount(BaseModel):
     last_sync_time = Column(DateTime, nullable=True, comment='最近同步时间')
 
 
+class MailLog(BaseModel):
+    """系统外发邮件日志：哪个邮箱 → 发给谁 → 什么内容 → 成功与否。"""
+    __tablename__ = 't_hr_mail_log'
+
+    sender_account_id = Column(BigInteger, nullable=True, comment='发件邮箱账号ID')
+    sender_email = Column(String(128), nullable=False, comment='发件邮箱地址')
+    recipient = Column(String(256), nullable=False, comment='收件邮箱地址')
+    subject = Column(String(256), nullable=False, comment='邮件主题')
+    mail_type = Column(String(32), nullable=False, default='other', comment='invite面试邀请/offer录用/entry入职包/test测试/other其他')
+    status = Column(Integer, nullable=False, default=1, comment='1成功 0失败')
+    error_msg = Column(String(512), nullable=True, comment='失败原因')
+
+
 class ChatLog(BaseModel):
     __tablename__ = 't_hr_chat_log'
 

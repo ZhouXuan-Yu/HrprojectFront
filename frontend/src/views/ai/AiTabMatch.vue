@@ -1,18 +1,20 @@
 <template>
   <div data-slot="ai-workspace">
-    <div data-slot="ai-conversation">
+    <AiConversation>
       <AiChatMessage role="ai" status="complete">
         <p>选择候选人和岗位，系统会基于简历画像和岗位 JD 进行多维匹配打分，并给出详细理由。</p>
       </AiChatMessage>
-      <AiChatMessage v-if="matchLoading && !matchStreamContent" role="ai" status="loading" />
 
-      <!-- Streaming content during match -->
-      <AiChatMessage
-        v-if="matchLoading && matchStreamContent"
-        role="ai"
-        status="streaming"
-        :streamingContent="matchStreamContent"
+      <!-- Thinking panel (思考 + 实时生成过程都在面板内) -->
+      <AiThinking
+        v-if="matchThinkingUsed"
+        :thinking="matchThinkingDisplay"
+        :active="matchLoading"
+        title="思考过程"
+        done-text="思考完成 · 点击展开"
       />
+
+      <AiChatMessage v-if="matchLoading && !matchStreamContent" role="ai" status="loading" />
 
       <AiChatMessage v-if="matchError && !matchLoading" role="ai" status="error">
         <template #error>{{ matchError }}</template>
@@ -28,7 +30,7 @@
               <div data-slot="ai-match-breakdown">
                 <div data-slot="ai-match-item"><span data-slot="ai-match-item-label">画像分</span><div class="progress-bar"><div class="progress-fill" :style="{ width: matchResult.profile_score + '%' }"></div></div><span data-slot="ai-match-item-val">{{ matchResult.profile_score }}</span></div>
                 <div data-slot="ai-match-item"><span data-slot="ai-match-item-label">匹配分</span><div class="progress-bar"><div class="progress-fill" :style="{ width: matchResult.match_score + '%' }"></div></div><span data-slot="ai-match-item-val">{{ matchResult.match_score }}</span></div>
-                <div data-slot="ai-match-item"><span data-slot="ai-match-item-label">综合等级</span><StatusBadge :type="matchResult.grade === 'A' ? 'done' : matchResult.grade === 'B' ? 'progress' : 'warn'">{{ matchResult.grade }} 级</StatusBadge></div>
+                <div data-slot="ai-match-item"><span data-slot="ai-match-item-label">综合等级</span><StatusBadge :type="matchResult.grade === 'A' || matchResult.grade === 'S' ? 'done' : matchResult.grade === 'B' ? 'progress' : 'warn'">{{ matchResult.grade }} 级</StatusBadge></div>
               </div>
             </div>
             <div data-slot="ai-jd-section"><div data-slot="ai-jd-section-title">匹配优势</div><ul data-slot="ai-jd-list"><li v-for="(s, i) in matchResult.strengths" :key="'s'+i">{{ s }}</li></ul></div>
@@ -38,7 +40,7 @@
         </AiChatMessage>
         <AiDisclaimer />
       </template>
-    </div>
+    </AiConversation>
     <div data-slot="ai-input-area">
       <div style="display:flex;gap:8px;margin-bottom:8px">
         <select v-model="matchForm.candidateId" style="flex:1;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;background:var(--c-card);color:var(--c-body)" aria-label="选择候选人">
@@ -59,7 +61,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, inject } from 'vue';
+import { ref, reactive, computed, inject } from 'vue';
+import AiConversation from '../../components/ai/AiConversation.vue';
+import AiThinking from '../../components/ai/AiThinking.vue';
 import AiChatMessage from '../../components/ai/AiChatMessage.vue';
 import AiSkeleton from '../../components/ai/AiSkeleton.vue';
 import AiDisclaimer from '../../components/ai/AiDisclaimer.vue';
@@ -71,7 +75,7 @@ const showToast = inject('showToast');
 const candidates = inject('aiCandidates');
 const demands = inject('aiDemands');
 
-// Streaming (SSE) for match
+// Streaming (SSE) for match — 流式优先，结构化缺失时用阻塞式 API 兜底补齐
 const {
   content: matchStreamContent,
   thinking: matchThinking,
@@ -86,46 +90,77 @@ const matchForm = reactive({ candidateId: '', demandId: '' });
 const matchResult = ref(null);
 const matchLoading = ref(false);
 const matchError = ref('');
+const matchThinkingUsed = ref(false);
 
-// Watch for match streaming completion
-watch([matchStreamContent, matchStreamResult, matchStreamError], () => {
-  if (matchStreamError.value) {
-    matchError.value = matchStreamError.value;
-    matchLoading.value = false;
-  }
-  if (!matchStreaming.value && matchStreamContent.value) {
-    matchResult.value = {
-      overall_score: matchStreamResult.value?.overall_score ?? 0,
-      profile_score: matchStreamResult.value?.profile_score ?? 0,
-      match_score: matchStreamResult.value?.match_score ?? 0,
-      grade: matchStreamResult.value?.grade ?? 'B',
-      reasons: matchStreamResult.value?.reasons || ['流式生成内容，请查看上方信息'],
-      missing_skills: matchStreamResult.value?.missing_skills || [],
-      strengths: matchStreamResult.value?.strengths || [],
-      disclaimer: matchStreamResult.value?.disclaimer || '此内容由AI生成，请人工审核确认后使用',
-    };
-    matchLoading.value = false;
-  }
+// 思考面板显示内容：静态思考提示 + 实时生成流（流式原文即生成过程）
+const matchThinkingDisplay = computed(() => {
+  const parts = [];
+  if (matchThinking.value) parts.push(matchThinking.value);
+  if (matchStreamContent.value) parts.push(matchStreamContent.value);
+  return parts.join('\n');
 });
+
+// --- 结构化字段归一化（兼容后端返回字符串数组的旧格式） ---
+function _nonEmptyArr(v) { return Array.isArray(v) && v.length > 0; }
+
+function _asStrList(list) {
+  if (!_nonEmptyArr(list)) return [];
+  return list
+    .map((x) => (typeof x === 'string' ? x : (x?.skill || x?.name || '')))
+    .filter(Boolean);
+}
+
+function _asMissingRows(list) {
+  if (!_nonEmptyArr(list)) return [];
+  return list
+    .map((ms) => (typeof ms === 'string'
+      ? { skill: ms, importance: '待补足', note: '' }
+      : { skill: ms?.skill || '', importance: ms?.importance || '待补足', note: ms?.note || '' }))
+    .filter((ms) => ms.skill);
+}
 
 async function runMatch() {
   if (!matchForm.candidateId || !matchForm.demandId) return;
-  matchError.value = ''; matchLoading.value = true;
-  try {
-    await startMatchStream('match', { candidate_id: matchForm.candidateId, demand_id: matchForm.demandId });
-    showToast('匹配完成');
-  } catch (e) {
-    // Fallback to blocking API
-    matchLoading.value = true;
+  matchError.value = ''; matchLoading.value = true; matchResult.value = null; matchThinkingUsed.value = true;
+
+  // 1) 流式匹配（useStreaming 内部捕获异常，不会 reject）
+  await startMatchStream('match', { candidate_id: matchForm.candidateId, demand_id: matchForm.demandId });
+
+  // 2) 结构化字段缺失（流式解析失败）时，调用阻塞式 API 补齐
+  const sr = matchStreamResult.value || {};
+  const incomplete = sr.profile_score == null || sr.match_score == null || !sr.grade || !_nonEmptyArr(sr.reasons);
+  let structured = sr;
+  if (incomplete) {
     try {
-      matchResult.value = await apiRunMatch({ candidate_id: matchForm.candidateId, demand_id: matchForm.demandId });
-      showToast('匹配完成');
-    } catch (e2) {
-      matchError.value = e2.message || '匹配失败，请重试';
-      showToast(matchError.value);
-    }
-    matchLoading.value = false;
+      const blocking = await apiRunMatch({ candidate_id: matchForm.candidateId, demand_id: matchForm.demandId });
+      structured = {
+        profile_score: sr.profile_score ?? blocking.profile_score,
+        match_score: sr.match_score ?? blocking.match_score,
+        overall_score: sr.overall_score ?? blocking.overall_score,
+        grade: sr.grade || blocking.grade,
+        reasons: _nonEmptyArr(sr.reasons) ? sr.reasons : blocking.reasons,
+        missing_skills: _nonEmptyArr(sr.missing_skills) ? sr.missing_skills : blocking.missing_skills,
+        strengths: _nonEmptyArr(sr.strengths) ? sr.strengths : blocking.strengths,
+        disclaimer: sr.disclaimer || blocking.disclaimer,
+      };
+    } catch (_e) { /* 保留流式已拿到的部分 */ }
   }
+
+  // 3) 汇总结果
+  const profileScore = structured.profile_score ?? 0;
+  const matchScore = structured.match_score ?? 0;
+  matchResult.value = {
+    overall_score: structured.overall_score ?? Math.round((profileScore + matchScore) / 2),
+    profile_score: profileScore,
+    match_score: matchScore,
+    grade: structured.grade || 'B',
+    reasons: _asStrList(structured.reasons),
+    missing_skills: _asMissingRows(structured.missing_skills),
+    strengths: _asStrList(structured.strengths),
+    disclaimer: structured.disclaimer || '此内容由AI生成，请人工审核确认后使用',
+  };
+  matchLoading.value = false;
+  showToast('匹配完成');
 }
 </script>
 

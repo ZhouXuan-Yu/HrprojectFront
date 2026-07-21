@@ -1,9 +1,16 @@
 <template>
   <div data-slot="ai-workspace">
-    <div data-slot="ai-conversation">
+    <AiConversation>
       <AiChatMessage role="ai" status="complete">
         <p>根据候选人简历和岗位 JD，AI 自动生成针对性面试问题。选择上下文信息后开始生成。</p>
       </AiChatMessage>
+      <AiThinking
+        v-if="interviewProcHasRun"
+        :steps="interviewProcSteps"
+        :active="interviewProcActive"
+        title="处理过程"
+        done-text="处理完成 · 点击展开"
+      />
       <AiChatMessage v-if="interviewLoading" role="ai" status="loading" />
       <AiChatMessage v-if="interviewError && !interviewLoading" role="ai" status="error">
         <template #error>{{ interviewError }}</template>
@@ -26,7 +33,7 @@
         </AiChatMessage>
         <AiDisclaimer />
       </template>
-    </div>
+    </AiConversation>
     <div data-slot="ai-input-area">
       <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
         <select v-model="interviewForm.candidateId" style="flex:1;min-width:130px;padding:7px 10px;border:1px solid var(--c-border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;background:var(--c-card);color:var(--c-body)" aria-label="选择候选人">
@@ -51,11 +58,14 @@
 
 <script setup>
 import { ref, reactive, inject } from 'vue';
+import AiConversation from '../../components/ai/AiConversation.vue';
+import AiThinking from '../../components/ai/AiThinking.vue';
 import AiChatMessage from '../../components/ai/AiChatMessage.vue';
 import AiSkeleton from '../../components/ai/AiSkeleton.vue';
 import AiDisclaimer from '../../components/ai/AiDisclaimer.vue';
 import StatusBadge from '../../components/StatusBadge.vue';
 import { runInterviewQuestions } from '../../api/ai.js';
+import { useProcessingSteps } from '../../composables/useProcessingSteps.js';
 
 const showToast = inject('showToast');
 const candidates = inject('aiCandidates');
@@ -68,12 +78,22 @@ const interviewLoading = ref(false);
 const interviewError = ref('');
 const expandedHints = ref({});
 
+// 分步处理过程（诚实标注为「处理过程」，非真实 AI 思考链）
+const {
+  steps: interviewProcSteps,
+  active: interviewProcActive,
+  hasRun: interviewProcHasRun,
+  start: interviewProcStart,
+  finish: interviewProcFinish,
+} = useProcessingSteps(['读取候选人画像', '分析岗位 JD', '生成面试问题', '校验维度覆盖']);
+
 async function generateQuestions() {
   if (!interviewForm.candidateId || !interviewForm.demandId) return;
   interviewError.value = ''; interviewLoading.value = true;
+  interviewProcStart();
   try { const r = await runInterviewQuestions({ candidate_id: interviewForm.candidateId, demand_id: interviewForm.demandId, round: interviewForm.round }); interviewQuestions.value = r.questions || []; expandedHints.value = {}; showToast('生成 ' + interviewQuestions.value.length + ' 个问题'); }
   catch (e) { interviewError.value = e.message || '生成失败，请重试'; showToast(interviewError.value); }
-  finally { interviewLoading.value = false; }
+  finally { interviewProcFinish(); interviewLoading.value = false; }
 }
 function toggleHint(i) { expandedHints.value = { ...expandedHints.value, [i]: !expandedHints.value[i] }; }
 </script>

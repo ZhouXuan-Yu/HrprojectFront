@@ -8,6 +8,19 @@
 
 **最终验证**：18/18 backend ✅ + build ✅ + 45/45 E2E ✅（commit `a8b991c`）
 
+### 2026-07-21 思考过程面板内容修正 ✅
+
+- 问题：流式生成原文显示在思考面板**外面**的 AI 气泡里（裸 JSON），思考面板内只有静态提示
+- 修复：JD/匹配 tab 的实时生成流并入 AiThinking 面板（静态提示 + 生成原文拼接），删除裸 JSON 流式气泡；AiThinking 文本体限高 240px + 流式期间自动跟随滚动到底
+- E2E **49/49**，build 504ms
+
+### 2026-07-21 招聘辅助中心 6 工作台改造 ✅
+
+- **结构化输出缺失修复**：JD_GENERATE_SYSTEM/MATCH_SYSTEM 强制纯 JSON 输出（禁围栏）；流式端 `_parse_accumulated_json` 加尾逗号容错；前端流式结束后结构化字段缺失时自动调阻塞式 API 字段级补齐 —— 岗位职责/必备技能/任职资格/待补足技能永远有内容
+- **思考过程可视化**：新增 `AiThinking.vue`（可折叠面板，active 自动展开/完成自动收起，text 流式 + steps 分步两种模式）+ `AiConversation.vue`（转译 HeroUIPro chat-conversation：role="log"、ResizeObserver 自动跟随滚动、回到底部按钮）；JD/Match 接真实 thinking，4 个阻塞 tab 用 steps 模式并诚实标注「处理过程」
+- **隐藏 bug 修复**：RecruitAI 候选人下拉 `talentRes.data`→`talentRes.ext`；AiTabSearch 输入框永禁用的鸡生蛋 bug
+- E2E 46→**49/49**，pytest **33/33**，build 782ms
+
 ### 2026-07-21 简历处理管道可视化 + 入库不显示 bug 修复 ✅
 
 - **根因 bug**：`fetchTalent()` 读 `r.data.items`，但 `success_list()` 契约是 `r.data` 直接为数组 → 人才库永远渲染 mock 数据，真实入库简历从不显示。已修复并按 `pageSize=100` 拉取

@@ -1,22 +1,23 @@
 <template>
   <div data-slot="ai-workspace">
-    <!-- Conversation area -->
-    <div data-slot="ai-conversation">
+    <!-- Conversation area (auto-follow scroll + back-to-bottom) -->
+    <AiConversation>
       <!-- AI intro -->
       <AiChatMessage role="ai" status="complete">
         <p>输入岗位信息，我帮你生成结构化的 JD 草稿，包括岗位职责、必备技能、加分项和任职资格。所有内容需人工审核确认后使用。</p>
       </AiChatMessage>
 
-      <!-- Loading -->
-      <AiChatMessage v-if="jdLoading && !jdStreamContent" role="ai" status="loading" />
-
-      <!-- Streaming content (shown during SSE, before final parse) -->
-      <AiChatMessage
-        v-if="jdLoading && jdStreamContent"
-        role="ai"
-        status="streaming"
-        :streamingContent="jdStreamContent"
+      <!-- Thinking panel (思考 + 实时生成过程都在面板内) -->
+      <AiThinking
+        v-if="jdThinkingUsed"
+        :thinking="jdThinkingDisplay"
+        :active="jdLoading"
+        title="思考过程"
+        done-text="思考完成 · 点击展开"
       />
+
+      <!-- Loading（流式内容开始前） -->
+      <AiChatMessage v-if="jdLoading && !jdStreamContent" role="ai" status="loading" />
 
       <!-- Error -->
       <AiChatMessage v-if="jdError && !jdLoading" role="ai" status="error">
@@ -30,6 +31,12 @@
             <div data-slot="ai-jd-header">
               <h4>{{ jdResult.position }}</h4>
               <span data-slot="ai-jd-dept">{{ jdResult.department }}</span>
+            </div>
+            <div v-if="jdResult.jd_text" data-slot="ai-jd-section">
+              <div data-slot="ai-jd-section-title">JD 全文</div>
+              <div data-slot="ai-jd-fulltext">
+                <AiMarkdown :content="jdResult.jd_text" />
+              </div>
             </div>
             <div data-slot="ai-jd-section">
               <div data-slot="ai-jd-section-title">岗位职责</div>
@@ -66,7 +73,7 @@
         </AiChatMessage>
         <AiDisclaimer />
       </template>
-    </div>
+    </AiConversation>
 
     <!-- Input area -->
     <div data-slot="ai-input-area">
@@ -96,30 +103,39 @@
 
 <script setup>
 import { ref, reactive, computed, watch, inject } from 'vue';
+import AiConversation from '../../components/ai/AiConversation.vue';
+import AiThinking from '../../components/ai/AiThinking.vue';
 import AiChatMessage from '../../components/ai/AiChatMessage.vue';
 import AiPromptInput from '../../components/ai/AiPromptInput.vue';
-import AiSkeleton from '../../components/ai/AiSkeleton.vue';
+import AiMarkdown from '../../components/ai/AiMarkdown.vue';
 import AiDisclaimer from '../../components/ai/AiDisclaimer.vue';
 import StatusBadge from '../../components/StatusBadge.vue';
 import { MOCK_DEPARTMENTS } from '../../data/ai.js';
 import { runJdGenerate } from '../../api/ai.js';
 import { useStreaming } from '../../composables/useStreaming.js';
-import { useClipboard } from '../../composables/useClipboard.js';
 
 const showToast = inject('showToast');
-const { copy, copied } = useClipboard();
 
 const levels = ['初级', '中级', '高级', '资深', '专家'];
-const qualLabels = { education: '学历', experience: '经验', industry: '行业', soft: '软技能' };
+const qualLabels = { education: '学历', experience: '经验', industry: '行业', soft: '软技能', others: '其他' };
 const departments = MOCK_DEPARTMENTS;
 
 const jdForm = reactive({ position: '', department: '', level: '高级', requirements: '' });
 const jdResult = ref(null);
 const jdLoading = ref(false);
 const jdError = ref('');
+const jdThinkingUsed = ref(false);
 const jdStatus = computed(() => jdLoading.value ? 'submitted' : (jdError.value ? 'error' : 'ready'));
 
-// Streaming (SSE) — tries streaming first, falls back to blocking
+// 思考面板显示内容：静态思考提示 + 实时生成流（流式原文即生成过程）
+const jdThinkingDisplay = computed(() => {
+  const parts = [];
+  if (jdThinking.value) parts.push(jdThinking.value);
+  if (jdStreamContent.value) parts.push(jdStreamContent.value);
+  return parts.join('\n');
+});
+
+// Streaming (SSE) — 流式优先，结构化缺失时用阻塞式 API 兜底补齐
 const {
   content: jdStreamContent,
   thinking: jdThinking,
@@ -130,52 +146,93 @@ const {
   stop: stopJdStream,
 } = useStreaming();
 
-// Watch for streaming completion and set jdResult
-watch([jdStreamContent, jdStreamResult, jdStreamError], () => {
-  if (jdStreamError.value) {
-    jdError.value = jdStreamError.value;
-    jdLoading.value = false;
+// --- 结构化字段归一化（兼容后端返回字符串数组的旧格式） ---
+function _nonEmptyArr(v) { return Array.isArray(v) && v.length > 0; }
+
+function _asStrList(list) {
+  if (!_nonEmptyArr(list)) return [];
+  return list
+    .map((x) => (typeof x === 'string' ? x : (x?.name || x?.skill || '')))
+    .filter(Boolean);
+}
+
+function _asSkillRows(list, defaultWeight) {
+  if (!_nonEmptyArr(list)) return [];
+  return list
+    .map((s) => (typeof s === 'string'
+      ? { name: s, weight: defaultWeight, description: '' }
+      : { name: s?.name || '', weight: s?.weight || defaultWeight, description: s?.description || '' }))
+    .filter((s) => s.name);
+}
+
+function _asPlusRows(list) {
+  if (!_nonEmptyArr(list)) return [];
+  return list
+    .map((s) => (typeof s === 'string'
+      ? { name: s, description: '' }
+      : { name: s?.name || '', description: s?.description || '' }))
+    .filter((s) => s.name);
+}
+
+function _asQual(q) {
+  if (!q || typeof q !== 'object') return {};
+  const out = {};
+  for (const [k, v] of Object.entries(q)) {
+    const val = Array.isArray(v) ? v.join('；') : String(v ?? '');
+    if (val) out[k] = val;
   }
-  if (!jdStreaming.value && jdStreamContent.value) {
-    // Parse the markdown stream into structured JD
-    jdResult.value = {
-      jd_text: jdStreamContent.value,
-      position: jdForm.position,
-      department: jdForm.department,
-      // Fallback structure if streaming didn't provide result keys
-      responsibilities: jdStreamResult.value?.responsibilities || ['（AI 流式生成的内容，请查看上方 Markdown）'],
-      required_skills: jdStreamResult.value?.required_skills || [],
-      plus_skills: jdStreamResult.value?.plus_skills || [],
-      qualifications: jdStreamResult.value?.qualifications || {},
-      disclaimer: jdStreamResult.value?.disclaimer || '此内容由AI生成，请人工审核确认后使用',
-    };
-    jdLoading.value = false;
+  return out;
+}
+
+function _hasQual(q) { return q && typeof q === 'object' && Object.keys(q).length > 0; }
+
+async function generateJd() {
+  if (!jdForm.position || !jdForm.department) return;
+  jdError.value = ''; jdLoading.value = true; jdResult.value = null; jdThinkingUsed.value = true;
+
+  // 1) 流式生成（useStreaming 内部捕获异常，不会 reject）
+  await startJdStream('jd-generate', { ...jdForm });
+
+  // 2) 结构化字段缺失（流式解析失败）时，调用阻塞式 API 补齐；
+  //    流式的 Markdown 正文仍保留展示
+  const sr = jdStreamResult.value || {};
+  const incomplete = !_nonEmptyArr(sr.responsibilities) || !_nonEmptyArr(sr.required_skills);
+  let structured = sr;
+  if (incomplete) {
+    try {
+      const blocking = await runJdGenerate({ ...jdForm });
+      structured = {
+        responsibilities: _nonEmptyArr(sr.responsibilities) ? sr.responsibilities : blocking.responsibilities,
+        required_skills: _nonEmptyArr(sr.required_skills) ? sr.required_skills : blocking.required_skills,
+        plus_skills: _nonEmptyArr(sr.plus_skills) ? sr.plus_skills : blocking.plus_skills,
+        qualifications: _hasQual(sr.qualifications) ? sr.qualifications : blocking.qualifications,
+        jd_text: sr.jd_text || blocking.jd_text,
+        disclaimer: sr.disclaimer || blocking.disclaimer,
+      };
+    } catch (_e) { /* 保留流式已拿到的部分 */ }
   }
-});
+
+  // 3) 汇总结果
+  let jdText = jdStreamContent.value || structured.jd_text || '';
+  // 流式正文若是纯 JSON（新提示词的标准输出），展示结构化 jd_text 字段
+  if (jdText.trim().startsWith('{')) jdText = structured.jd_text || '';
+
+  jdResult.value = {
+    jd_text: jdText,
+    position: jdForm.position,
+    department: jdForm.department,
+    responsibilities: _asStrList(structured.responsibilities),
+    required_skills: _asSkillRows(structured.required_skills, '必须'),
+    plus_skills: _asPlusRows(structured.plus_skills),
+    qualifications: _asQual(structured.qualifications),
+    disclaimer: structured.disclaimer || '此内容由AI生成，请人工审核确认后使用',
+  };
+  jdLoading.value = false;
+  showToast('JD 草稿生成完成');
+}
 
 // Watch: clear error on input change
 watch(() => jdForm.requirements, () => { if (jdError.value) jdError.value = ''; });
-
-// Override generateJd to use streaming
-async function generateJd() {
-  if (!jdForm.position || !jdForm.department) return;
-  jdError.value = ''; jdLoading.value = true;
-  try {
-    await startJdStream('jd-generate', { ...jdForm });
-    showToast('JD 草稿生成完成');
-  } catch (e) {
-    // Fallback to blocking API
-    jdLoading.value = true;
-    try {
-      jdResult.value = await runJdGenerate({ ...jdForm });
-      showToast('JD 草稿生成完成');
-    } catch (e2) {
-      jdError.value = e2.message || '生成失败，请重试';
-      showToast(jdError.value);
-    }
-    jdLoading.value = false;
-  }
-}
 </script>
 
 <style scoped>
@@ -205,6 +262,7 @@ async function generateJd() {
 [data-slot="ai-jd-section"] { margin-bottom:16px }
 [data-slot="ai-jd-section-title"] { font-size:12px;font-weight:700;color:var(--c-text);margin-bottom:8px;display:flex;align-items:center;gap:6px }
 [data-slot="ai-jd-section-title"]::before { content:'';width:3px;height:12px;background:var(--c-primary);border-radius:2px }
+[data-slot="ai-jd-fulltext"] { padding:12px 14px;background:var(--c-surface-elevated);border:1px solid var(--c-border-light);border-radius:var(--radius-sm);max-height:280px;overflow-y:auto }
 [data-slot="ai-jd-list"] { padding-left:16px;font-size:13px;color:var(--c-body);line-height:2 }
 [data-slot="ai-jd-skill-table"] { border:1px solid var(--c-border);border-radius:var(--radius-sm);overflow:hidden }
 [data-slot="ai-jd-skill-row"] { display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--c-border-light);font-size:12px }
@@ -226,6 +284,7 @@ input:focus-visible, select:focus-visible { outline:2px solid var(--c-primary);o
   [data-slot="ai-jd-info-grid"] { grid-template-columns: 1fr; }
   [data-slot="ai-jd-skill-row"] { flex-wrap: wrap; gap: 4px; }
   [data-slot="ai-jd-skill-name"] { min-width: auto; }
+  [data-slot="ai-jd-fulltext"] { max-height: 200px; padding: 10px 12px; }
   [data-slot="ai-input-area"] input,
   [data-slot="ai-input-area"] select { min-width: 100%; }
 }
