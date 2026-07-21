@@ -24,12 +24,18 @@
         <!-- Candidate & Demand info -->
         <div class="schedule-meta">
           <div class="meta-item">
-            <span class="meta-label">候选人</span>
-            <span class="meta-value">{{ candidate?.name || '—' }}</span>
+            <span class="meta-label">候选人 <span class="required">*</span></span>
+            <select v-model="selectedCandidateNo" class="form-select meta-select">
+              <option value="" disabled>请选择候选人</option>
+              <option v-for="c in candidateOptions" :key="c.id" :value="c.id">{{ c.name }}（{{ c.id }}）</option>
+            </select>
           </div>
           <div class="meta-item">
-            <span class="meta-label">应聘岗位</span>
-            <span class="meta-value">{{ demand?.position || '—' }}</span>
+            <span class="meta-label">应聘岗位 <span class="required">*</span></span>
+            <select v-model="selectedDemandNo" class="form-select meta-select">
+              <option value="" disabled>请选择岗位</option>
+              <option v-for="d in demandOptions" :key="d.id" :value="d.id">{{ d.position }}（{{ d.id }}）</option>
+            </select>
           </div>
         </div>
 
@@ -167,6 +173,11 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue';
 import { createInterview } from '../api/interview.js';
+import { fetchTalent } from '../api/talent.js';
+import { fetchDemands } from '../api/demand.js';
+import { useToast } from '../composables/useToast.js';
+
+const { toast } = useToast();
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -209,8 +220,39 @@ function createEmptyRound() {
 const rounds = ref([createEmptyRound()]);
 const submitting = ref(false);
 
+const candidateOptions = ref([]);
+const demandOptions = ref([]);
+const selectedCandidateNo = ref('');
+const selectedDemandNo = ref('');
+
+async function loadOptions() {
+  try {
+    const [t, d] = await Promise.all([fetchTalent(), fetchDemands()]);
+    candidateOptions.value = (t && t.data) || [];
+    demandOptions.value = ((d && d.data) || []).filter(x => x.status !== 'closed');
+    // 若调用方已带候选人/岗位名称（如从列表行发起），预选匹配项
+    if (props.candidate?.name) {
+      const hit = candidateOptions.value.find(c => c.name === props.candidate.name);
+      if (hit) selectedCandidateNo.value = hit.id;
+    }
+    if (props.demand?.position) {
+      const hit = demandOptions.value.find(x => x.position === props.demand.position);
+      if (hit) selectedDemandNo.value = hit.id;
+    }
+  } catch (e) {
+    console.warn('[ScheduleInterviewModal] loadOptions failed:', e);
+    toast.error('候选人/岗位列表加载失败，请确认后端服务已启动后重试');
+  }
+}
+
+const selectedCandidate = computed(() =>
+  candidateOptions.value.find(c => c.id === selectedCandidateNo.value) || null);
+const selectedDemand = computed(() =>
+  demandOptions.value.find(d => d.id === selectedDemandNo.value) || null);
+
 const isValid = computed(() => {
-  return rounds.value.every((r) => r.interviewer && r.mode && r.date && r.time);
+  return selectedCandidateNo.value && selectedDemandNo.value &&
+    rounds.value.every((r) => r.interviewer && r.mode && r.date && r.time);
 });
 
 function onModeChange(round) {
@@ -254,10 +296,12 @@ async function handleSubmit() {
     for (let i = 0; i < rounds.value.length; i++) {
       const r = rounds.value[i];
       const payload = {
-        candidate_id: props.candidate?.id || '',
-        candidate: props.candidate?.name || '',
-        position: props.demand?.position || '',
-        demand_id: props.demand?.id || '',
+        candidate_id: selectedCandidateNo.value,
+        candidateNo: selectedCandidateNo.value,
+        candidate: selectedCandidate.value?.name || props.candidate?.name || '',
+        position: selectedDemand.value?.position || props.demand?.position || '',
+        demand_id: selectedDemandNo.value,
+        demandNo: selectedDemandNo.value,
         round: i + 1,
         total_rounds: rounds.value.length,
         interviewer_id: r.interviewer,
@@ -287,6 +331,9 @@ watch(
   (v) => {
     if (v) {
       resetForm();
+      selectedCandidateNo.value = '';
+      selectedDemandNo.value = '';
+      loadOptions();
     }
   }
 );
@@ -401,6 +448,11 @@ watch(
 .meta-value {
   color: var(--e-text, #172033);
   font-weight: 600;
+}
+
+.meta-select {
+  min-width: 180px;
+  height: 32px;
 }
 
 /* ===== Body / rounds ===== */

@@ -170,7 +170,8 @@ test('dashboard exposes executive recruiting overview and linked work queues', a
 });
 
 test('non-dashboard pages expose page-level operational workspaces', async ({ page }) => {
-  const workspacePages = pages.filter(([path]) => !path.includes('dashboard'));
+  // /recruit-talent 的人才资产工作台已按需求替换为「简历处理管道」面板（Vue 原生渲染）
+  const workspacePages = pages.filter(([path]) => !path.includes('dashboard') && !path.includes('recruit-talent'));
   for (const [path] of workspacePages) {
     await page.goto(path);
     await expect(page.locator('.hero-page-command')).toBeVisible();
@@ -178,6 +179,17 @@ test('non-dashboard pages expose page-level operational workspaces', async ({ pa
     await expect(page.locator('.hero-page-workspace .hero-bottleneck-list')).toBeVisible();
     await expect(page.locator('.hero-page-workspace .hero-next-list')).toBeVisible();
   }
+});
+
+test('talent library exposes resume ingestion pipeline panel', async ({ page }) => {
+  await page.goto('/recruit-talent');
+  // 原「人才资产工作台」已移除，替换为简历处理管道
+  await expect(page.locator('.pipeline-panel')).toBeVisible();
+  await expect(page.locator('.pipeline-panel .pp-title')).toContainText('简历处理管道');
+  await expect(page.locator('.pipeline-panel .pp-log-title')).toContainText('最近入库');
+  // 简历储备库 tab 行最右侧有手动刷新按钮
+  await expect(page.locator('.tabs .mail-sync-btn')).toBeVisible();
+  await expect(page.locator('.tabs .mail-sync-btn')).toContainText('刷新邮箱简历');
 });
 
 test('core data components expose density, sorting, reset, KPI context, and dialog semantics', async ({ page }) => {

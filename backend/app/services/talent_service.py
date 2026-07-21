@@ -365,9 +365,31 @@ def get_match_results(demand_id):
 def get_candidate_detail(candidate_id):
     """Return single candidate detail for drawer view. DB-first, mock fallback."""
     try:
-        from app.models.candidate import Candidate
+        from app.models.candidate import Candidate, Resume
+        from app.models.infrastructure import File
         c = Candidate.query.filter_by(candidate_no=candidate_id, is_deleted=0).first()
         if c:
+            # 最新一份简历的解析结果与原件信息
+            resume_info = None
+            resume = (Resume.query.filter_by(candidate_id=c.id, is_deleted=0)
+                      .order_by(Resume.storage_time.desc()).first())
+            if resume:
+                ext = resume.extract_json or {}
+                file_name = None
+                if resume.resume_file_id:
+                    f = File.query.filter_by(id=resume.resume_file_id, is_deleted=0).first()
+                    file_name = f.file_name if f else None
+                resume_info = {
+                    'resumeId': resume.id,
+                    'fileName': file_name,
+                    'parseEngine': ext.get('parse_engine', '—'),
+                    'parsedAt': ext.get('parsed_at', '—'),
+                    'summary': resume.work_exp_text or ext.get('summary', ''),
+                    'skills': ext.get('skills', []),
+                    'certs': ext.get('certs', []),
+                    'recentCompany': ext.get('recent_company', ''),
+                    'storageTime': resume.storage_time.strftime('%Y-%m-%d %H:%M') if resume.storage_time else '—',
+                }
             return {
                 'id': c.candidate_no,
                 'name': c.candidate_name,
@@ -386,6 +408,7 @@ def get_candidate_detail(candidate_id):
                 'email': c.email or '—',
                 'blackFlag': bool(c.black_flag),
                 'schoolLevel': {1:'普通',2:'211',3:'985',4:'C9'}.get(c.school_level, '—'),
+                'resume': resume_info,
             }
     except Exception as exc:
         log.error("DB query failed in get_candidate_detail: %s", exc, exc_info=True)
@@ -397,8 +420,78 @@ def get_candidate_detail(candidate_id):
         'skills': [], 'company': '—', 'source': '—', 'inDate': '—',
         'status': 'available', 'statusLabel': '可联系', 'note': '',
         'mobile': '—', 'email': '—', 'blackFlag': False, 'schoolLevel': '—',
+        'resume': None,
         '_fallback': True,
     }
+
+
+def get_candidate_contact(candidate_id):
+    """Return full (unmasked) contact info for the explicit contact action.
+
+    Auth-protected route; every access is audit-logged by the API layer.
+    DB-first, mock fallback. Returns None when the candidate is unknown.
+    """
+    if _mock_enabled():
+        mock = {
+            'C2026070012': ('张三', '13812345678', 'zhangsan@example.com'),
+            'C2026070010': ('郑一', '13923456789', 'zhengyi@example.com'),
+            'C2026070011': ('李四', '13734567890', 'lisi@example.com'),
+        }.get(candidate_id)
+        if mock:
+            return {'id': candidate_id, 'name': mock[0], 'mobile': mock[1], 'email': mock[2]}
+        return {'id': candidate_id, 'name': str(candidate_id), 'mobile': '13800001111',
+                'email': f'{candidate_id}@example.com'.lower()}
+    try:
+        from app.models.candidate import Candidate
+        c = Candidate.query.filter_by(candidate_no=candidate_id, is_deleted=0).first()
+        if not c:
+            return None
+        return {
+            'id': c.candidate_no,
+            'name': c.candidate_name,
+            'mobile': c.mobile or '',
+            'email': c.email or '',
+        }
+    except Exception as exc:
+        log.warning('get_candidate_contact DB failed: %s', exc)
+        return None
+
+
+def get_ingest_log(limit=10):
+    """Recent resume ingestions (email sync / manual upload) for the pipeline panel.
+
+    Returns newest-first list: candidate, source, parse engine, timestamps.
+    DB-first; returns [] on failure or when mock fallback is active.
+    """
+    if _mock_enabled():
+        return []
+    try:
+        from app.models.candidate import Candidate, Resume
+        rows = (Resume.query.filter(Resume.is_deleted == 0)
+                .order_by(Resume.storage_time.desc())
+                .limit(max(1, min(50, int(limit)))).all())
+        if not rows:
+            return []
+        cand_ids = {r.candidate_id for r in rows}
+        cands = {c.id: c for c in Candidate.query.filter(Candidate.id.in_(cand_ids)).all()}
+        items = []
+        for r in rows:
+            c = cands.get(r.candidate_id)
+            ext = r.extract_json or {}
+            items.append({
+                'resumeId': r.id,
+                'candidate': c.candidate_name if c else f'#{r.candidate_id}',
+                'candidateNo': c.candidate_no if c else '',
+                'source': c.source_channel if c and c.source_channel else '邮箱',
+                'engine': ext.get('parse_engine', '—'),
+                'parsedAt': ext.get('parsed_at', ''),
+                'storageTime': r.storage_time.strftime('%Y-%m-%d %H:%M') if r.storage_time else '',
+                'summary': (r.work_exp_text or '')[:60],
+            })
+        return items
+    except Exception as exc:
+        log.warning('get_ingest_log DB failed: %s', exc)
+        return []
 
 
 def get_employee_detail(employee_id):

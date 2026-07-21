@@ -163,10 +163,15 @@ async function handleSubmit() {
   };
 
   try {
+    if (!props.resumeId || !props.demand?.id) {
+      submitting.value = false;
+      toast.error('该面试记录未关联候选人或岗位，无法发送 Offer');
+      return;
+    }
     const payload = {
-      resumeId: props.resumeId || 1,
+      resumeId: props.resumeId,
       processId: props.processId || 0,
-      demandId: props.demand?.id || 1,
+      demandId: props.demand.id,
       salaryJson,
       validDeadline: form.validDeadline,
       offerContent: form.content || generateDefaultContent(),

@@ -9,6 +9,9 @@ AUTH_WHITELIST = {
     'auth.login',
     'static',
     'health.health_check',
+    # 候选人确认页/提交 —— 通过签名 token 鉴权，无需登录
+    'confirm.confirm_page',
+    'confirm.confirm_submit',
     # Boss endpoints — auth is via boss-cli Puppeteer session, not JWT
     'boss.boss_login',
     'boss.get_status',

@@ -193,11 +193,22 @@ def send_offer(offer_id):
     db.session.commit()
     log.info("Offer sent: %s -> candidate(resume_id=%s)", offer_id, offer.resume_id)
 
+    # 发送 Offer 邮件（含候选人确认链接）—— best-effort
+    email_sent, email_msg = False, '未尝试'
+    try:
+        from app.services.confirm_service import send_offer_email
+        email_sent, email_msg = send_offer_email(offer)
+    except Exception as exc:
+        log.warning("Offer 邮件发送失败（best-effort）: %s", exc)
+        email_msg = str(exc)
+
     return {
         'sent': True,
         'id': offer_id,
         'sendTime': now.strftime('%Y-%m-%d %H:%M:%S'),
         'offerContent': offer.offer_content,
+        'emailSent': email_sent,
+        'emailMsg': email_msg,
     }
 
 

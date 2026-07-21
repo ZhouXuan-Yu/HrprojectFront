@@ -71,13 +71,26 @@ def get_recipient_open_id(name: str) -> Optional[str]:
 
 
 def _get_app_credentials() -> tuple:
-    """Return (app_id, app_secret) from env vars.  Raises RuntimeError if missing."""
+    """Return (app_id, app_secret).
+
+    Resolution order: environment variables first, then the encrypted values
+    saved on the config page (``feishu_app_id`` / ``feishu`` api-key entries).
+    Raises RuntimeError if the pair is incomplete.
+    """
     app_id = os.getenv("FEISHU_APP_ID", "")
     app_secret = os.getenv("FEISHU_APP_SECRET", "")
+    if not (app_id and app_secret):
+        try:
+            from app.services.config_service import get_decrypted_api_key
+            app_id = app_id or (get_decrypted_api_key('feishu_app_id') or '')
+            app_secret = app_secret or (get_decrypted_api_key('feishu') or '')
+        except Exception:
+            # Outside app context or config store unavailable — env-only mode.
+            pass
     if not app_id or not app_secret:
         raise RuntimeError(
-            "FEISHU_APP_ID and FEISHU_APP_SECRET must be set in the environment "
-            "to call the Feishu Open API.  Set FEISHU_MOCK_MODE=true to bypass."
+            "飞书凭证不完整：请在环境变量或「招聘基础配置 → API 密钥管理」中 "
+            "同时配置飞书 App ID 和 App Secret。Set FEISHU_MOCK_MODE=true to bypass."
         )
     return app_id, app_secret
 

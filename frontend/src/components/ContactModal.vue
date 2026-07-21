@@ -19,11 +19,45 @@
             <div style="display:flex;gap:10px;flex-wrap:wrap">
               <button v-for="ch in channels" :key="ch.key"
                 class="ct-channel-btn" :class="{ active: selectedChannel === ch.key }"
+                :disabled="!channelAvailable(ch.key)"
+                :title="channelDisabledReason(ch.key)"
                 @click="selectedChannel = ch.key"
               >
                 <span v-html="ch.icon"></span>
                 {{ ch.label }}
               </button>
+            </div>
+          </div>
+
+          <!-- 联系方式详情（简历识别提取） -->
+          <div class="ct-contact-card" v-if="contactLoading">
+            <span class="ct-loading">正在读取简历识别的联系方式...</span>
+          </div>
+          <div class="ct-contact-card" v-else-if="selectedChannel === 'phone'">
+            <template v-if="contact.mobile">
+              <div class="ct-contact-row">
+                <span class="ct-contact-label">手机号</span>
+                <span class="ct-contact-value">{{ contact.mobile }}</span>
+                <button class="btn btn-text btn-sm" @click="copyText(contact.mobile, '手机号')">复制</button>
+              </div>
+              <div class="ct-contact-hint">来自简历识别提取，点击「拨打并记录」唤起系统拨号。</div>
+            </template>
+            <div class="ct-contact-empty" v-else>简历中未识别到手机号，可查看简历原件手动补录。</div>
+          </div>
+          <div class="ct-contact-card" v-else-if="selectedChannel === 'email'">
+            <template v-if="contact.email">
+              <div class="ct-contact-row">
+                <span class="ct-contact-label">邮箱</span>
+                <span class="ct-contact-value">{{ contact.email }}</span>
+                <button class="btn btn-text btn-sm" @click="copyText(contact.email, '邮箱')">复制</button>
+              </div>
+              <div class="ct-contact-hint">来自简历识别提取，点击「写邮件并记录」唤起系统邮件客户端。</div>
+            </template>
+            <div class="ct-contact-empty" v-else>简历中未识别到邮箱，可查看简历原件手动补录。</div>
+          </div>
+          <div class="ct-contact-card" v-else>
+            <div class="ct-contact-hint">
+              飞书沟通请在飞书客户端中搜索候选人姓名发起，系统仅辅助记录联系动作。
             </div>
           </div>
         </div>
@@ -40,8 +74,14 @@
         <div class="ct-actions">
           <span v-if="isSubmitting" style="font-size:12px;color:var(--c-sub)">提交中...</span>
           <button class="btn btn-ghost btn-sm" @click="close">取消</button>
-          <button class="btn btn-primary btn-sm" :disabled="isSubmitting" @click="submit">
-            {{ isBatch ? '记录批量联系' : '发起联系并记录' }}
+          <template v-if="!isBatch && selectedChannel === 'phone' && contact.mobile">
+            <a class="btn btn-primary btn-sm ct-action-link" :href="`tel:${contact.mobile}`" @click="recordAction('电话')">拨打并记录</a>
+          </template>
+          <template v-else-if="!isBatch && selectedChannel === 'email' && contact.email">
+            <a class="btn btn-primary btn-sm ct-action-link" :href="`mailto:${contact.email}`" @click="recordAction('邮件')">写邮件并记录</a>
+          </template>
+          <button v-else class="btn btn-primary btn-sm" :disabled="isSubmitting" @click="submit">
+            {{ isBatch ? '记录批量联系' : '记录联系' }}
           </button>
         </div>
       </div>
@@ -50,8 +90,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import { recordTalentContact, batchContactCandidates } from '../api/talent.js';
+import { ref, computed, watch } from 'vue';
+import { recordTalentContact, batchContactCandidates, fetchCandidateContact } from '../api/talent.js';
+import { useToast } from '../composables/useToast.js';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -62,9 +103,12 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close', 'done']);
+const toast = useToast();
 
 const selectedChannel = ref('phone');
 const isSubmitting = ref(false);
+const contact = ref({ mobile: '', email: '' });
+const contactLoading = ref(false);
 
 const channels = [
   { key: 'phone', label: '电话', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>' },
@@ -72,17 +116,69 @@ const channels = [
   { key: 'feishu', label: '飞书', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' },
 ];
 
+function channelAvailable(key) {
+  if (key === 'phone') return !!contact.value.mobile;
+  if (key === 'email') return !!contact.value.email;
+  return true;
+}
+
+function channelDisabledReason(key) {
+  if (channelAvailable(key)) return '';
+  return key === 'phone' ? '简历中未识别到手机号' : '简历中未识别到邮箱';
+}
+
+// 打开弹窗时拉取简历识别提取的联系方式
+watch(() => props.visible, async (v) => {
+  if (!v || props.isBatch || !props.candidateId) return;
+  contactLoading.value = true;
+  contact.value = { mobile: '', email: '' };
+  try {
+    const res = await fetchCandidateContact(props.candidateId);
+    const data = (res && res.data) ? res.data : res;
+    contact.value = { mobile: data?.mobile || '', email: data?.email || '' };
+    // 默认选中第一个可用渠道
+    if (!contact.value.mobile && contact.value.email) selectedChannel.value = 'email';
+    else selectedChannel.value = 'phone';
+  } catch (e) {
+    console.warn('[ContactModal] fetch contact failed:', e);
+    contact.value = { mobile: '', email: '' };
+  } finally {
+    contactLoading.value = false;
+  }
+});
+
+async function copyText(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(`${label}已复制`);
+  } catch {
+    toast.warning('复制失败，请手动选择复制');
+  }
+}
+
 function close() {
   if (!isSubmitting.value) emit('close');
 }
 
+// 电话/邮件：外部动作由 tel:/mailto: 链接触发，这里同步记录联系
+async function recordAction(methodLabel) {
+  try {
+    await recordTalentContact(props.candidateId, methodLabel);
+    emit('done', { channel: selectedChannel.value, names: [props.candidateName] });
+  } catch (e) {
+    console.warn('[ContactModal] record failed:', e);
+    emit('done', { channel: selectedChannel.value, names: [props.candidateName], fallback: true });
+  }
+}
+
 async function submit() {
   isSubmitting.value = true;
+  const methodLabel = { phone: '电话', email: '邮件', feishu: '飞书' }[selectedChannel.value] || '系统记录';
   try {
     if (props.isBatch) {
-      await batchContactCandidates(props.selected, selectedChannel.value);
+      await batchContactCandidates(props.selected, methodLabel);
     } else {
-      await recordTalentContact(props.candidateId, selectedChannel.value);
+      await recordTalentContact(props.candidateId, methodLabel);
     }
     emit('done', { channel: selectedChannel.value, names: props.isBatch ? props.selected : [props.candidateName] });
   } catch (e) {
@@ -110,6 +206,16 @@ async function submit() {
 .ct-channel-btn { display: flex; align-items: center; gap: 6px; padding: 10px 16px; border: 1.5px solid var(--c-border); border-radius: 8px; background: transparent; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; color: var(--c-body); }
 .ct-channel-btn:hover { border-color: var(--c-primary); color: var(--c-primary); }
 .ct-channel-btn.active { border-color: var(--c-primary); background: var(--c-primary-subtle); color: var(--c-primary); }
+.ct-channel-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.ct-channel-btn:disabled:hover { border-color: var(--c-border); color: var(--c-body); }
+.ct-contact-card { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--e-border-soft, #EFF3F8); border-radius: 8px; background: var(--e-surface-soft, #F8FAFD); }
+.ct-contact-row { display: flex; align-items: center; gap: 10px; }
+.ct-contact-label { font-size: 12px; color: var(--c-sub); flex-shrink: 0; }
+.ct-contact-value { font-size: 15px; font-weight: 700; color: var(--c-text); font-variant-numeric: tabular-nums; letter-spacing: 0.3px; }
+.ct-contact-hint { margin-top: 8px; font-size: 12px; color: var(--c-sub); line-height: 1.5; }
+.ct-contact-empty { font-size: 13px; color: var(--c-warn); }
+.ct-loading { font-size: 12px; color: var(--c-sub); }
+.ct-action-link { text-decoration: none; }
 .ct-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 12px 20px; border-top: 1px solid var(--e-border-soft, #EFF3F8); }
 .btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
 .btn-primary { background: var(--c-primary); color: #fff; }

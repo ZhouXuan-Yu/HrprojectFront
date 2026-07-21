@@ -117,6 +117,15 @@
         <div class="secret-key-info">
           <div class="secret-key-label">{{ keyInfo.label }}</div>
           <div class="secret-key-desc">{{ keyInfo.desc }}</div>
+          <a
+            v-if="keyInfo.link"
+            class="secret-key-link"
+            :href="keyInfo.link"
+            target="_blank"
+            rel="noopener noreferrer"
+          >{{ keyInfo.link_text || '去获取密钥' }}
+            <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
         </div>
         <div class="secret-key-input-group">
           <input
@@ -133,17 +142,104 @@
             :aria-label="keyInfo.showInput ? '隐藏输入' : '显示输入'"
           >{{ keyInfo.showInput ? '隐藏' : '显示' }}</button>
           <button
+            class="btn btn-text btn-sm"
+            :disabled="!keyInfo.has_value || keyInfo.testing"
+            @click="runApiKeyTest(keyInfo)"
+            :aria-label="'测试 ' + keyInfo.label + ' 连接'"
+          >{{ keyInfo.testing ? '测试中...' : '测试连接' }}</button>
+          <button
             class="btn btn-primary btn-sm"
             :disabled="!keyInfo.inputValue || keyInfo.inputValue === keyInfo.masked"
             @click="saveApiKey(keyInfo)"
             :aria-label="'保存 ' + keyInfo.label"
           >{{ keyInfo.saving ? '保存中...' : '保存' }}</button>
         </div>
+        <div
+          v-if="keyInfo.testStatus"
+          class="secret-key-test-result"
+          :class="keyInfo.testStatus"
+          role="status"
+        >
+          <svg v-if="keyInfo.testStatus === 'ok'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <svg v-else-if="keyInfo.testStatus === 'fail'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>{{ keyInfo.testMessage }}</span>
+          <span v-if="keyInfo.testSource" class="secret-key-test-source">（密钥来源：{{ keyInfo.testSource === 'env' ? '环境变量' : '数据库配置' }}）</span>
+        </div>
       </div>
       <div class="secret-key-note">
         <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:var(--c-warn);fill:none;stroke-width:2;stroke-linecap:round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         密钥保存后即加密存储，仅可覆盖不可查看。环境变量中的密钥优先于此处配置。
       </div>
+    </BaseAccordion>
+
+    <!-- 飞书配置 -->
+    <BaseAccordion title="飞书配置">
+      <div class="accordion-desc">
+        配置飞书开放平台应用凭证（App ID 与 App Secret 需配对填写），用于面试通知、审批推送。App Secret <b>AES-256-GCM 加密存储</b>，不可逆向查看。留空的字段保持不变。
+        <a class="secret-key-link" href="https://open.feishu.cn/app" target="_blank" rel="noopener noreferrer">没有应用？去飞书开放平台创建应用，获取 App ID 与 App Secret
+          <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+        <br>
+        当前状态：<span class="tencent-status" :class="feishuStatus.configured ? 'ok' : 'off'">{{ feishuStatus.configured ? '已配置' : '未配置' }}</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>App ID</label>
+          <input type="text" v-model="feishuForm.appId" :placeholder="feishuKeys.feishu_app_id?.has_value ? feishuKeys.feishu_app_id.masked : '输入 App ID（cli_ 开头）...'" class="secret-key-field" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label>App Secret <span class="field-hint">加密存储，留空保持不变</span></label>
+          <div class="secret-key-input-group">
+            <input :type="feishuShowSecret ? 'text' : 'password'" v-model="feishuForm.appSecret" :placeholder="feishuKeys.feishu?.has_value ? feishuKeys.feishu.masked : '输入 App Secret...'" class="secret-key-field" autocomplete="off">
+            <button class="btn btn-text btn-sm secret-key-toggle" @click="feishuShowSecret = !feishuShowSecret" :aria-label="feishuShowSecret ? '隐藏输入' : '显示输入'">{{ feishuShowSecret ? '隐藏' : '显示' }}</button>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" @click="saveFeishu" :disabled="feishuSaving">{{ feishuSaving ? '保存中...' : '保存' }}</button>
+      <button class="btn btn-text btn-sm" @click="testFeishu" :disabled="feishuTesting || !feishuStatus.configured">{{ feishuTesting ? '测试中...' : '测试连接' }}</button>
+      <span v-if="feishuMsg" class="save-msg" :class="feishuMsgType">{{ feishuMsg }}</span>
+      <div v-if="feishuTest.status" class="secret-key-test-result" :class="feishuTest.status" role="status">
+        <svg v-if="feishuTest.status === 'ok'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <svg v-else-if="feishuTest.status === 'fail'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>{{ feishuTest.message }}</span>
+        <span v-if="feishuTest.source" class="secret-key-test-source">（密钥来源：{{ feishuTest.source === 'env' ? '环境变量' : '数据库配置' }}）</span>
+      </div>
+    </BaseAccordion>
+
+    <!-- 腾讯会议配置 -->
+    <BaseAccordion title="腾讯会议配置">
+      <div class="accordion-desc">
+        配置腾讯会议开放平台凭证，用于创建「腾讯会议」类型的线上面试。SecretKey <b>AES-256-GCM 加密存储</b>，不可逆向查看。留空的字段保持不变。
+        <a class="secret-key-link" href="https://meeting.tencent.com/support-doc-detail/776/index.html" target="_blank" rel="noopener noreferrer">没有凭证？去腾讯会议官网「用户中心 → 高级 → RestAPI」创建密钥对（需企业版/商业版）
+          <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+        <br>
+        当前状态：<span class="tencent-status" :class="tencentStatus.configured ? 'ok' : 'off'">{{ tencentStatus.configured ? '已配置' : '未配置' }}</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>AppId</label>
+          <input type="text" v-model="tencentForm.appid" :placeholder="tencentKeys.tencent_appid?.has_value ? tencentKeys.tencent_appid.masked : '输入 AppId...'" class="secret-key-field" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label>SecretId</label>
+          <input type="text" v-model="tencentForm.secretid" :placeholder="tencentKeys.tencent_secretid?.has_value ? tencentKeys.tencent_secretid.masked : '输入 SecretId...'" class="secret-key-field" autocomplete="off">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>SecretKey <span class="field-hint">加密存储，留空保持不变</span></label>
+          <input type="password" v-model="tencentForm.secretkey" :placeholder="tencentKeys.tencent_secretkey?.has_value ? tencentKeys.tencent_secretkey.masked : '输入 SecretKey...'" class="secret-key-field" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label>主持人 UserID <span class="field-hint">创建会议必填</span></label>
+          <input type="text" v-model="tencentForm.userid" :placeholder="tencentKeys.tencent_userid?.has_value ? tencentKeys.tencent_userid.masked : '输入主持人 userid...'" class="secret-key-field" autocomplete="off">
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" @click="saveTencent" :disabled="tencentSaving">{{ tencentSaving ? '保存中...' : '保存' }}</button>
+      <span v-if="tencentMsg" class="save-msg" :class="tencentMsgType">{{ tencentMsg }}</span>
     </BaseAccordion>
 
     <!-- 角色权限 -->
@@ -266,7 +362,7 @@ import { useToast } from '../composables/useToast.js';
 import { useAppError } from '../composables/useAppError.js';
 import {
   fetchEmailAccounts, fetchChannels, fetchScoreRules, fetchNotifyTemplates,
-  fetchRolePermissions, fetchAuditLogs, fetchApiKeys, saveApiKeys,
+  fetchRolePermissions, fetchAuditLogs, fetchApiKeys, saveApiKeys, testApiKey, fetchTencentStatus, fetchFeishuStatus,
   createEmailAccount, updateEmailAccount, deleteEmailAccount,
   createChannel, updateChannel,
   updateScoreRules,
@@ -287,6 +383,21 @@ const notifyTemplates = ref([]);
 const rolePermissions = ref([]);
 const auditLogs = ref([]);
 const secretKeys = ref([]);
+const tencentKeys = ref({});
+const tencentStatus = ref({ configured: false });
+const tencentForm = reactive({ appid: '', secretid: '', secretkey: '', userid: '' });
+const tencentSaving = ref(false);
+const tencentMsg = ref('');
+const tencentMsgType = ref('ok');
+const feishuKeys = ref({});
+const feishuStatus = ref({ configured: false });
+const feishuForm = reactive({ appId: '', appSecret: '' });
+const feishuShowSecret = ref(false);
+const feishuSaving = ref(false);
+const feishuTesting = ref(false);
+const feishuMsg = ref('');
+const feishuMsgType = ref('ok');
+const feishuTest = reactive({ status: '', message: '', source: null });
 
 const showEmailModal = ref(false);
 const showChanModal = ref(false);
@@ -321,10 +432,10 @@ const reverseStatus = (s) => normalizeStatus(s) ? 0 : 1;
 
 async function loadAll() {
   try {
-    const [emails, chs, rules, notifs, roles, logs, keys] = await Promise.all([
+    const [emails, chs, rules, notifs, roles, logs, keys, tStatus, fStatus] = await Promise.all([
       fetchEmailAccounts(), fetchChannels(), fetchScoreRules(),
       fetchNotifyTemplates(), fetchRolePermissions(), fetchAuditLogs(),
-      fetchApiKeys(),
+      fetchApiKeys(), fetchTencentStatus(), fetchFeishuStatus(),
     ]);
     if (emails && emails.length) emailAccounts.value = emails;
     if (chs && chs.length) channels.value = chs;
@@ -332,7 +443,19 @@ async function loadAll() {
     if (notifs && notifs.length) notifyTemplates.value = notifs;
     if (roles && roles.length) rolePermissions.value = roles;
     if (logs && logs.length) auditLogs.value = logs;
-    if (keys) secretKeys.value = Object.values(keys).map(k => ({ ...k, inputValue: '', showInput: false, saving: false }));
+    if (keys) {
+      secretKeys.value = Object.values(keys)
+        .filter(k => !k.key_name.startsWith('tencent_') && k.key_name !== 'feishu' && k.key_name !== 'feishu_app_id')
+        .map(k => ({ ...k, inputValue: '', showInput: false, saving: false, testing: false, testStatus: '', testMessage: '', testSource: null }));
+      tencentKeys.value = Object.fromEntries(
+        Object.entries(keys).filter(([name]) => name.startsWith('tencent_')),
+      );
+      feishuKeys.value = Object.fromEntries(
+        Object.entries(keys).filter(([name]) => name === 'feishu' || name === 'feishu_app_id'),
+      );
+    }
+    if (tStatus) tencentStatus.value = tStatus;
+    if (fStatus) feishuStatus.value = fStatus;
   } catch (e) {
     console.warn('Config API fallback:', e.message);
   }
@@ -350,10 +473,115 @@ async function saveApiKey(keyInfo) {
     keyInfo.inputValue = '';
     keyInfo.showInput = false;
     await loadAll();
+    // 保存后立即做连通性测试，让用户知道密钥是否可用
+    const row = secretKeys.value.find(k => k.key_name === keyInfo.key_name);
+    if (row) await runApiKeyTest(row);
   } catch (e) {
     toast.error('保存失败: ' + e.message);
   } finally {
     keyInfo.saving = false;
+  }
+}
+
+async function runApiKeyTest(keyInfo) {
+  keyInfo.testing = true;
+  keyInfo.testStatus = 'testing';
+  keyInfo.testMessage = '正在测试连接...';
+  keyInfo.testSource = null;
+  try {
+    const res = await testApiKey(keyInfo.key_name);
+    const r = (res && res.data) ? res.data : res;
+    if (r && r.ok) {
+      keyInfo.testStatus = 'ok';
+      keyInfo.testMessage = r.message || '连接成功，密钥可用';
+      keyInfo.testSource = r.source || null;
+      toast.success(`${keyInfo.label} 连接测试成功`);
+    } else {
+      keyInfo.testStatus = 'fail';
+      keyInfo.testMessage = (r && r.message) || '连接失败';
+      keyInfo.testSource = (r && r.source) || null;
+      toast.warning(`${keyInfo.label}：${keyInfo.testMessage}`);
+    }
+  } catch (e) {
+    keyInfo.testStatus = 'fail';
+    keyInfo.testMessage = '测试请求失败: ' + e.message;
+    keyInfo.testSource = null;
+  } finally {
+    keyInfo.testing = false;
+  }
+}
+
+// ── Tencent Meeting ──
+async function saveTencent() {
+  const payload = {};
+  if (tencentForm.appid.trim()) payload.tencent_appid = tencentForm.appid.trim();
+  if (tencentForm.secretid.trim()) payload.tencent_secretid = tencentForm.secretid.trim();
+  if (tencentForm.secretkey.trim()) payload.tencent_secretkey = tencentForm.secretkey.trim();
+  if (tencentForm.userid.trim()) payload.tencent_userid = tencentForm.userid.trim();
+  if (!Object.keys(payload).length) {
+    toast.warning('请至少填写一项凭证');
+    return;
+  }
+  tencentSaving.value = true;
+  tencentMsg.value = '';
+  try {
+    await saveApiKeys(payload);
+    toast.success('腾讯会议凭证已保存');
+    Object.assign(tencentForm, { appid: '', secretid: '', secretkey: '', userid: '' });
+    await loadAll();
+    tencentMsg.value = tencentStatus.value.configured ? '凭证齐全，已启用' : '已保存，凭证尚不完整';
+    tencentMsgType.value = tencentStatus.value.configured ? 'ok' : 'error';
+  } catch (e) {
+    toast.error('保存失败: ' + e.message);
+  } finally {
+    tencentSaving.value = false;
+  }
+}
+
+// ── Feishu ──
+async function saveFeishu() {
+  const payload = {};
+  if (feishuForm.appId.trim()) payload.feishu_app_id = feishuForm.appId.trim();
+  if (feishuForm.appSecret.trim()) payload.feishu = feishuForm.appSecret.trim();
+  if (!Object.keys(payload).length) {
+    toast.warning('请至少填写一项凭证');
+    return;
+  }
+  feishuSaving.value = true;
+  feishuMsg.value = '';
+  try {
+    await saveApiKeys(payload);
+    toast.success('飞书凭证已保存');
+    Object.assign(feishuForm, { appId: '', appSecret: '' });
+    feishuShowSecret.value = false;
+    await loadAll();
+    feishuMsg.value = feishuStatus.value.configured ? '凭证齐全，已启用' : '已保存，App ID 与 App Secret 需配对填写';
+    feishuMsgType.value = feishuStatus.value.configured ? 'ok' : 'error';
+    if (feishuStatus.value.configured) await testFeishu();
+  } catch (e) {
+    toast.error('保存失败: ' + e.message);
+  } finally {
+    feishuSaving.value = false;
+  }
+}
+
+async function testFeishu() {
+  feishuTesting.value = true;
+  Object.assign(feishuTest, { status: 'testing', message: '正在测试连接...', source: null });
+  try {
+    const res = await testApiKey('feishu');
+    const r = (res && res.data) ? res.data : res;
+    if (r && r.ok) {
+      Object.assign(feishuTest, { status: 'ok', message: r.message || '连接成功，密钥可用', source: r.source || null });
+      toast.success('飞书连接测试成功');
+    } else {
+      Object.assign(feishuTest, { status: 'fail', message: (r && r.message) || '连接失败', source: (r && r.source) || null });
+      toast.warning(`飞书：${feishuTest.message}`);
+    }
+  } catch (e) {
+    Object.assign(feishuTest, { status: 'fail', message: '测试请求失败: ' + e.message, source: null });
+  } finally {
+    feishuTesting.value = false;
   }
 }
 
@@ -381,15 +609,19 @@ function editEmail(acct) {
   showEmailModal.value = true;
 }
 async function testEmailConn(acct) {
-  if (acct && acct.id) {
-    await updateEmailAccount(acct.id, { __test_conn: true });
-  }
+  if (!acct || !acct.id) return;
   emailSaving.value = true;
   try {
-    await updateEmailAccount(editingEmail.value?.id || 0, { __test_conn: true });
-  } catch (e) { /* ignore */ }
+    const r = await updateEmailAccount(acct.id, { __test_conn: true });
+    if (r && r.test_ok) {
+      toast.success('IMAP 连接成功：' + (acct.server || '—') + ':' + (acct.port || '993'));
+    } else {
+      toast.error('连接失败：' + ((r && r.test_msg) || '未知错误'));
+    }
+  } catch (e) {
+    toast.error('连接失败: ' + e.message);
+  }
   emailSaving.value = false;
-  toast.success('测试连接完成\n服务器：' + (emailForm.server || acct?.server || '—') + '\n端口：' + (emailForm.port || acct?.port || '993'));
   await loadAll();
 }
 async function deleteEmail(acct) {
@@ -568,6 +800,16 @@ async function submitTemplate() {
 .secret-key-info { flex: 1; min-width: 0; }
 .secret-key-label { font-size: 14px; font-weight: 650; color: var(--c-text); margin-bottom: 2px; }
 .secret-key-desc { font-size: 12px; color: var(--c-sub); }
+.secret-key-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--c-primary);
+  text-decoration: none;
+}
+.secret-key-link:hover { text-decoration: underline; }
 .secret-key-input-group { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .secret-key-field {
   width: 260px;
@@ -591,4 +833,20 @@ async function submitTemplate() {
   gap: 6px;
 }
 .secret-key-saving { opacity: .6; pointer-events: none; }
+.secret-key-test-result {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.secret-key-test-result svg { width: 14px; height: 14px; flex-shrink: 0; }
+.secret-key-test-result.ok { color: var(--c-done); }
+.secret-key-test-result.fail { color: var(--c-warn); }
+.secret-key-test-result.testing { color: var(--c-sub); }
+.secret-key-test-source { color: var(--c-sub); }
+.tencent-status { font-weight: 650; }
+.tencent-status.ok { color: var(--c-done); }
+.tencent-status.off { color: var(--c-warn); }
 </style>

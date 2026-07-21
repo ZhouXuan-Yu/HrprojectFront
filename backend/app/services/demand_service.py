@@ -727,10 +727,17 @@ def _mock_list_demand_candidates():
 
 
 def link_candidate_to_demand(demand_id, name):
-    """Link a candidate to demand by looking up candidate name in DB."""
+    """Link a candidate to demand by looking up candidate name in DB.
+
+    联动规则：
+      - 写入真实 resume_id（候选人最新一份简历），不再留 0
+      - 黑名单 / 面试锁定中的候选人不可加入
+      - 同一候选人在同一需求下的进行中流程去重（淘汰/放弃后允许重新加入）
+      - 加入时用 JD 对简历做一次匹配打分，写入 t_hr_resume_match
+    """
     try:
-        from app.models.candidate import Candidate
-        from app.models.process import RecruitProcess
+        from app.models.candidate import Candidate, Resume
+        from app.models.process import RecruitProcess, ResumeMatch
         from app.models.demand import RecruitDemand
         from app.extensions import db
         from datetime import datetime
@@ -738,7 +745,7 @@ def link_candidate_to_demand(demand_id, name):
         demand = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
         if not demand:
             log.warning("link_candidate_to_demand: demand %s not found", demand_id)
-            return {'linked': False, 'linkedCount': 0, '_fallback': True}
+            return {'linked': False, 'linkedCount': 0, 'reason': '需求不存在', '_fallback': True}
 
         candidate = Candidate.query.filter(
             Candidate.candidate_name == name,
@@ -747,29 +754,75 @@ def link_candidate_to_demand(demand_id, name):
 
         if not candidate:
             log.warning("link_candidate_to_demand: candidate '%s' not found", name)
-            return {'linked': False, 'linkedCount': 0, '_fallback': True}
+            return {'linked': False, 'linkedCount': 0, 'reason': '候选人不存在', '_fallback': True}
+
+        # 状态守卫
+        if candidate.black_flag:
+            return {'linked': False, 'linkedCount': 0, 'reason': '黑名单候选人不可加入需求'}
+        if candidate.status == 'locked':
+            return {'linked': False, 'linkedCount': 0, 'reason': '候选人面试中（锁定），不可重复加入'}
+
+        # 去重：进行中的流程不重复创建
+        existing = RecruitProcess.query.filter(
+            RecruitProcess.candidate_id == candidate.id,
+            RecruitProcess.demand_id == demand.id,
+            RecruitProcess.process_status.notin_([4, 7]),  # 淘汰/放弃除外
+            RecruitProcess.is_deleted == 0,
+        ).first()
+        if existing:
+            linked_count = RecruitProcess.query.filter(
+                RecruitProcess.demand_id == demand.id,
+                RecruitProcess.is_deleted == 0,
+            ).count()
+            return {'linked': True, 'already': True, 'linkedCount': linked_count,
+                    'reason': '该候选人已在此需求流程中'}
+
+        # 真实 resume_id（最新一份简历）
+        resume = (Resume.query.filter_by(candidate_id=candidate.id, is_deleted=0)
+                  .order_by(Resume.storage_time.desc()).first())
+        resume_id = resume.id if resume else 0
 
         now = datetime.now()
-        process_no = f"RP{now.strftime('%Y%m%d%H%M%S')}"
+        process_no = f"RP{now.strftime('%Y%m%d%H%M%S')}{candidate.id % 100:02d}"
 
         process = RecruitProcess(
             process_no=process_no,
             demand_id=demand.id,
-            resume_id=0,
+            resume_id=resume_id,
             candidate_id=candidate.id,
             process_status=0,  # pending screening
         )
         db.session.add(process)
+
+        # 匹配打分（best-effort）：JD vs 简历解析结果
+        match_score = None
+        try:
+            if resume and demand.jd_content:
+                from app.services.ai_engine import match_job
+                candidate_data = (resume.extract_json or {})
+                m = match_job(candidate_data, demand.jd_content)
+                match_score = m.get('match_score')
+                db.session.add(ResumeMatch(
+                    resume_id=resume_id,
+                    demand_id=demand.id,
+                    match_score=match_score or 0,
+                    score_detail=m.get('score_detail'),
+                    calculate_time=now,
+                ))
+        except Exception as exc:
+            log.warning("match scoring failed on link (best-effort): %s", exc)
+
         db.session.commit()
 
-        log.info("Linked candidate '%s' (id=%s) to demand '%s'", name, candidate.id, demand_id)
+        log.info("Linked candidate '%s' (id=%s, resume=%s) to demand '%s', match=%s",
+                 name, candidate.id, resume_id, demand_id, match_score)
 
         linked_count = RecruitProcess.query.filter(
             RecruitProcess.demand_id == demand.id,
             RecruitProcess.is_deleted == 0,
         ).count()
 
-        return {'linked': True, 'linkedCount': linked_count}
+        return {'linked': True, 'linkedCount': linked_count, 'matchScore': match_score}
 
     except Exception as exc:
         log.error("DB write failed in link_candidate_to_demand: %s", exc, exc_info=True)

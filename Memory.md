@@ -2,11 +2,51 @@
 
 ## 当前状态
 
-**日期**：2026-07-20
-**阶段**：✅ **阶段 0-4 完成 | BOSS 登录打通 | 飞书 HTTP 直连 | 去重 | 抽屉 | Toast**
-**状态**：系统稳定，14/14 后端测试，45/45 E2E 全绿
+**日期**：2026-07-21
+**阶段**：✅ **阶段 0-4 完成 | BOSS 登录打通 | 飞书 HTTP 直连 | 去重 | 抽屉 | Toast | 面试会议链接**
+**状态**：系统稳定，18/18 后端测试，45/45 E2E 全绿
 
-**最终验证**：14/14 backend ✅ + build ✅ + 35~45/45 E2E ✅
+**最终验证**：18/18 backend ✅ + build ✅ + 45/45 E2E ✅（commit `a8b991c`）
+
+### 2026-07-21 简历处理管道可视化 + 入库不显示 bug 修复 ✅
+
+- **根因 bug**：`fetchTalent()` 读 `r.data.items`，但 `success_list()` 契约是 `r.data` 直接为数组 → 人才库永远渲染 mock 数据，真实入库简历从不显示。已修复并按 `pageSize=100` 拉取
+- **删除**：app.js 的「人才资产工作台」（人才池质量分层/标签覆盖/今日动作）注入配置
+- **新增**：RecruitTalent「简历处理管道」面板（Vue 原生）——本次同步逐账号/逐邮件步骤条（收取→附件识别→AI解析→入库 + 候选人/跳过原因）+ 最近入库记录表
+- **新端点** `GET /api/talent/ingest-log`：Resume 表最近入库记录（候选人/编号/来源/解析引擎/入库时间）
+- **合并**：顶栏重复的「刷新邮箱简历」按钮（另一会话加的）已移除，统一为 tab 行按钮；上传简历/同步后同时刷新列表和入库记录
+- E2E：工作台断言排除 recruit-talent，新增管道面板断言 → **46/46**；pytest **33/33**
+
+### 2026-07-21 人才库手动刷新邮箱简历 ✅
+
+- 复用已有端点 `POST /api/config/email-accounts/sync`（同步执行 IMAP 拉取 → 解析 → 入库；定时任务仍为 Celery Beat 30min）
+- RecruitTalent 简历储备库 tab 行最右侧新增「刷新邮箱简历」按钮：旋转动画 + 防重复点击，完成后 toast 汇总（新邮件 N 封 / 新入库简历 M 份 / 无启用邮箱提示 / 部分失败警告）并自动重载列表
+
+### 2026-07-21 人才库「联系」真实化（电话/邮件）✅
+
+- 简历解析提取链路已有（`resume_service.py`：DeepSeek + 正则兜底提取 phone/email → `Candidate.mobile/email`）
+- 新端点 `GET /api/talent/candidate/<id>/contact-info`：返回完整手机号/邮箱（不打码），写审计日志
+- ContactModal 重写：打开即拉取联系方式；电话 → `tel:` 拨打并记录、邮件 → `mailto:` 写邮件并记录、复制按钮；无对应数据时渠道禁用并提示「简历中未识别」；飞书保持辅助记录口径
+- 种子数据补齐 6 个候选人的 mobile/email（真实 sha256 mobile_hash）
+- 新增 `test_contact_info.py` 4 用例 → pytest **31/31**，E2E 45/45
+
+### 2026-07-21 API 密钥连通性测试 ✅
+
+- 后端 `config_service.test_api_key()`：deepseek（GET /models 探活）、feishu（tenant_access_token 换取）、dify/其他标记不支持；env 密钥优先于 DB，返回 `source` 标识
+- 新端点 `POST /api/config/api-keys/test`（写审计日志）
+- 前端 RecruitConfig：保存密钥后自动测试并显示内联结果（成功绿/失败红/测试中灰 + 密钥来源），新增「测试连接」按钮可随时复测
+- 新增 `backend/tests/test_api_key_test.py` 9 用例 → pytest 18→**27/27**，E2E 45/45
+
+### 2026-07-21 面试会议链接（meeting_url）✅
+
+- `InterviewBook.meeting_url` 字段 + 幂等迁移脚本 `scripts/migrate_meeting_url.py`
+- `feishu_client.create_vc_meeting()`（`/vc/v1/reserves/apply`，Mock 返回 `vc.feishu.cn/j/<9位>`）
+- `create_interview()` 按类型生成链接：飞书→VC API（失败本地 fallback）、腾讯→本地拼 URL、其他线上→用户自定义、线下→空
+- 建面试后 best-effort 飞书邀约通知（卡片含「进入面试」按钮），快照写入 `invite_json`
+- 前端 RecruitInterview 三个表格方式列渲染可点击会议链接
+- 修复隐藏 bug：前端传 `round: i+1`（int）导致 `'复试' in round_label` TypeError → 防御性 `str()` 转换
+- 环境补齐：`backend/.venv` 补装 `requests`（既有声明依赖）
+- 新增 `backend/tests/test_meeting_url.py` 4 用例 → pytest 14→18
 
 ---
 

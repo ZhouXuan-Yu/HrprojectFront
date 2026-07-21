@@ -45,12 +45,85 @@ def _release_candidate_lock(candidate_id, candidate_name):
     return True
 
 
+def _candidate_id_for_resume(resume_id):
+    """Resolve the candidate that owns a resume. Returns candidate id or None."""
+    try:
+        from app.models.candidate import Resume
+        r = Resume.query.filter_by(id=resume_id, is_deleted=0).first()
+        if r and r.candidate_id:
+            return r.candidate_id
+    except Exception as exc:
+        log.warning("_candidate_id_for_resume failed: %s", exc)
+    return None
+
+
+def _release_lock_for_resume(resume_id):
+    """Release the candidate lock via resume_id (book rows store resume_id, not candidate_id)."""
+    cid = _candidate_id_for_resume(resume_id)
+    if cid:
+        return _release_candidate_lock(cid, None)
+    log.warning("release lock skipped: no candidate for resume_id=%s", resume_id)
+    return False
+
+
+def _ensure_process_for_interview(resume_id, demand_id, interview_round):
+    """Find-or-create the RecruitProcess linking this interview to demand management.
+
+    联动规则：
+      - 简历能定位到候选人时，按 (candidate_id, demand_id) 查进行中的流程
+        （淘汰=4 / 放弃=7 除外），没有则创建 process_status=0 的新流程
+      - 流程状态推进到面试阶段：一面=2 / 二面及以上=3
+      - 候选人锁定 status='locked'，人才库同步显示"面试中"
+
+    Returns (process_id, candidate_id)；无法定位候选人时返回 (0, None)。
+    """
+    from app.models.candidate import Candidate, Resume
+    from app.models.process import RecruitProcess
+    from app.extensions import db
+
+    candidate = None
+    resume = Resume.query.filter_by(id=resume_id, is_deleted=0).first() if resume_id else None
+    if resume and resume.candidate_id:
+        candidate = Candidate.query.filter_by(id=resume.candidate_id, is_deleted=0).first()
+    if not candidate:
+        return 0, None
+
+    process = None
+    if demand_id:
+        process = RecruitProcess.query.filter(
+            RecruitProcess.candidate_id == candidate.id,
+            RecruitProcess.demand_id == demand_id,
+            RecruitProcess.process_status.notin_([4, 7]),
+            RecruitProcess.is_deleted == 0,
+        ).first()
+        if not process:
+            now = datetime.now()
+            process = RecruitProcess(
+                process_no=f"RP{now.strftime('%Y%m%d%H%M%S')}{candidate.id % 100:02d}",
+                demand_id=demand_id,
+                resume_id=resume_id or 0,
+                candidate_id=candidate.id,
+                process_status=0,
+            )
+            db.session.add(process)
+            db.session.flush()
+
+    if process:
+        process.process_status = 3 if interview_round >= 2 else 2
+    if candidate.status != 'locked':
+        candidate.status = 'locked'
+        log.info("候选人已锁定（面试中）: id=%s name=%s", candidate.id, candidate.candidate_name)
+
+    return (process.id if process else 0), candidate.id
+
+
 def _db_to_dict(book):
     """Convert an InterviewBook ORM object to frontend-compatible dict.
 
     Resolves status from process/interview-record state rather than a column on the book row.
     """
     candidate_name = None
+    candidate_no = ''
     demand_pos = None
     try:
         from app.models.candidate import Candidate, Resume
@@ -60,9 +133,15 @@ def _db_to_dict(book):
             c = Candidate.query.filter_by(id=r.candidate_id, is_deleted=0).first()
             if c:
                 candidate_name = c.candidate_name
+                candidate_no = c.candidate_no or ''
         d = RecruitDemand.query.filter_by(id=book.demand_id, is_deleted=0).first()
         if d:
-            demand_pos = f'岗位#{d.demand_no}'
+            try:
+                from app.services.demand_service import POS_NAMES
+                pos_title = POS_NAMES.get(d.position_id)
+            except Exception:
+                pos_title = None
+            demand_pos = pos_title or f'岗位#{d.demand_no}'
     except Exception:
         pass
 
@@ -73,6 +152,9 @@ def _db_to_dict(book):
         if record.interview_result == 1:
             display_status = 'offer'
             display_label = '待录用'
+        elif record.interview_result == 2:
+            display_status = 'done'
+            display_label = '已淘汰'
         else:
             display_status = 'evaluating'
             display_label = '待评价'
@@ -88,6 +170,9 @@ def _db_to_dict(book):
     return {
         'id': f'INT{book.id:04d}',
         'name': candidate_name or f'候选人#{book.resume_id}',
+        'candidateId': candidate_no,
+        'resumeId': book.resume_id or 0,
+        'demandId': book.demand_id or 0,
         'position': demand_pos or f'岗位#{book.demand_id}',
         'round': f"{'初试' if round_num == 1 else '复试'}({round_num}轮)",
         'interviewer': '待分配',
@@ -99,6 +184,8 @@ def _db_to_dict(book):
         'meetingPwd': book.meeting_pwd or '',
         'status': display_status,
         'statusLabel': display_label,
+        'candidateConfirm': (book.invite_json or {}).get('candidate_confirm'),
+        'emailSent': (book.invite_json or {}).get('email_sent', bool((book.invite_json or {}).get('email_log'))),
         'createdBy': '系统',
         'isMine': False,
         'score': None,
@@ -175,6 +262,65 @@ def get_alerts():
     return alerts[:6]
 
 
+def _resolve_links(data):
+    """Resolve real (resume_id, demand_id) from display numbers or names.
+
+    The frontend sends display identifiers (candidate_no like 'C2026…',
+    demand_no like 'DM…') or plain names. Older callers may still send
+    numeric ids — those are honored first.
+    """
+    resume_id = 0
+    demand_id = 0
+    try:
+        from app.models.candidate import Candidate, Resume
+        from app.models.demand import RecruitDemand
+
+        # numeric ids from legacy callers
+        raw_resume = data.get('resume_id') or data.get('candidate_id') or 0
+        if isinstance(raw_resume, int) and raw_resume:
+            resume_id = raw_resume
+        raw_demand = data.get('position_id') or data.get('demand_id') or 0
+        if isinstance(raw_demand, int) and raw_demand:
+            demand_id = raw_demand
+
+        # candidate resolution: candidateNo > candidate name
+        if not resume_id:
+            candidate = None
+            candidate_no = (data.get('candidateNo') or data.get('candidate_no') or '').strip()
+            if not candidate_no:
+                raw = str(data.get('candidate_id') or '').strip()
+                if raw.upper().startswith('C'):
+                    candidate_no = raw
+            if candidate_no:
+                candidate = Candidate.query.filter_by(candidate_no=candidate_no, is_deleted=0).first()
+            if not candidate:
+                name = (data.get('candidate') or data.get('name') or '').strip()
+                if name:
+                    candidate = (Candidate.query.filter_by(candidate_name=name, is_deleted=0)
+                                 .order_by(Candidate.id.desc()).first())
+            if candidate:
+                resume = (Resume.query.filter_by(candidate_id=candidate.id, is_deleted=0)
+                          .order_by(Resume.storage_time.desc()).first())
+                if resume:
+                    resume_id = resume.id
+
+        # demand resolution: demandNo > position title
+        if not demand_id:
+            demand_no = (data.get('demandNo') or data.get('demand_no') or '').strip()
+            if not demand_no:
+                raw = str(data.get('demand_id') or '').strip()
+                if raw.upper().startswith('DM'):
+                    demand_no = raw
+            demand = None
+            if demand_no:
+                demand = RecruitDemand.query.filter_by(demand_no=demand_no, is_deleted=0).first()
+            if demand:
+                demand_id = demand.id
+    except Exception:
+        pass
+    return resume_id, demand_id
+
+
 def create_interview(data):
     """Create an interview booking — DB only.
 
@@ -223,10 +369,21 @@ def create_interview(data):
     if interview_type in (1, 2, 3) and not meeting_pwd:
         meeting_pwd = _random_digits(random.choice((4, 5, 6)))
 
+    resolved_resume_id, resolved_demand_id = _resolve_links(data)
+
+    # ── 联动需求管理：找到/创建流程并锁定候选人 ──
+    process_id = data.get('process_id', 0) or 0
+    if not process_id:
+        try:
+            process_id, _cid = _ensure_process_for_interview(
+                resolved_resume_id, resolved_demand_id, interview_round)
+        except Exception as exc:
+            log.warning("ensure process for interview failed (best-effort): %s", exc)
+
     book = InterviewBook(
-        demand_id=data.get('position_id', 0) or data.get('demand_id', 0) or 0,
-        resume_id=data.get('resume_id', 0) or data.get('candidate_id', 0) or 0,
-        process_id=data.get('process_id', 0) or 0,
+        demand_id=resolved_demand_id,
+        resume_id=resolved_resume_id,
+        process_id=process_id,
         slot_id=data.get('slot_id', 0) or 0,
         interview_round=interview_round,
         interview_type=interview_type,
@@ -332,6 +489,18 @@ def _notify_interview_invite(book, data, book_time):
     except Exception as exc:
         log.warning("面试通知发送失败（best-effort，不影响主流程）: %s", exc)
         snapshot['error'] = str(exc)
+
+    # 邮件邀请（含候选人确认链接）—— 候选人通常不在飞书组织内，
+    # 邮件是触达候选人的主通道。best-effort，不影响主流程。
+    try:
+        from app.services.confirm_service import send_interview_invite_email
+        ok, msg = send_interview_invite_email(book)
+        snapshot['email_sent'] = ok
+        snapshot['email_msg'] = msg
+    except Exception as exc:
+        log.warning("面试邀请邮件发送失败（best-effort）: %s", exc)
+        snapshot['email_sent'] = False
+        snapshot['email_msg'] = str(exc)
     return snapshot
 
 
@@ -397,6 +566,14 @@ def complete_interview(book_id, data):
     return {'completed': True, 'record_id': record.id}
 
 
+def _normalize_book_id(book_id):
+    """Accept both raw int ids and display ids like 'INT0004'."""
+    s = str(book_id).strip()
+    if s.upper().startswith('INT'):
+        s = s[3:]
+    return int(s)
+
+
 def evaluate_interview(book_id, data):
     """Submit interview evaluation with state transition.
 
@@ -405,13 +582,21 @@ def evaluate_interview(book_id, data):
       evaluating + fail -> candidate released, process set to rejected
       evaluating + hold -> stays evaluating, process returns to pending/screening
 
-    The book must exist and have an InterviewRecord associated.
+    评价理由（comment）为必填 —— 产品纪要要求面试官必须填写评价，
+    不能仅点"通过/拒绝"。
+
+    interview_result codes: 0=未评价 1=通过 2=淘汰 3=暂缓
     """
     from app.models.interview import InterviewBook, InterviewRecord
     from app.models.process import RecruitProcess
     from app.extensions import db
 
-    book = InterviewBook.query.filter_by(id=book_id, is_deleted=0).first()
+    try:
+        bid = _normalize_book_id(book_id)
+    except (TypeError, ValueError):
+        raise AppError('BAD_REQUEST', f'无效的面试预约ID: {book_id}')
+
+    book = InterviewBook.query.filter_by(id=bid, is_deleted=0).first()
     if not book:
         raise AppError('NOT_FOUND', f'面试预约 {book_id} 不存在')
 
@@ -419,15 +604,22 @@ def evaluate_interview(book_id, data):
     if not record:
         raise AppError('INVALID_STATE', f'面试预约 {book_id} 尚未完成面试')
 
-    if record.interview_result in (1,):
-        raise AppError('ALREADY_EVALUATED', f'面试预约 {book_id} 已评价')
+    if record.interview_result != 0:
+        raise AppError('ALREADY_EVALUATED', f'面试预约 {book_id} 已评价，请勿重复提交')
+
+    result = data.get('result', 'hold')  # pass | fail | hold
+    if result not in ('pass', 'fail', 'hold'):
+        raise AppError('VALIDATION_ERROR', '评价结果只能是 pass/fail/hold')
+
+    # 强制评价：任何结果都必须填写评价理由
+    comment = (data.get('comment') or '').strip()
+    if len(comment) < 5:
+        raise AppError('VALIDATION_ERROR', '必须填写评价理由（不少于 5 个字），不能仅提交通过/拒绝')
 
     score = data.get('score', 75)
-    result = data.get('result', 'hold')  # pass | fail | hold
-    comment = data.get('comment', '')
 
     now = datetime.now()
-    record.interview_result = 1 if result == 'pass' else 0
+    record.interview_result = {'pass': 1, 'fail': 2, 'hold': 3}[result]
     record.submit_interviewer_id = data.get('submit_user_id', record.submit_interviewer_id)
     record.evaluate_text = comment
     record.score_json = data.get('score_json', {})
@@ -444,10 +636,10 @@ def evaluate_interview(book_id, data):
 
     # Release lock on fail
     if result == 'fail':
-        _release_candidate_lock(book.resume_id, None)
+        _release_lock_for_resume(book.resume_id)
 
     db.session.commit()
-    log.info("面试评价已提交: book_id=%s, result=%s, score=%s", book_id, result, score)
+    log.info("面试评价已提交: book_id=%s, result=%s, score=%s", book.id, result, score)
 
     new_status = 'pending'
     new_label = '待安排'
@@ -455,7 +647,7 @@ def evaluate_interview(book_id, data):
         new_status = 'offer'
         new_label = '待录用'
     elif result == 'fail':
-        new_status = 'pending'
+        new_status = 'done'
         new_label = '已淘汰'
 
     return {

@@ -15,12 +15,75 @@
           <div style="color:var(--c-body);margin-top:4px">&bull; 本页面仅 <b>HR 专员</b>和<b>系统管理员</b>可见</div>
         </div>
       </div>
-      <button class="btn btn-primary btn-sm" @click="uploadResume">+ 上传简历</button>
+      <button class="btn btn-primary btn-sm" :disabled="uploading" @click="uploadResume">
+        {{ uploading ? '解析中...' : '+ 上传简历' }}
+      </button>
+      <input ref="resumeFileInput" type="file" accept=".pdf,.docx,.txt,.md,.html" style="display:none" @change="onResumeFilePicked">
     </template>
 
     <!-- 资产统计卡 -->
     <StatCardRow :cards="statCards" :active-key="statActiveKey" clickable @select="onStatSelect" />
-    <section class="hero-page-summary" style="display:none" aria-hidden="true"></section>
+
+    <!-- 简历处理管道：邮箱收取 → 附件识别 → AI 解析 → 入库 全过程可视 -->
+    <section class="pipeline-panel" aria-label="简历处理管道">
+      <div class="pp-header">
+        <div>
+          <div class="pp-title">简历处理管道</div>
+          <div class="pp-sub">邮箱收取 → 附件识别 → AI 解析 → 入库，每封简历的处理过程可追踪</div>
+        </div>
+        <div class="pp-meta" v-if="lastSyncText">上次同步：{{ lastSyncText }}</div>
+      </div>
+
+      <!-- 本次同步处理过程 -->
+      <div v-if="syncProcess" class="pp-sync">
+        <div v-for="acct in syncProcess" :key="acct.email" class="pp-account">
+          <div class="pp-account-head">
+            <span class="pp-account-name">{{ acct.email }}</span>
+            <span class="pp-account-stat">新邮件 {{ acct.new_emails || 0 }} · 入库 {{ acct.resumes_ingested || 0 }}</span>
+            <span class="pp-badge" :class="acct.status === 'error' ? 'fail' : 'ok'">{{ acct.status === 'error' ? '同步失败' : '完成' }}</span>
+          </div>
+          <div v-if="acct.error" class="pp-mail-note">{{ acct.error }}</div>
+          <div v-for="(d, i) in (acct.details || [])" :key="i" class="pp-mail">
+            <div class="pp-mail-head">
+              <span class="pp-mail-subject">{{ d.subject || '(无主题)' }}</span>
+              <span class="pp-mail-from">{{ d.from }}</span>
+            </div>
+            <div class="pp-steps">
+              <span class="pp-step ok">收取</span>
+              <span class="pp-arrow">→</span>
+              <span class="pp-step" :class="d.file ? 'ok' : 'skip'">附件识别</span>
+              <span class="pp-arrow">→</span>
+              <span class="pp-step" :class="d.engine ? 'ok' : 'skip'">AI 解析<template v-if="d.engine"> · {{ d.engine }}</template></span>
+              <span class="pp-arrow">→</span>
+              <span class="pp-step" :class="d.ingested ? 'ok' : 'skip'">{{ d.ingested ? '入库' : '未入库' }}</span>
+              <span v-if="d.ingested" class="pp-mail-cand">{{ d.candidate }}（{{ d.candidate_no }}）</span>
+            </div>
+            <div v-if="d.note" class="pp-mail-note">{{ d.note }}</div>
+          </div>
+          <div v-if="!(acct.details || []).length && acct.status !== 'error'" class="pp-empty-line">该邮箱无新简历邮件</div>
+        </div>
+      </div>
+
+      <!-- 最近入库记录 -->
+      <div class="pp-log">
+        <div class="pp-log-title">最近入库</div>
+        <table v-if="ingestLog.length" class="pp-table">
+          <thead>
+            <tr><th>候选人</th><th>编号</th><th>来源</th><th>解析引擎</th><th>入库时间</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in ingestLog" :key="item.resumeId">
+              <td style="font-weight:600">{{ item.candidate }}</td>
+              <td>{{ item.candidateNo }}</td>
+              <td>{{ item.source }}</td>
+              <td><span class="pp-engine">{{ item.engine }}</span></td>
+              <td>{{ item.storageTime }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="pp-empty-line">暂无入库记录，点击右侧「刷新邮箱简历」或上方「上传简历」开始</div>
+      </div>
+    </section>
 
     <!-- 3 Tabs -->
     <div class="tabs" role="tablist">
@@ -29,6 +92,17 @@
         :aria-selected="activeTab === tab.id ? 'true' : 'false'"
         role="tab" @click="activeTab = tab.id"
       >{{ tab.label }}</button>
+      <button
+        v-if="activeTab === 'external'"
+        class="btn btn-outline btn-sm mail-sync-btn"
+        :disabled="mailSyncing"
+        @click="manualMailSync"
+        title="手动收取所有启用邮箱中的简历邮件（定时任务每 30 分钟自动执行）"
+        aria-label="手动刷新邮箱简历"
+      >
+        <svg class="mail-sync-icon" :class="{ spinning: mailSyncing }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        {{ mailSyncing ? '收取中...' : '刷新邮箱简历' }}
+      </button>
     </div>
 
     <!-- ===== Tab 1: 简历储备库（外部） ===== -->
@@ -284,7 +358,8 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { EXT_DATA, INT_DATA, BLACKLIST_DATA, DEMAND_OPTIONS } from '../data/talent.js';
-import { fetchTalent, updateTalentNote, fetchMatchResults, linkTalentToDemand } from '../api/talent.js';
+import { fetchTalent, updateTalentNote, fetchMatchResults, linkTalentToDemand, uploadResumeFile, fetchIngestLog } from '../api/talent.js';
+import { syncAllEmailAccounts } from '../api/config.js';
 import { useToast } from '../composables/useToast.js';
 import { useAppError } from '../composables/useAppError.js';
 import StatCardRow from '../components/StatCardRow.vue';
@@ -345,6 +420,48 @@ async function loadFromApi() {
     }
   } catch (e) {
     console.warn('Failed to load talent data from API, using mock fallback:', e);
+  }
+}
+
+// 手动刷新邮箱简历（定时任务之外的即时收取）
+const mailSyncing = ref(false);
+const syncProcess = ref(null);   // 本次同步的逐账号/逐邮件处理明细
+const lastSyncText = ref('');
+const ingestLog = ref([]);       // 最近入库记录（DB）
+
+async function loadIngestLog() {
+  try {
+    const res = await fetchIngestLog(8);
+    const r = (res && res.data) ? res.data : res;
+    ingestLog.value = (r && r.items) || [];
+  } catch (e) {
+    console.warn('Failed to load ingest log:', e);
+    ingestLog.value = [];
+  }
+}
+
+async function manualMailSync() {
+  if (mailSyncing.value) return;
+  mailSyncing.value = true;
+  try {
+    const res = await syncAllEmailAccounts();
+    const r = (res && res.data) ? res.data : res;
+    syncProcess.value = (r && r.details) || [];
+    lastSyncText.value = new Date().toLocaleString('zh-CN', { hour12: false });
+    if (r && r.accounts_checked === 0) {
+      toast.warning('没有已启用的收简历邮箱，请先在「基础配置」中添加');
+    } else if (r && (r.new_emails > 0 || r.resumes_ingested > 0)) {
+      toast.success(`收取完成：新邮件 ${r.new_emails} 封，新入库简历 ${r.resumes_ingested} 份`);
+    } else if (r && r.status === 'partial') {
+      toast.warning('部分邮箱同步失败，请检查邮箱配置');
+    } else {
+      toast.success('收取完成：暂无新简历邮件');
+    }
+    await Promise.all([loadFromApi(), loadIngestLog()]);
+  } catch (e) {
+    toast.error('邮箱刷新失败: ' + e.message);
+  } finally {
+    mailSyncing.value = false;
   }
 }
 
@@ -558,8 +675,29 @@ function onCandidateJoin(data) {
   showDemandDropdown.value = true;
 }
 
+const uploading = ref(false);
+const resumeFileInput = ref(null);
+
 function uploadResume() {
-  toast.info('上传简历功能即将开放，支持 PDF/DOCX 格式');
+  resumeFileInput.value && resumeFileInput.value.click();
+}
+
+async function onResumeFilePicked(e) {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  uploading.value = true;
+  try {
+    const r = await uploadResumeFile(file);
+    const engine = r.parse_engine === 'deepseek' ? 'DeepSeek' : '本地解析';
+    toast.success(`简历已入库：${r.candidate_name}（${r.candidate_no} · ${engine}）`);
+    await Promise.all([loadFromApi(), loadIngestLog()]);
+  } catch (err) {
+    handleError(err, 'RecruitTalent.uploadResume');
+    toast.error('简历解析入库失败：' + (err?.response?.data?.message || err.message || '未知错误'));
+  } finally {
+    uploading.value = false;
+  }
 }
 
 async function startInternalInterview(r) {
@@ -587,6 +725,7 @@ function onDocClick(e) {
 onMounted(() => {
   document.addEventListener('click', onDocClick);
   loadFromApi();
+  loadIngestLog();
 });
 onUnmounted(() => document.removeEventListener('click', onDocClick));
 </script>
@@ -600,4 +739,51 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
 .batch-bar .count { font-weight: 700; color: var(--c-primary); }
 .row-locked { opacity: 0.7; }
 .row-archived { opacity: 0.4; }
+.mail-sync-btn { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.mail-sync-icon { width: 13px; height: 13px; flex-shrink: 0; }
+.mail-sync-icon.spinning { animation: mail-sync-spin 1s linear infinite; }
+@keyframes mail-sync-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .mail-sync-icon.spinning { animation: none; }
+}
+
+/* ── 简历处理管道 ── */
+.pipeline-panel {
+  margin-top: 14px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-card);
+  padding: 14px 18px;
+}
+.pp-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.pp-title { font-size: 14px; font-weight: 700; color: var(--c-text); }
+.pp-sub { font-size: 12px; color: var(--c-sub); margin-top: 2px; }
+.pp-meta { font-size: 12px; color: var(--c-sub); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pp-sync { margin-top: 12px; border-top: 1px dashed var(--c-border); padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.pp-account { border: 1px solid var(--c-border); border-radius: 8px; padding: 10px 14px; background: var(--c-bg); }
+.pp-account-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pp-account-name { font-size: 13px; font-weight: 700; color: var(--c-text); }
+.pp-account-stat { font-size: 12px; color: var(--c-sub); font-variant-numeric: tabular-nums; }
+.pp-badge { margin-left: auto; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+.pp-badge.ok { color: var(--c-done); background: rgba(34,197,94,0.1); }
+.pp-badge.fail { color: var(--c-warn); background: rgba(245,158,11,0.1); }
+.pp-mail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--c-border); }
+.pp-mail-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.pp-mail-subject { font-size: 13px; font-weight: 600; color: var(--c-text); }
+.pp-mail-from { font-size: 12px; color: var(--c-sub); }
+.pp-steps { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.pp-step { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
+.pp-step.ok { color: var(--c-done); background: rgba(34,197,94,0.1); }
+.pp-step.skip { color: var(--c-sub); background: var(--c-border); }
+.pp-arrow { font-size: 11px; color: var(--c-sub); }
+.pp-mail-cand { font-size: 12px; font-weight: 700; color: var(--c-primary); margin-left: 4px; }
+.pp-mail-note { margin-top: 6px; font-size: 12px; color: var(--c-warn); }
+.pp-empty-line { font-size: 12px; color: var(--c-sub); margin-top: 8px; }
+.pp-log { margin-top: 12px; border-top: 1px dashed var(--c-border); padding-top: 12px; }
+.pp-log-title { font-size: 12px; font-weight: 700; color: var(--c-sub); margin-bottom: 8px; }
+.pp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pp-table th { text-align: left; color: var(--c-sub); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--c-border); }
+.pp-table td { padding: 6px 10px; border-bottom: 1px solid var(--c-border); color: var(--c-body); font-variant-numeric: tabular-nums; }
+.pp-table tr:last-child td { border-bottom: none; }
+.pp-engine { font-size: 11px; font-weight: 600; color: var(--c-primary); background: var(--c-primary-subtle); padding: 1px 7px; border-radius: 99px; }
 </style>

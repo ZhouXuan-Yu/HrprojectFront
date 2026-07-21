@@ -76,6 +76,83 @@ def link_to_demand():
     return success({'linked': len(results), 'total': len(names), 'candidates': results})
 
 
+@bp.route('/resume-file/<resume_id>')
+def download_resume_file(resume_id):
+    """GET /api/talent/resume-file/{resume_id} — 下载/预览简历原件。"""
+    import os
+    from flask import send_file, current_app
+    from app.models.candidate import Resume
+    from app.models.infrastructure import File
+
+    resume = Resume.query.filter_by(id=resume_id, is_deleted=0).first()
+    if not resume or not resume.resume_file_id:
+        raise AppError('NOT_FOUND', '简历原件不存在')
+
+    f = File.query.filter_by(id=resume.resume_file_id, is_deleted=0).first()
+    if not f or not f.file_url or not os.path.exists(f.file_url):
+        raise AppError('NOT_FOUND', '简历文件已被移除')
+
+    # 防目录穿越：文件必须位于 uploads 目录内
+    uploads_root = os.path.join(os.path.dirname(current_app.root_path), 'uploads')
+    real_path = os.path.realpath(f.file_url)
+    if not real_path.startswith(os.path.realpath(uploads_root)):
+        raise AppError('FORBIDDEN', '非法文件路径')
+
+    return send_file(real_path, as_attachment=False,
+                     download_name=f.file_name or 'resume')
+
+
+@bp.route('/upload-resume', methods=['POST'])
+def upload_resume():
+    """POST /api/talent/upload-resume — 手动上传简历（multipart）。
+
+    文件经文本提取（pdfplumber/python-docx）→ DeepSeek 结构化解析 → 去重入库。
+    """
+    from app.services.resume_service import ingest_resume, SUPPORTED_EXTENSIONS
+    import os
+
+    file = request.files.get('file')
+    if not file or not file.filename:
+        raise AppError('BAD_REQUEST', '请选择要上传的简历文件')
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in SUPPORTED_EXTENSIONS and ext != '.doc':
+        raise AppError('BAD_REQUEST',
+                       f'不支持的文件格式 {ext}，支持 PDF/DOCX/TXT')
+
+    file_bytes = file.read()
+    if len(file_bytes) > 20 * 1024 * 1024:
+        raise AppError('BAD_REQUEST', '文件大小不能超过 20MB')
+
+    try:
+        result = ingest_resume(file_bytes, file.filename, source_channel='手动上传')
+    except ValueError as exc:
+        raise AppError('BAD_REQUEST', str(exc))
+
+    return success(result)
+
+
+@bp.route('/ingest-log')
+def get_ingest_log():
+    """GET /api/talent/ingest-log — recent resume ingestion records for pipeline view."""
+    from app.services.talent_service import get_ingest_log as _log
+    limit = request.args.get('limit', 10)
+    return success({'items': _log(limit)})
+
+
+@bp.route('/candidate/<candidate_id>/contact-info')
+def get_candidate_contact_info(candidate_id):
+    """GET /api/talent/candidate/<id>/contact-info — full mobile/email for contact action."""
+    from app.services.talent_service import get_candidate_contact
+    from app.services.config_service import append_audit_log
+    data = get_candidate_contact(candidate_id)
+    if data is None:
+        raise AppError('NOT_FOUND', f'候选人不存在: {candidate_id}')
+    append_audit_log('系统', '人才库', '查看联系方式',
+                     f"查看候选人 {data.get('name', candidate_id)} 的联系方式")
+    return success(data)
+
+
 @bp.route('/contact', methods=['POST'])
 def contact_candidate():
     """POST /api/talent/contact — record candidate contact action."""

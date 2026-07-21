@@ -67,7 +67,11 @@
               </a>
               <template v-else>{{ item.method }}</template>
             </td>
-            <td><StatusBadge :type="STATUS_TYPE_MAP[item.status]">{{ item.statusLabel }}</StatusBadge></td>
+            <td><StatusBadge :type="STATUS_TYPE_MAP[item.status]">{{ item.statusLabel }}</StatusBadge>
+              <div v-if="item.candidateConfirm === 'accept'" style="font-size:11px;color:#22a06b;margin-top:2px">✔ 候选人已确认</div>
+              <div v-else-if="item.candidateConfirm === 'reject'" style="font-size:11px;color:var(--c-reject);margin-top:2px">✘ 候选人已婉拒</div>
+              <div v-else-if="item.emailSent" style="font-size:11px;color:var(--c-sub);margin-top:2px">⏳ 待候选人确认</div>
+            </td>
             <td style="white-space:nowrap" v-html="renderActions(item)"></td>
           </tr>
         </tbody></table>
@@ -98,7 +102,11 @@
               </a>
               <template v-else>{{ item.method }}</template>
             </td>
-            <td><StatusBadge :type="STATUS_TYPE_MAP[item.status]">{{ item.statusLabel }}</StatusBadge></td>
+            <td><StatusBadge :type="STATUS_TYPE_MAP[item.status]">{{ item.statusLabel }}</StatusBadge>
+              <div v-if="item.candidateConfirm === 'accept'" style="font-size:11px;color:#22a06b;margin-top:2px">✔ 候选人已确认</div>
+              <div v-else-if="item.candidateConfirm === 'reject'" style="font-size:11px;color:var(--c-reject);margin-top:2px">✘ 候选人已婉拒</div>
+              <div v-else-if="item.emailSent" style="font-size:11px;color:var(--c-sub);margin-top:2px">⏳ 待候选人确认</div>
+            </td>
             <td style="white-space:nowrap" v-html="renderActions(item)"></td>
           </tr>
         </tbody></table>
@@ -146,7 +154,11 @@
                     </a>
                     <template v-else>{{ item.method }}</template>
                   </td>
-                  <td><StatusBadge :type="STATUS_TYPE_MAP[item.status]">{{ item.statusLabel }}</StatusBadge></td>
+                  <td><StatusBadge :type="STATUS_TYPE_MAP[item.status]">{{ item.statusLabel }}</StatusBadge>
+              <div v-if="item.candidateConfirm === 'accept'" style="font-size:11px;color:#22a06b;margin-top:2px">✔ 候选人已确认</div>
+              <div v-else-if="item.candidateConfirm === 'reject'" style="font-size:11px;color:var(--c-reject);margin-top:2px">✘ 候选人已婉拒</div>
+              <div v-else-if="item.emailSent" style="font-size:11px;color:var(--c-sub);margin-top:2px">⏳ 待候选人确认</div>
+            </td>
                 </tr>
               </tbody></table>
             </div>
@@ -175,9 +187,57 @@
       :visible="showOfferModal"
       :candidate="offerCandidate"
       :demand="offerDemand"
+      :resume-id="offerResumeId"
       @close="showOfferModal = false"
       @success="onOfferSuccess"
     />
+
+    <!-- 候选人简历抽屉（真实数据） -->
+    <CandidateDrawer
+      :visible="showCandidateDrawer"
+      :candidate-id="activeCandidateId"
+      @close="showCandidateDrawer = false"
+      @contact="onDrawerAction('contact')"
+      @join="onDrawerAction('join')"
+    />
+
+    <!-- 面试评价 Modal（强制填写评价理由） -->
+    <Teleport to="body">
+      <div v-if="showEvalModal" class="modal-overlay" @click.self="showEvalModal = false" style="display:flex">
+        <div class="modal-box" style="width:480px">
+          <h3 style="margin:0 0 4px">面试评价 · {{ evalTarget.name }}</h3>
+          <div style="font-size:12px;color:var(--c-sub);margin-bottom:14px">评价结果与评价理由将同步至招聘流程，评价理由为必填项</div>
+
+          <div style="margin-bottom:12px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px">评价结果</div>
+            <div style="display:flex;gap:8px">
+              <button v-for="opt in [{v:'pass',t:'✅ 通过'},{v:'fail',t:'❌ 不通过'},{v:'hold',t:'⏸ 暂缓'}]"
+                :key="opt.v" class="btn btn-sm"
+                :class="evalForm.result === opt.v ? 'btn-primary' : 'btn-outline'"
+                @click="evalForm.result = opt.v">{{ opt.t }}</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px">综合评分（{{ evalForm.score }} 分）</div>
+            <input type="range" min="0" max="100" step="5" v-model.number="evalForm.score" style="width:100%">
+          </div>
+
+          <div style="margin-bottom:16px">
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px">评价理由 <span style="color:var(--c-reject)">*必填</span></div>
+            <textarea v-model="evalForm.comment" rows="4" placeholder="请填写具体评价：技术能力、沟通表现、匹配度等（不少于 5 个字）"
+              style="width:100%;padding:8px 10px;border:1px solid var(--c-border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
+          </div>
+
+          <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:8px">
+            <button class="btn btn-ghost btn-sm" @click="showEvalModal = false">取消</button>
+            <button class="btn btn-primary btn-sm" :disabled="evalSaving" @click="submitEvaluation">
+              {{ evalSaving ? '提交中...' : '提交评价' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </WorkbenchLayout>
 </template>
 
@@ -185,13 +245,14 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { ALL_INTERVIEWS, STATUSES, STATUS_LABELS, STATUS_TYPE_MAP, ALERTS } from '../data/interview.js';
-import { fetchInterviews, fetchInterviewAlerts, createInterview, evaluateInterview } from '../api/interview.js';
+import { fetchInterviews, fetchInterviewAlerts, createInterview, evaluateInterview, completeInterview } from '../api/interview.js';
 import { useToast } from '../composables/useToast.js';
 import { useAppError } from '../composables/useAppError.js';
 import { KPI_ICONS } from '../components/kpiIcons.js';
 import ScheduleInterviewModal from '../components/ScheduleInterviewModal.vue';
 import OfferModal from '../components/OfferModal.vue';
 import EmptyState from '../components/EmptyState.vue';
+import CandidateDrawer from '../components/CandidateDrawer.vue';
 
 const { toast } = useToast();
 const { handleError } = useAppError();
@@ -204,6 +265,7 @@ const scheduleCandidate = ref({ name: '', id: '' });
 const scheduleDemand = ref({ position: '', id: '' });
 const offerCandidate = ref({ name: '', id: '' });
 const offerDemand = ref({ position: '', id: '' });
+const offerResumeId = ref(0);
 const currentScope = ref('all');
 const activeTab = ref('list');
 const listStatus = ref('all');
@@ -290,9 +352,9 @@ function renderActions(item) {
     case 'pending':
       return resumeBtn + ' <button class="btn btn-primary btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:schedule\',{detail:\'' + item.name + '|' + item.position + '\'}))">发起面试</button>';
     case 'scheduled':
-      return resumeBtn + ' <button class="btn btn-text-danger btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:cancel\',{detail:\'' + item.name + '\'}))">取消</button>';
+      return resumeBtn + ' <button class="btn btn-primary btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:complete\',{detail:\'' + item.id + '|' + item.name + '\'}))">完成面试</button> <button class="btn btn-text-danger btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:cancel\',{detail:\'' + item.name + '\'}))">取消</button>';
     case 'evaluating':
-      return resumeBtn + ' <button class="btn btn-primary btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:evaluate\',{detail:\'' + item.name + '\'}))">填评价</button>';
+      return resumeBtn + ' <button class="btn btn-primary btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:evaluate\',{detail:\'' + item.id + '|' + item.name + '\'}))">填评价</button>';
     case 'offer':
       return resumeBtn + ' <button class="btn btn-outline btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:approval\',{detail:\'' + item.name + '\'}))">审批中</button> <button class="btn btn-success btn-sm" onclick="window.dispatchEvent(new CustomEvent(\'interview:offer\',{detail:\'' + item.name + '\'}))">发Offer</button>';
     case 'onboard':
@@ -305,14 +367,24 @@ function renderActions(item) {
 
 function onScopeChange() {}
 
+const showCandidateDrawer = ref(false);
+const activeCandidateId = ref('');
+
 async function openCandidateDrawer(name) {
-  try {
-    const { fetchInterviews } = await import('../api/interview.js');
-    toast.info('候选人简历抽屉：' + name + '（API数据加载中，将在右侧抽屉展示完整档案）');
-  } catch (e) {
-    console.warn('[RecruitInterview] openCandidateDrawer failed:', e);
-    toast.info('候选人简历抽屉：' + name);
+  // 从当前列表数据中找到该面试记录，取后端下发的真实候选人编号
+  const item = INTERVIEWS_SOURCE.value.find(i => i.name === name);
+  const candidateId = item && item.candidateId ? item.candidateId : '';
+  if (!candidateId) {
+    toast.warning(`${name} 未关联真实候选人档案（该记录可能是旧测试数据）`);
+    return;
   }
+  activeCandidateId.value = candidateId;
+  showCandidateDrawer.value = true;
+}
+
+function onDrawerAction(kind) {
+  showCandidateDrawer.value = false;
+  toast.info(kind === 'contact' ? '请前往「人才库」页面联系该候选人' : '请前往「人才库」页面将候选人加入需求');
 }
 
 function openGlobalScheduleModal(name, position, dept) {
@@ -336,12 +408,11 @@ async function doAlert(msg) {
       }
     } else if (msg.indexOf('填写对') === 0) {
       const name = msg.replace('填写对', '').replace('的评价', '');
-      try {
-        await evaluateInterview(name, { result: 'pass', comment: '' });
-        toast.success('【面试评价】' + name + '已提交评价（通过待录用）');
-      } catch (e) {
-        console.warn('[RecruitInterview] evaluate failed:', e);
-        toast.info(msg + ' [通过待录用] [不通过回流]');
+      const item = INTERVIEWS_SOURCE.value.find(i => i.name === name && i.status === 'evaluating');
+      if (item) {
+        openEvalModal(item.id, item.name);
+      } else {
+        toast.warning('未找到 ' + name + ' 的待评价面试，请先在列表中点击"完成面试"');
       }
     } else {
       toast.info(msg);
@@ -363,6 +434,7 @@ function onDocClick(e) {
 onMounted(() => {
   document.addEventListener('click', onDocClick);
   window.addEventListener('interview:evaluate', handleEvaluate);
+  window.addEventListener('interview:complete', handleComplete);
   window.addEventListener('interview:schedule', handleSchedule);
   window.addEventListener('interview:offer', handleOffer);
   window.addEventListener('interview:cancel', handleCancel);
@@ -374,6 +446,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', onDocClick);
   window.removeEventListener('interview:evaluate', handleEvaluate);
+  window.removeEventListener('interview:complete', handleComplete);
   window.removeEventListener('interview:schedule', handleSchedule);
   window.removeEventListener('interview:offer', handleOffer);
   window.removeEventListener('interview:cancel', handleCancel);
@@ -381,14 +454,76 @@ onUnmounted(() => {
   window.removeEventListener('interview:open-drawer', handleOpenDrawer);
 });
 
-async function handleEvaluate(e) {
-  const name = e.detail;
+// ── 面试评价（强制填写评价理由）──
+const showEvalModal = ref(false);
+const evalTarget = ref({ id: '', name: '' });
+const evalForm = reactive({ result: 'pass', score: 75, comment: '' });
+const evalSaving = ref(false);
+
+function openEvalModal(id, name) {
+  evalTarget.value = { id, name };
+  Object.assign(evalForm, { result: 'pass', score: 75, comment: '' });
+  showEvalModal.value = true;
+}
+
+async function submitEvaluation() {
+  if (!evalForm.comment || evalForm.comment.trim().length < 5) {
+    toast.warning('请填写评价理由（不少于 5 个字）');
+    return;
+  }
+  evalSaving.value = true;
   try {
-    await evaluateInterview(name, { result: 'pass', comment: '' });
-    toast.success('【面试评价】' + name + '已提交评价（通过待录用）');
+    if (!evalTarget.value.id) {
+      toast.error('该记录未同步到服务端（可能为本地演示数据），无法提交评价');
+      return;
+    }
+    const r = await evaluateInterview(evalTarget.value.id, {
+      result: evalForm.result,
+      score: evalForm.score,
+      comment: evalForm.comment.trim(),
+    });
+    const label = { pass: '通过，进入待录用', fail: '不通过，已回流人才库', hold: '暂缓，保持待评价' }[evalForm.result];
+    toast.success(`【面试评价】${evalTarget.value.name}：${label}`);
+    showEvalModal.value = false;
+    await loadFromApi();
   } catch (err) {
-    console.warn('[RecruitInterview] evaluateInterview failed, using mock:', err);
-    toast.info('【面试评价】填写对' + name + '的评价 [通过待录用] [不通过回流]');
+    handleError(err, 'RecruitInterview.submitEvaluation');
+    toast.error('评价提交失败：' + (err?.response?.data?.message || err.message || '未知错误'));
+  } finally {
+    evalSaving.value = false;
+  }
+}
+
+async function handleEvaluate(e) {
+  const parts = String(e.detail).split('|');
+  // 新格式: 'INT0001|张三'；旧格式仅姓名时按姓名查找
+  if (parts.length === 2) {
+    openEvalModal(parts[0], parts[1]);
+    return;
+  }
+  const item = INTERVIEWS_SOURCE.value.find(i => i.name === parts[0] && i.status === 'evaluating');
+  if (item) {
+    openEvalModal(item.id, item.name);
+  } else {
+    toast.warning('未找到 ' + parts[0] + ' 的待评价面试');
+  }
+}
+
+async function handleComplete(e) {
+  const parts = String(e.detail).split('|');
+  const id = parts[0], name = parts[1] || '';
+  if (!id || id === 'undefined') {
+    toast.error('该记录未同步到服务端（可能为本地演示数据），无法操作');
+    return;
+  }
+  if (!window.confirm('确认 ' + name + ' 的面试已完成？完成后将进入待评价状态')) return;
+  try {
+    await completeInterview(id, { is_arrive: 1 });
+    toast.success('【面试完成】' + name + ' 已进入待评价，请面试官提交评价');
+    await loadFromApi();
+  } catch (err) {
+    handleError(err, 'RecruitInterview.handleComplete');
+    toast.error('操作失败：' + (err?.response?.data?.message || err.message || '未知错误'));
   }
 }
 
@@ -403,10 +538,15 @@ async function handleSchedule(e) {
 
 async function handleCancel(e) {
   const name = e.detail;
+  const item = INTERVIEWS_SOURCE.value.find(i => i.name === name);
+  if (!item || !item.id) {
+    toast.error('该记录未同步到服务端（可能为本地演示数据），无法取消');
+    return;
+  }
   if (!window.confirm('确认取消 ' + name + ' 的面试？')) return;
   try {
     const { cancelInterview } = await import('../api/interview.js');
-    await cancelInterview(name, 'HR 手动取消');
+    await cancelInterview(item.id, 'HR 手动取消');
     toast.success('已取消 ' + name + ' 的面试');
     await loadFromApi();
   } catch (err) {
@@ -422,8 +562,10 @@ function handleApproval(e) {
 
 function handleOffer(e) {
   const name = e.detail;
-  offerCandidate.value = { name, id: '' };
-  offerDemand.value = { position: '', id: '' };
+  const item = INTERVIEWS_SOURCE.value.find(i => i.name === name) || {};
+  offerCandidate.value = { name, id: item.candidateId || '' };
+  offerDemand.value = { position: item.position || '', id: item.demandId || 0 };
+  offerResumeId.value = item.resumeId || 0;
   showOfferModal.value = true;
 }
 

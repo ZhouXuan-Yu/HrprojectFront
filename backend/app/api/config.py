@@ -55,6 +55,25 @@ def delete_email_account(account_id):
     return success(result)
 
 
+@bp.route('/email-accounts/sync', methods=['POST'])
+def sync_all_email_accounts():
+    """POST /api/config/email-accounts/sync — 手动刷新：同步所有启用邮箱。
+
+    同步执行 IMAP 拉取 → 简历识别 → 文本提取 → DeepSeek 解析 → 入库。
+    """
+    from app.services.email_sync_service import sync_all_accounts
+    result = sync_all_accounts()
+    return success(result)
+
+
+@bp.route('/email-accounts/<account_id>/sync', methods=['POST'])
+def sync_email_account(account_id):
+    """POST /api/config/email-accounts/{account_id}/sync — 手动刷新单个邮箱。"""
+    from app.services.email_sync_service import sync_mail_account
+    result = sync_mail_account(account_id)
+    return success(result)
+
+
 @bp.route('/channels')
 def get_channels():
     """GET /api/config/channels"""
@@ -168,3 +187,31 @@ def save_api_keys():
         append_audit_log('系统', '配置', '更新密钥',
                          f"更新密钥: {', '.join(result.get('keys', []))}")
     return success(result)
+
+
+@bp.route('/api-keys/test', methods=['POST'])
+def test_api_key():
+    """POST /api/config/api-keys/test — live connectivity test for a stored key."""
+    from app.services.config_service import test_api_key as _test, append_audit_log
+    data = request.get_json(silent=True) or {}
+    key_name = data.get('key_name', '')
+    if not key_name:
+        return success({'ok': False, 'supported': False, 'message': '缺少 key_name'})
+    result = _test(key_name)
+    append_audit_log('系统', '配置', '测试密钥连接',
+                     f"测试 {key_name}: {'成功' if result.get('ok') else '失败'}")
+    return success(result)
+
+
+@bp.route('/tencent-meeting/status')
+def tencent_meeting_status():
+    """GET /api/config/tencent-meeting/status — configured flag only, no values."""
+    from app.services.config_service import get_tencent_meeting_status
+    return success(get_tencent_meeting_status())
+
+
+@bp.route('/feishu/status')
+def feishu_status():
+    """GET /api/config/feishu/status — pair-configured flag only, no values."""
+    from app.services.config_service import get_feishu_status
+    return success(get_feishu_status())

@@ -15,6 +15,7 @@ def register_blueprints(app):
     from app.api.health import bp as health_bp
     from app.api.hire import bp as hire_bp
     from app.api.dedup import bp as dedup_bp
+    from app.api.confirm import bp as confirm_bp
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
@@ -27,3 +28,5 @@ def register_blueprints(app):
     app.register_blueprint(health_bp, url_prefix='/api/health')
     app.register_blueprint(hire_bp, url_prefix='/api/hire')
     app.register_blueprint(dedup_bp, url_prefix='/api/dedup')
+    # 候选人确认页（GET /confirm/<token>）与提交（POST /api/confirm/<token>），无需登录
+    app.register_blueprint(confirm_bp)

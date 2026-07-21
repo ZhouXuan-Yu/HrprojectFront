@@ -1,0 +1,373 @@
+"""Enterprise mailbox sync service — real IMAP pipeline.
+
+Pulls unread emails from configured recruit mailboxes, detects resume
+attachments (or resume-like bodies), runs the resume ingest pipeline
+(extract → DeepSeek parse → dedup → DB), and records sync state.
+
+Used by:
+    - tasks/email_sync.py (Celery periodic task)
+    - POST /api/config/email-accounts/<id>/sync (手动刷新)
+"""
+import imaplib
+import logging
+import re
+from datetime import datetime
+from email import message_from_bytes
+from email.header import decode_header
+from email.utils import parseaddr
+
+log = logging.getLogger(__name__)
+
+# Cap per sync run to avoid hammering the LLM / mailbox on first sync
+_MAX_EMAILS_PER_SYNC = 50
+
+
+# ===========================================================================
+# Credential handling
+# ===========================================================================
+
+def _get_password(account):
+    """Decrypt the stored IMAP password/authorization code.
+
+    New rows store AES-256-GCM encrypted values (hex). Legacy rows may hold
+    plaintext — fall back transparently.
+    """
+    raw = account.password_encrypted or ''
+    if not raw:
+        return ''
+    if re.fullmatch(r'[0-9a-f]+', raw) and len(raw) > 64:
+        try:
+            from flask import current_app
+            from app.services.crypto_utils import decrypt
+            return decrypt(raw, current_app.config['SECRET_KEY'])
+        except Exception as exc:
+            log.warning("Password decrypt failed for account %s, "
+                        "trying plaintext fallback: %s", account.id, exc)
+    return raw
+
+
+# ===========================================================================
+# IMAP connection
+# ===========================================================================
+
+def test_connection(account):
+    """Try IMAP connect + login + logout. Returns (ok: bool, message: str)."""
+    host = account.imap_host
+    port = account.imap_port or 993
+    if not host:
+        return False, '未配置 IMAP 服务器地址'
+    password = _get_password(account)
+    if not password:
+        return False, '未配置邮箱密码/授权码'
+    try:
+        conn = imaplib.IMAP4_SSL(host, port, timeout=15)
+        try:
+            conn.login(account.email_address, password)
+        finally:
+            try:
+                conn.logout()
+            except Exception:
+                pass
+        return True, '连接成功'
+    except imaplib.IMAP4.error as exc:
+        return False, f'登录失败: {exc}'
+    except Exception as exc:
+        return False, f'连接失败: {exc}'
+
+
+def _connect(account):
+    """Open an authenticated IMAP connection, selecting the monitor folder."""
+    host = account.imap_host
+    port = account.imap_port or 993
+    password = _get_password(account)
+    if not host or not password:
+        raise RuntimeError('邮箱未配置 IMAP 服务器或密码/授权码')
+
+    conn = imaplib.IMAP4_SSL(host, port, timeout=30)
+    conn.login(account.email_address, password)
+
+    folder = account.monitor_folder or 'INBOX'
+    status, _ = conn.select(f'"{folder}"', readonly=False)
+    if status != 'OK':
+        # Fallback to INBOX when the custom folder doesn't exist
+        log.warning("Folder %s not selectable on %s, falling back to INBOX",
+                    folder, account.email_address)
+        conn.select('INBOX', readonly=False)
+    return conn
+
+
+# ===========================================================================
+# Email parsing helpers
+# ===========================================================================
+
+def _decode_str(value):
+    """Decode an RFC-2047 encoded header value to str."""
+    if not value:
+        return ''
+    parts = []
+    for chunk, charset in decode_header(value):
+        if isinstance(chunk, bytes):
+            for enc in (charset, 'utf-8', 'gb18030', 'latin-1'):
+                if not enc:
+                    continue
+                try:
+                    chunk = chunk.decode(enc)
+                    break
+                except (UnicodeDecodeError, LookupError):
+                    continue
+            else:
+                chunk = chunk.decode('utf-8', errors='ignore')
+        parts.append(chunk)
+    return ''.join(parts)
+
+
+def _iter_attachments(msg):
+    """Yield (filename, payload_bytes) for every attachment part."""
+    for part in msg.walk():
+        disposition = str(part.get('Content-Disposition') or '')
+        filename = part.get_filename()
+        if not filename and 'attachment' not in disposition.lower():
+            continue
+        if not filename:
+            continue
+        filename = _decode_str(filename)
+        payload = part.get_payload(decode=True)
+        if payload:
+            yield filename, payload
+
+
+def _extract_body(msg):
+    """Extract plain-text body (first text/plain part, html stripped fallback)."""
+    plain, html = '', ''
+    for part in msg.walk():
+        ctype = part.get_content_type()
+        disposition = str(part.get('Content-Disposition') or '')
+        if 'attachment' in disposition.lower():
+            continue
+        if ctype == 'text/plain' and not plain:
+            payload = part.get_payload(decode=True)
+            if payload:
+                charset = part.get_content_charset() or 'utf-8'
+                try:
+                    plain = payload.decode(charset, errors='ignore')
+                except LookupError:
+                    plain = payload.decode('utf-8', errors='ignore')
+        elif ctype == 'text/html' and not html:
+            payload = part.get_payload(decode=True)
+            if payload:
+                charset = part.get_content_charset() or 'utf-8'
+                try:
+                    html = payload.decode(charset, errors='ignore')
+                except LookupError:
+                    html = payload.decode('utf-8', errors='ignore')
+    if plain.strip():
+        return plain
+    if html.strip():
+        from app.services.resume_service import _strip_html
+        return _strip_html(html)
+    return ''
+
+
+# ===========================================================================
+# Main sync entry
+# ===========================================================================
+
+def sync_mail_account(account_id):
+    """Sync one mail account: pull unread emails, ingest resumes.
+
+    Returns summary dict: {status, account_id, email, new_emails,
+                           resumes_ingested, candidates, details}
+    """
+    from app.extensions import db
+    from app.models.auxiliary import RecruitMailAccount
+    from app.services import resume_service
+
+    account = RecruitMailAccount.active().filter_by(id=account_id).first()
+    if not account:
+        return {'status': 'error', 'error': 'Account not found', 'account_id': account_id}
+    if account.status != 1:
+        return {'status': 'error', 'error': 'Account not active', 'account_id': account_id}
+
+    acct_name = account.email_address or account.account_name or f'account#{account.id}'
+    result = {
+        'status': 'ok', 'account_id': account.id, 'email': acct_name,
+        'new_emails': 0, 'resumes_ingested': 0, 'candidates': [], 'details': [],
+    }
+
+    conn = None
+    try:
+        conn = _connect(account)
+        status, data = conn.search(None, 'UNSEEN')
+        if status != 'OK':
+            raise RuntimeError(f'IMAP search failed: {status}')
+
+        msg_ids = data[0].split()[-_MAX_EMAILS_PER_SYNC:]
+        result['new_emails'] = len(msg_ids)
+        log.info("Mailbox %s: %d unread email(s) to process", acct_name, len(msg_ids))
+
+        for num in msg_ids:
+            detail = _process_one_message(conn, num, account, resume_service)
+            if detail:
+                result['details'].append(detail)
+                if detail.get('ingested'):
+                    result['resumes_ingested'] += 1
+                    result['candidates'].append(detail.get('candidate'))
+
+        account.last_sync_time = datetime.now()
+        db.session.commit()
+
+    except Exception as exc:
+        log.error("Mailbox sync failed for %s: %s", acct_name, exc, exc_info=True)
+        db.session.rollback()
+        result['status'] = 'error'
+        result['error'] = str(exc)
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            try:
+                conn.logout()
+            except Exception:
+                pass
+
+    _audit_sync(account, result)
+    return result
+
+
+def _process_one_message(conn, num, account, resume_service):
+    """Fetch and process a single email. Returns a detail dict or None."""
+    from app.extensions import db
+
+    status, msg_data = conn.fetch(num, '(RFC822)')
+    if status != 'OK' or not msg_data or not msg_data[0]:
+        return None
+
+    msg = message_from_bytes(msg_data[0][1])
+    subject = _decode_str(msg.get('Subject'))
+    sender = parseaddr(_decode_str(msg.get('From')))[1]
+
+    detail = {'subject': subject[:80], 'from': sender, 'ingested': False}
+
+    attachments = [
+        (fn, payload) for fn, payload in _iter_attachments(msg)
+        if resume_service.is_resume_attachment(fn)
+    ]
+
+    try:
+        if attachments:
+            for fn, payload in attachments:
+                try:
+                    r = resume_service.ingest_resume(
+                        payload, fn,
+                        source_channel='邮箱',
+                        mail_account_id=account.id,
+                    )
+                    detail.update(
+                        ingested=True, file=fn,
+                        candidate=r['candidate_name'],
+                        candidate_no=r['candidate_no'],
+                        engine=r['parse_engine'],
+                    )
+                    # Mark as seen only after successful ingest
+                    conn.store(num, '+FLAGS', '\\Seen')
+                    break  # one resume per email is enough
+                except ValueError as exc:
+                    log.warning("Attachment %s skipped: %s", fn, exc)
+                    detail['note'] = str(exc)
+                except Exception as exc:
+                    log.error("Attachment %s ingest failed: %s", fn, exc, exc_info=True)
+                    db.session.rollback()
+                    detail['note'] = f'入库失败: {exc}'
+        else:
+            # No resume attachment — check whether the body itself is a resume
+            body = _extract_body(msg)
+            if body and resume_service.looks_like_resume(subject, body) and len(body) > 150:
+                try:
+                    r = resume_service.ingest_resume(
+                        body.encode('utf-8'),
+                        f'{subject[:40] or "email-resume"}.txt',
+                        source_channel='邮箱',
+                        mail_account_id=account.id,
+                        raw_text=body,
+                    )
+                    detail.update(
+                        ingested=True, file='(邮件正文)',
+                        candidate=r['candidate_name'],
+                        candidate_no=r['candidate_no'],
+                        engine=r['parse_engine'],
+                    )
+                    conn.store(num, '+FLAGS', '\\Seen')
+                except Exception as exc:
+                    log.error("Body ingest failed (%s): %s", subject[:40], exc, exc_info=True)
+                    db.session.rollback()
+                    detail['note'] = f'正文解析失败: {exc}'
+            else:
+                detail['note'] = '非简历邮件，跳过'
+    except Exception as exc:
+        log.error("Message processing failed: %s", exc, exc_info=True)
+        detail['note'] = str(exc)
+
+    return detail
+
+
+def _is_due(account, now=None):
+    """Whether an account is due for sync based on its sync_freq (minutes)."""
+    if account.last_sync_time is None:
+        return True
+    now = now or datetime.now()
+    freq_min = account.sync_freq or 30
+    elapsed = (now - account.last_sync_time).total_seconds() / 60
+    return elapsed >= freq_min
+
+
+def sync_all_accounts(respect_freq=False):
+    """Sync every active mail account. Returns aggregate summary.
+
+    Args:
+        respect_freq: when True (periodic Celery beat), skip accounts whose
+            per-account sync_freq has not elapsed since last_sync_time.
+            Manual refresh from the API passes False and always syncs.
+    """
+    from app.models.auxiliary import RecruitMailAccount
+
+    accounts = RecruitMailAccount.active().filter(
+        RecruitMailAccount.status == 1,
+    ).all()
+
+    if respect_freq:
+        due_accounts = [a for a in accounts if _is_due(a)]
+        skipped = len(accounts) - len(due_accounts)
+        if skipped:
+            log.info("Email sync tick: %d account(s) skipped (sync_freq not reached)", skipped)
+        accounts = due_accounts
+
+    summary = {
+        'status': 'ok', 'accounts_checked': len(accounts),
+        'new_emails': 0, 'resumes_ingested': 0, 'details': [],
+    }
+    for acct in accounts:
+        r = sync_mail_account(acct.id)
+        summary['new_emails'] += r.get('new_emails', 0)
+        summary['resumes_ingested'] += r.get('resumes_ingested', 0)
+        summary['details'].append(r)
+        if r.get('status') == 'error':
+            summary['status'] = 'partial'
+    if summary['accounts_checked'] == 0:
+        summary['status'] = 'ok'
+    return summary
+
+
+def _audit_sync(account, result):
+    """Write an audit log entry for the sync run (best-effort)."""
+    try:
+        from app.services.config_service import append_audit_log
+        if result.get('status') == 'error':
+            detail = f"{result.get('email')} 同步失败: {result.get('error', '')[:100]}"
+        else:
+            detail = (f"{result.get('email')} 拉取 {result.get('new_emails', 0)} 封邮件，"
+                      f"识别入库 {result.get('resumes_ingested', 0)} 封简历")
+        append_audit_log('系统', '邮件', '邮箱同步', detail)
+    except Exception as exc:
+        log.warning("Audit log for mail sync failed: %s", exc)

@@ -6,6 +6,8 @@ and falls back to hardcoded mock data when _mock_enabled() returns True.
 import logging
 from datetime import datetime
 
+import requests
+
 from app.utils.response import AppError
 from app.services.crypto_utils import encrypt, decrypt
 
@@ -15,6 +17,17 @@ log = logging.getLogger(__name__)
 def _mock_enabled():
     from app.utils.response import should_mock_fallback
     return should_mock_fallback()
+
+
+def _encrypt_mail_password(raw):
+    """Encrypt a mailbox password/authorization code for storage.
+
+    Returns None when raw is empty (field left unchanged by callers).
+    """
+    if not raw:
+        return None
+    from flask import current_app
+    return encrypt(raw, current_app.config['SECRET_KEY'])
 
 
 # ── In-memory channel cost mapping ──
@@ -256,11 +269,21 @@ def create_email_account(data):
             monitor_folder=data.get('folder', 'INBOX'),
             mail_type=data.get('type'),
             sync_freq=freq_minutes,
-            password_encrypted=data.get('pass'),
-            last_sync_time=datetime.now() if data.get('__test_conn') else None,
+            password_encrypted=_encrypt_mail_password(data.get('pass')),
         )
         db.session.add(account)
         db.session.commit()
+
+        # Real IMAP connection test when requested
+        if data.get('__test_conn'):
+            from app.services.email_sync_service import test_connection
+            ok, msg = test_connection(account)
+            account.last_sync_time = datetime.now() if ok else None
+            db.session.commit()
+            if not ok:
+                return {'created': True, 'id': account.id, 'address': address,
+                        'test_ok': False, 'test_msg': msg}
+
         return {'created': True, 'id': account.id, 'address': address}
     except Exception as exc:
         log.error("DB write failed in create_email_account: %s", exc, exc_info=True)
@@ -302,9 +325,13 @@ def update_email_account(account_id, data):
         if 'freq' in data:
             account.sync_freq = _MAIL_FREQ_REVERSE.get(data['freq'], 30)
         if 'pass' in data and data['pass']:
-            account.password_encrypted = data['pass']
+            account.password_encrypted = _encrypt_mail_password(data['pass'])
         if '__test_conn' in data:
-            account.last_sync_time = datetime.now()
+            from app.services.email_sync_service import test_connection
+            ok, msg = test_connection(account)
+            account.last_sync_time = datetime.now() if ok else account.last_sync_time
+            db.session.commit()
+            return {'updated': True, 'id': int(account_id), 'test_ok': ok, 'test_msg': msg}
 
         db.session.commit()
         return {'updated': True, 'id': int(account_id)}
@@ -667,10 +694,23 @@ def get_ai_capabilities():
 # ── API Key management ──
 
 _API_KEY_DISPLAY = {
-    'deepseek': {'label': 'DeepSeek API Key', 'desc': 'AI 简历解析、匹配打分、JD生成'},
-    'feishu':   {'label': '飞书 App Secret',  'desc': '消息通知、审批推送'},
+    'deepseek': {'label': 'DeepSeek API Key', 'desc': 'AI 简历解析、匹配打分、JD生成',
+                 'link': 'https://platform.deepseek.com/api_keys', 'link_text': '去 DeepSeek 开放平台获取 Key'},
+    'feishu_app_id': {'label': '飞书 App ID',  'desc': '消息通知、审批推送（与 App Secret 配对使用）',
+                      'link': 'https://open.feishu.cn/app', 'link_text': '去飞书开放平台创建应用，获取 App ID 与 App Secret'},
+    'feishu':   {'label': '飞书 App Secret',  'desc': '消息通知、审批推送（与 App ID 配对使用）',
+                 'link': 'https://open.feishu.cn/app', 'link_text': '去飞书开放平台创建应用，获取 App ID 与 App Secret'},
     'dify':     {'label': 'Dify API Key',     'desc': 'Dify 工作流引擎（兼容保留）'},
+    'tencent_appid':     {'label': '腾讯会议 AppId',       'desc': '腾讯会议开放平台应用 AppId'},
+    'tencent_secretid':  {'label': '腾讯会议 SecretId',    'desc': '腾讯会议开放平台 SecretId'},
+    'tencent_secretkey': {'label': '腾讯会议 SecretKey',   'desc': '腾讯会议开放平台 SecretKey（加密存储）'},
+    'tencent_userid':    {'label': '腾讯会议主持人 UserID', 'desc': '创建会议时的主持人 userid（必填）'},
 }
+
+# Tencent Meeting credential key names stored in ApiKeyConfig
+TENCENT_MEETING_KEY_NAMES = (
+    'tencent_appid', 'tencent_secretid', 'tencent_secretkey', 'tencent_userid',
+)
 
 
 def get_api_keys():
@@ -692,6 +732,8 @@ def get_api_keys():
             'desc': display['desc'],
             'masked': masked,
             'has_value': has_value,
+            'link': display.get('link'),
+            'link_text': display.get('link_text'),
         }
     return result
 
@@ -744,6 +786,121 @@ def get_decrypted_api_key(key_name):
         return decrypt(row.value_encrypted, secret)
     except Exception:
         return None
+
+
+def test_api_key(key_name):
+    """Test whether an API key actually works against its provider.
+
+    Resolution order mirrors real usage: environment variable first, then the
+    encrypted DB value. Returns a safe dict (never contains the key itself):
+
+        {"ok": bool, "supported": bool, "message": str,
+         "source": "env"|"db"|None, "tested_at": iso8601}
+    """
+    import os
+
+    result = {'ok': False, 'supported': True, 'message': '', 'source': None,
+              'tested_at': datetime.now().isoformat(timespec='seconds')}
+
+    if key_name not in ('deepseek', 'feishu', 'dify'):
+        result['supported'] = False
+        result['message'] = '该密钥暂不支持连通性测试'
+        return result
+
+    if key_name == 'dify':
+        result['supported'] = False
+        result['message'] = 'Dify 为兼容保留配置，暂不支持连通性测试'
+        return result
+
+    if key_name == 'deepseek':
+        key = os.getenv('DEEPSEEK_API_KEY') or get_decrypted_api_key('deepseek')
+        result['source'] = 'env' if os.getenv('DEEPSEEK_API_KEY') else ('db' if key else None)
+        if not key:
+            result['message'] = '未配置密钥，请先保存'
+            return result
+        from config import Config
+        base = (getattr(Config, 'DEEPSEEK_BASE_URL', '') or 'https://api.deepseek.com').rstrip('/')
+        try:
+            resp = requests.get(f'{base}/models',
+                                headers={'Authorization': f'Bearer {key}'}, timeout=10)
+        except requests.RequestException as exc:
+            result['message'] = f'网络请求失败：{exc.__class__.__name__}'
+            return result
+        if resp.status_code == 200:
+            result['ok'] = True
+            result['message'] = '连接成功，密钥可用'
+        elif resp.status_code in (401, 403):
+            result['message'] = '密钥无效或已过期（HTTP %d）' % resp.status_code
+        else:
+            result['message'] = f'服务返回 HTTP {resp.status_code}'
+        return result
+
+    # feishu: app_id / secret 均为环境变量优先，其次取配置页加密集群
+    app_id = os.getenv('FEISHU_APP_ID') or get_decrypted_api_key('feishu_app_id') or ''
+    secret = os.getenv('FEISHU_APP_SECRET') or get_decrypted_api_key('feishu')
+    result['source'] = 'env' if os.getenv('FEISHU_APP_SECRET') else ('db' if secret else None)
+    if not secret:
+        result['message'] = '未配置 App Secret，请先保存'
+        return result
+    if not app_id:
+        result['message'] = '未配置 App ID，请先保存'
+        return result
+    try:
+        resp = requests.post(
+            'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
+            json={'app_id': app_id, 'app_secret': secret}, timeout=10)
+        body = resp.json()
+    except requests.RequestException as exc:
+        result['message'] = f'网络请求失败：{exc.__class__.__name__}'
+        return result
+    except ValueError:
+        result['message'] = f'服务返回非 JSON 响应（HTTP {resp.status_code}）'
+        return result
+    if body.get('code') == 0:
+        result['ok'] = True
+        result['message'] = '连接成功，已获取 tenant_access_token'
+    else:
+        result['message'] = f"飞书返回错误：{body.get('msg', '未知错误')}（code={body.get('code')}）"
+    return result
+
+
+def get_tencent_meeting_credentials():
+    """Return decrypted Tencent Meeting credentials as a dict.
+
+    Values are None when not configured. Used internally by
+    ``tencent_meeting_client`` — never expose via API.
+    """
+    return {k: get_decrypted_api_key(k) for k in TENCENT_MEETING_KEY_NAMES}
+
+
+def get_tencent_meeting_status():
+    """Return whether all four Tencent Meeting credentials are configured.
+
+    Safe for API responses — contains booleans only, no values.
+    """
+    from app.models.auxiliary import ApiKeyConfig
+
+    fields = {}
+    for key_name in TENCENT_MEETING_KEY_NAMES:
+        row = ApiKeyConfig.active().filter_by(key_name=key_name).first()
+        fields[key_name] = bool(row and row.value_encrypted)
+    return {'configured': all(fields.values()), 'fields': fields}
+
+
+def get_feishu_status():
+    """Return whether the Feishu credential pair (App ID + App Secret) is configured.
+
+    Resolution order mirrors real usage: environment variables first, then the
+    encrypted DB values. Safe for API responses — booleans only, no values.
+    """
+    import os
+
+    app_id = bool(os.getenv('FEISHU_APP_ID') or get_decrypted_api_key('feishu_app_id'))
+    app_secret = bool(os.getenv('FEISHU_APP_SECRET') or get_decrypted_api_key('feishu'))
+    return {
+        'configured': app_id and app_secret,
+        'fields': {'app_id': app_id, 'app_secret': app_secret},
+    }
 
 
 def _mask_value(encrypted: str) -> str:

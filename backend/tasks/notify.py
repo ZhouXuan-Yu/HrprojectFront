@@ -430,9 +430,11 @@ def notify_batch(book_ids):
 # ============================================================================
 
 BEAT_SCHEDULE = {
-    'sync-email-every-30min': {
+    # 15 分钟 tick 一次；每个邮箱按自己的 sync_freq（30分钟/2小时/每天…）
+    # 在任务内部判断是否到期，避免为不同频率建多个 schedule
+    'sync-email-tick': {
         'task': 'tasks.email_sync.sync_all_mailboxes',
-        'schedule': 1800.0,  # 30 minutes
+        'schedule': 900.0,  # 15 minutes
     },
     'check-overdue-evaluations': {
         'task': 'tasks.notify.check_overdue',

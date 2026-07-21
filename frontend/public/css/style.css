@@ -531,7 +531,9 @@ button{letter-spacing:0}
   border-bottom:1px solid var(--e-border);
   gap:12px;
   min-width:0;
-  overflow-x:auto;
+  /* 不能用 overflow-x:auto：它会让 overflow-y 也变为裁剪，
+     顶栏里的下拉层（铃铛预警等）会被顶栏自身裁掉 */
+  overflow:visible;
   scrollbar-width:none;
 }
 .topbar::-webkit-scrollbar{display:none}

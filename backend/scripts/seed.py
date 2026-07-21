@@ -85,23 +85,28 @@ def seed():
 
         # ── Candidates ──
         if not Candidate.query.first():
+            import hashlib
+            def _cand(no, name, mobile, email, **kw):
+                return Candidate(candidate_no=no, candidate_name=name,
+                    mobile=mobile, email=email,
+                    mobile_hash=hashlib.sha256(mobile.encode()).hexdigest(), **kw)
             cands = [
-                Candidate(candidate_no='C2026070012', candidate_name='张三', mobile_hash='h1',
+                _cand('C2026070012', '张三', '13812345678', 'zhangsan@example.com',
                     static_ability_score=88, edu_level=2, school_level=3, work_years=5,
                     big_company_flag=1, status='locked', source_channel='邮箱'),
-                Candidate(candidate_no='C2026070010', candidate_name='郑一', mobile_hash='h2',
+                _cand('C2026070010', '郑一', '13923456789', 'zhengyi@example.com',
                     static_ability_score=84, edu_level=2, school_level=2, work_years=4,
                     big_company_flag=1, status='locked', source_channel='猎聘'),
-                Candidate(candidate_no='C2026070011', candidate_name='李四', mobile_hash='h3',
+                _cand('C2026070011', '李四', '13734567890', 'lisi@example.com',
                     static_ability_score=76, edu_level=3, school_level=3, work_years=3,
                     big_company_flag=1, status='available', source_channel='Boss'),
-                Candidate(candidate_no='C2026070007', candidate_name='王五', mobile_hash='h4',
+                _cand('C2026070007', '王五', '13645678901', 'wangwu@example.com',
                     static_ability_score=80, edu_level=3, school_level=2, work_years=3,
                     big_company_flag=1, status='reserve', source_channel='Boss'),
-                Candidate(candidate_no='C2026070009', candidate_name='孙九', mobile_hash='h5',
+                _cand('C2026070009', '孙九', '13556789012', 'sunjiu@example.com',
                     static_ability_score=68, edu_level=2, school_level=1, work_years=6,
                     big_company_flag=1, status='locked', source_channel='内推'),
-                Candidate(candidate_no='C2024070001', candidate_name='孙七', mobile_hash='h6',
+                _cand('C2024070001', '孙七', '13467890123', 'sunqi@example.com',
                     static_ability_score=55, edu_level=3, school_level=1, work_years=7,
                     status='archived', source_channel='猎聘'),
             ]

@@ -47,44 +47,44 @@ def evaluate(interview_id):
     return success(result)
 
 
-@bp.route('/<int:book_id>')
+@bp.route('/<book_id>')
 def get_detail(book_id):
     """GET /api/interview/{id} — single interview detail."""
-    from app.services.interview_service import get_interview
-    data = get_interview(book_id)
+    from app.services.interview_service import get_interview, _normalize_book_id
+    data = get_interview(_normalize_book_id(book_id))
     return success(data)
 
 
-@bp.route('/<int:book_id>', methods=['DELETE'])
+@bp.route('/<book_id>', methods=['DELETE'])
 def cancel(book_id):
     """DELETE /api/interview/{id} — cancel interview with reason."""
-    from app.services.interview_service import cancel_interview
+    from app.services.interview_service import cancel_interview, _normalize_book_id
     body = request.get_json(silent=True) or {}
-    result = cancel_interview(book_id, reason=body.get('reason', ''))
+    result = cancel_interview(_normalize_book_id(book_id), reason=body.get('reason', ''))
     return success(result)
 
 
-@bp.route('/<int:book_id>/complete', methods=['POST'])
+@bp.route('/<book_id>/complete', methods=['POST'])
 def complete(book_id):
     """POST /api/interview/{id}/complete — mark interview as completed (scheduled -> evaluating)."""
-    from app.services.interview_service import complete_interview
-    result = complete_interview(book_id, request.get_json(silent=True) or {})
+    from app.services.interview_service import complete_interview, _normalize_book_id
+    result = complete_interview(_normalize_book_id(book_id), request.get_json(silent=True) or {})
     return success(result)
 
 
-@bp.route('/<int:book_id>/offer', methods=['POST'])
+@bp.route('/<book_id>/offer', methods=['POST'])
 def send_offer(book_id):
     """POST /api/interview/{id}/offer — send offer after evaluation passed."""
-    from app.services.interview_service import send_offer
-    result = send_offer(book_id, request.get_json(silent=True) or {})
+    from app.services.interview_service import send_offer, _normalize_book_id
+    result = send_offer(_normalize_book_id(book_id), request.get_json(silent=True) or {})
     return success(result)
 
 
-@bp.route('/<int:book_id>/onboard', methods=['POST'])
+@bp.route('/<book_id>/onboard', methods=['POST'])
 def confirm_onboard(book_id):
     """POST /api/interview/{id}/onboard — confirm candidate onboard."""
-    from app.services.interview_service import confirm_onboard
-    result = confirm_onboard(book_id)
+    from app.services.interview_service import confirm_onboard, _normalize_book_id
+    result = confirm_onboard(_normalize_book_id(book_id))
     return success(result)
 
 

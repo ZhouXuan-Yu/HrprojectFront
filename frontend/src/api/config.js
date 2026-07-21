@@ -5,6 +5,8 @@ export async function fetchEmailAccounts()    { const r = await api.get('/config
 export async function createEmailAccount(d)   { const r = await api.post('/config/email-accounts', d); return r.data; }
 export async function updateEmailAccount(id,d){ const r = await api.put(`/config/email-accounts/${id}`, d); return r.data; }
 export async function deleteEmailAccount(id)  { const r = await api.delete(`/config/email-accounts/${id}`); return r.data; }
+export async function syncAllEmailAccounts()  { const r = await api.post('/config/email-accounts/sync'); return r.data; }
+export async function syncEmailAccount(id)    { const r = await api.post(`/config/email-accounts/${id}/sync`); return r.data; }
 
 export async function fetchChannels()         { const r = await api.get('/config/channels'); return r.data; }
 export async function createChannel(d)        { const r = await api.post('/config/channels', d); return r.data; }
@@ -22,3 +24,6 @@ export async function fetchAuditLogs()        { const r = await api.get('/config
 export async function fetchAiCapabilities()   { const r = await api.get('/ai/capabilities'); return r.data; }
 export async function fetchApiKeys()          { const r = await api.get('/config/api-keys'); return r.data; }
 export async function saveApiKeys(d)          { const r = await api.put('/config/api-keys', d); return r.data; }
+export async function testApiKey(name)        { const r = await api.post('/config/api-keys/test', { key_name: name }); return r.data; }
+export async function fetchTencentStatus()    { const r = await api.get('/config/tencent-meeting/status'); return r.data; }
+export async function fetchFeishuStatus()     { const r = await api.get('/config/feishu/status'); return r.data; }

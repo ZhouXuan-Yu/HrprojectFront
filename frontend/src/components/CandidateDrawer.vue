@@ -49,6 +49,32 @@
           <div v-if="data.note" style="margin-top:16px;padding:12px;background:var(--c-bg);border-radius:8px;font-size:13px;color:var(--c-body)">
             <span style="font-weight:700;color:var(--c-text)">备注：</span>{{ data.note }}
           </div>
+
+          <!-- AI 简历解析结果 -->
+          <div v-if="data.resume" style="margin-top:16px;padding:14px;background:var(--c-primary-subtle,#EEF2FF);border:1px solid rgba(79,110,247,.18);border-radius:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div style="font-size:13px;font-weight:700;color:var(--c-text)">
+                🤖 AI 简历解析
+                <span style="font-size:11px;font-weight:400;color:var(--c-sub);margin-left:6px">
+                  {{ data.resume.parseEngine === 'deepseek' ? 'DeepSeek' : '本地解析' }} · {{ data.resume.parsedAt }}
+                </span>
+              </div>
+              <button v-if="data.resume.resumeId && data.resume.fileName" class="btn btn-outline btn-sm"
+                      :disabled="openingFile" @click="openResumeFile">
+                {{ openingFile ? '打开中...' : '📄 查看原件' }}
+              </button>
+            </div>
+            <div v-if="data.resume.summary" style="font-size:13px;color:var(--c-body);line-height:1.7;margin-bottom:10px">{{ data.resume.summary }}</div>
+            <div v-if="data.resume.skills && data.resume.skills.length" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+              <span v-for="sk in data.resume.skills" :key="sk" class="tag-item tag-hit">{{ sk }}</span>
+            </div>
+            <div v-if="data.resume.certs && data.resume.certs.length" style="font-size:12px;color:var(--c-sub)">
+              证书：{{ data.resume.certs.join('、') }}
+            </div>
+            <div style="font-size:11px;color:var(--c-sub);margin-top:8px">
+              原件：{{ data.resume.fileName || '(未保存文件)' }} · 入库 {{ data.resume.storageTime }}
+            </div>
+          </div>
         </div>
 
         <div class="drawer-actions" v-if="!loading && !errorMsg">
@@ -63,7 +89,7 @@
 
 <script setup>
 import { ref, watch } from 'vue';
-import { fetchCandidateDetail } from '../api/talent.js';
+import { fetchCandidateDetail, fetchResumeFile } from '../api/talent.js';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -75,6 +101,7 @@ const emit = defineEmits(['close', 'contact', 'join']);
 const data = ref({});
 const loading = ref(false);
 const errorMsg = ref('');
+const openingFile = ref(false);
 
 watch(() => [props.visible, props.candidateId], ([v]) => { if (v) load(); }, { immediate: true });
 
@@ -89,6 +116,22 @@ async function load() {
     errorMsg.value = e.message || '加载候选人详情失败';
   } finally {
     loading.value = false;
+  }
+}
+
+async function openResumeFile() {
+  const resumeId = data.value?.resume?.resumeId;
+  if (!resumeId) return;
+  openingFile.value = true;
+  try {
+    const blob = await fetchResumeFile(resumeId);
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    errorMsg.value = '打开简历原件失败：' + (e.message || '未知错误');
+  } finally {
+    openingFile.value = false;
   }
 }
 
