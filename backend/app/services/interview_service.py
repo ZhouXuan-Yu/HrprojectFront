@@ -660,7 +660,14 @@ def evaluate_interview(book_id, data):
 def send_offer(book_id, data):
     """Send offer after evaluation passed — evaluating -> offer.
 
-    Creates an Offer record via hire_service and updates the process.
+    Creates an Offer via hire_service and actually sends it (draft -> sent,
+    with salary validation, letter generation and candidate email).
+
+    Draft-reuse: if a previous attempt left a draft Offer for the same
+    candidate+demand (e.g. the request was retried after a failure), the
+    draft is updated and sent instead of raising DUPLICATE_OFFER, so the
+    "发送 Offer" action is idempotent. An already-sent/accepted Offer still
+    blocks with a clear message.
     """
     from app.models.interview import InterviewBook, InterviewRecord
     from app.models.process import RecruitProcess
@@ -675,7 +682,7 @@ def send_offer(book_id, data):
         raise AppError('INVALID_STATE', f'面试预约 {book_id} 尚未通过评价')
 
     # Create the offer via hire_service
-    from app.services.hire_service import create_offer
+    from app.services import hire_service
     offer_data = {
         'resumeId': book.resume_id,
         'processId': book.process_id,
@@ -686,7 +693,46 @@ def send_offer(book_id, data):
         'validDeadline': data.get('valid_deadline'),
         'sendUserId': data.get('send_user_id', 0),
     }
-    result = create_offer(offer_data)
+
+    reused = False
+    try:
+        result = hire_service.create_offer(offer_data)
+        offer_no = result['id']
+    except AppError as exc:
+        if exc.code != 'DUPLICATE_OFFER':
+            raise
+        # A previous attempt left an Offer for this candidate+demand — reuse if draft
+        from app.models.hire import Offer
+        existing = Offer.query.filter(
+            Offer.resume_id == book.resume_id,
+            Offer.demand_id == book.demand_id,
+            Offer.is_deleted == 0,
+        ).order_by(Offer.id.desc()).first()
+        if not existing or existing.offer_status != 0:
+            status_label = hire_service.OFFER_STATUS_LABELS.get(
+                existing.offer_status if existing else -1, '未知')
+            raise AppError(
+                'DUPLICATE_OFFER',
+                f'该候选人已存在"{status_label}"状态的Offer（{existing.offer_no if existing else "?"}），'
+                '请勿重复发送；如需修改请先撤回原Offer')
+        # Update the draft with the latest submitted fields
+        if offer_data['offerContent']:
+            existing.offer_content = offer_data['offerContent']
+        if offer_data['salaryJson']:
+            existing.salary_json = offer_data['salaryJson']
+        if offer_data['validDeadline']:
+            parsed = hire_service._parse_date(offer_data['validDeadline'])
+            if parsed:
+                existing.valid_deadline = datetime.combine(
+                    parsed, datetime.max.time().replace(microsecond=0))
+        existing.last_interview_id = record.id
+        db.session.flush()
+        offer_no = existing.offer_no
+        reused = True
+        log.info("复用已有草稿Offer: %s (book_id=%s)", offer_no, book_id)
+
+    # Actually send it: draft -> sent, validates salary, generates letter, emails candidate
+    send_result = hire_service.send_offer(offer_no)
 
     # Update process
     if book.process_id:
@@ -695,8 +741,8 @@ def send_offer(book_id, data):
             process.process_status = 5  # pending offer
 
     db.session.commit()
-    log.info("Offer已发送: book_id=%s, offer_no=%s", book_id, result.get('id'))
-    return result
+    log.info("Offer已发送: book_id=%s, offer_no=%s, reused=%s", book_id, offer_no, reused)
+    return {**send_result, 'id': offer_no, 'reused': reused}
 
 
 def confirm_onboard(book_id):
