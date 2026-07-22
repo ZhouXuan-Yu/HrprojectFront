@@ -9,6 +9,18 @@ log = logging.getLogger(__name__)
 bp = Blueprint('config', __name__)
 
 
+@bp.route('/email-accounts/detect', methods=['POST'])
+def detect_email_server():
+    """POST /api/config/email-accounts/detect — auto-detect IMAP server from email."""
+    from app.services.email_sync_service import detect_imap_server
+    body = request.get_json(silent=True) or {}
+    email = body.get('email', '')
+    if not email or '@' not in email:
+        return error('BAD_REQUEST', '请提供有效的邮箱地址')
+    result = detect_imap_server(email)
+    return success(result)
+
+
 @bp.route('/email-accounts')
 def get_email_accounts():
     """GET /api/config/email-accounts"""

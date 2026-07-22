@@ -24,12 +24,26 @@ _client: Optional[OpenAI] = None
 
 
 def _get_client() -> OpenAI:
-    """Return (and cache) the OpenAI-compatible DeepSeek client."""
+    """Return (and cache) the OpenAI-compatible DeepSeek client.
+
+    REVIEW: key 获取优先级
+        1. 环境变量 DEEPSEEK_API_KEY（.env）
+        2. 数据库 t_hr_api_key（网页「API 密钥管理」配置，AES-256-GCM 加密存储）
+        3. 两者皆空 → API 调用将失败，AI 功能降级为本地规则引擎
+    改动原因：支持在网页端配置 DeepSeek key，无需登录服务器改 .env 重启。
+    """
     global _client
     if _client is None:
         from config import Config
+        api_key = Config.DEEPSEEK_API_KEY
+        if not api_key:
+            try:
+                from app.services.config_service import get_decrypted_api_key
+                api_key = get_decrypted_api_key('deepseek') or ''
+            except Exception:
+                pass
         _client = OpenAI(
-            api_key=Config.DEEPSEEK_API_KEY,
+            api_key=api_key,
             base_url=Config.DEEPSEEK_BASE_URL,
         )
     return _client

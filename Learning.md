@@ -39,3 +39,12 @@
 - 用户添加 `deepseek_client.py` + `boss_cli_service.py` + `boss.py` + `ai.py` 重写
 - 47→50 文件，AI 3→6 工作流
 - E2E 33/33 保持不变
+
+## 复盘 #8 — 项目复现 & 审批还原 (7/22)
+
+- **模型加字段要重建 DB**：给 `RecruitDemand` 加 `position_name` 列后，旧 SQLite 文件仍存在，`create_all()` 不会自动 ALTER TABLE。必须 `drop_all()` + `create_all()` 或手动 ALTER。
+- **审批 `commit()` 顺序**：`_fire_match_batch()` 在 `commit()` 之前执行会卡死 HTTP 响应——匹配任务调 DeepSeek API 超时导致 commit 永远不执行。应先 commit 再触发异步任务。
+- **模板传参类型**：`@click="fn(d.id)"` 传字符串，函数里 `d.id` 就是 `undefined`。Vue 模板传对象要写 `@click="fn(d)"`。
+- **前端事件不可靠**：`@blur` / `@change` 在某些交互顺序下不触发。改用 Vue `watch` 监听数据变化更可靠。
+- **邮箱重复添加**：`email_address` 有 unique 约束，软删除的记录也会冲突。创建前先查是否存在，软删除的复用、活跃的报错。
+- **变更前确认**：修改了大量业务代码后用户要求还原，因为没有 git 只能手动逐文件 revert。以后大改动前先 `git init` + `git commit` 保存基线。

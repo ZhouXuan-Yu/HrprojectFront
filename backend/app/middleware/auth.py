@@ -8,6 +8,7 @@ import jwt
 AUTH_WHITELIST = {
     'auth.login',
     'static',
+    'health',               # REVIEW: 新增，health 端点免登录，方便运维探活
     'health.health_check',
     # 候选人确认页/提交 —— 通过签名 token 鉴权，无需登录
     'confirm.confirm_page',

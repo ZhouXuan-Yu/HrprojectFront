@@ -44,10 +44,10 @@ class Config:
     DIFY_WORKFLOW_MATCH = os.getenv('DIFY_WORKFLOW_MATCH', '')
     DIFY_WORKFLOW_INTERVIEW_QA = os.getenv('DIFY_WORKFLOW_INTERVIEW_QA', '')
 
-    # DeepSeek AI — required, no hardcoded fallback
-    DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY')
-    if not DEEPSEEK_API_KEY:
-        raise ValueError("DEEPSEEK_API_KEY environment variable is required")
+    # DeepSeek AI
+    # REVIEW: 原为必填（空值抛 ValueError），改为可选。
+    # 留空时系统从数据库 t_hr_api_key 读取网页端配置的 key，支持线上配置无需重启。
+    DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
     DEEPSEEK_BASE_URL = os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
     DEEPSEEK_MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat')
 
