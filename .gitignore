@@ -49,3 +49,11 @@ frontend/.codebase-memory/
 
 # --- Docs with secrets (dev plan contains keys) ---
 docs/DEVELOPMENT_PLAN.md
+
+# --- Runtime / local artifacts ---
+.meta-kim/
+frontend/.meta-kim/
+.vite/
+backend/*.db-shm
+backend/*.db-wal
+backend/uploads/
