@@ -244,20 +244,17 @@ def _connect(account):
     if not password:
         raise RuntimeError('未配置邮箱密码/授权码——请在「基础配置→邮箱配置」中输入授权码')
 
-    from imaplib import IMAP4_SSL, IMAP4
-    timeout_secs = 15  # shorter timeout per-connection so UI doesn't hang
+    from imaplib import IMAP4_SSL
+    timeout_secs = 10  # short so IMAP failures don't block the UI
     try:
         conn = IMAP4_SSL(host, port, timeout=timeout_secs)
-    except Exception:
-        # Some mail servers (especially fake ones in dev) require STARTTLS fallback
-        conn = IMAP4(host, port, timeout=timeout_secs)
-        conn.starttls()
+    except socket.timeout:
+        raise RuntimeError(f'连接 {host} 超时')
     conn.login(account.email_address, password)
 
     folder = account.monitor_folder or 'INBOX'
     status, _ = conn.select(f'"{folder}"', readonly=False)
     if status != 'OK':
-        # Fallback to INBOX when the custom folder doesn't exist
         log.warning("Folder %s not selectable on %s, falling back to INBOX",
                     folder, account.email_address)
         conn.select('INBOX', readonly=False)
