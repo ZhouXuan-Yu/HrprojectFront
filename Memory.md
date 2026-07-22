@@ -4,7 +4,7 @@
 
 **日期**：2026-07-22
 **阶段**：✅ 阶段 0-4 完成 | 项目复现 | 邮箱配置增强 | MySQL 云数据库就绪
-**状态**：后端 Flask 运行中 (:5000)，前端 Vite 运行中 (:5173)，前后端联通
+**状态**：后端 Flask 运行中 (:5000)，前端 Vite 运行中 (:7100)，前后端联通
 
 ## 2026-07-22 项目复现 & 配置
 
@@ -264,7 +264,7 @@ cd backend/ && python scripts/seed.py && python app.py  # :5000
 cd backend/ && python -m pytest tests/ -v                # 37/37
 
 # Frontend
-cd frontend/ && npm run dev                              # :5173
+cd frontend/ && npm run dev                              # :7100
 cd frontend/ && npx playwright test --workers=2          # 49/49 E2E
 ```
 
@@ -278,9 +278,9 @@ cd frontend/ && npx playwright test --workers=2          # 49/49 E2E
 | 数据库 31 张表 | ✅ db.create_all() + seed.py 种子数据 |
 | Flask :5000 | ✅ health/login/demand/talent/interview/AI 全部正常 |
 | 前端 npm install | ✅ 82 packages |
-| Vite dev server :5174 | ✅ (5173 被旧进程占用) |
+| Vite dev server | ✅ 端口已统一为 **7100**（原 5173/5174，5173 曾被旧进程占用） |
 | npm run build | ✅ 839ms |
-| Playwright E2E | **46/49** 通过。3 个失败：2 个 timeout（看板折叠面板/经营台）+ 1 个 workspace 元素缺失，均为测试连旧端口 5173 导致 |
+| Playwright E2E | **49/49** 通过 ✅（端口统一 7100 后重跑；JD 生成测试因真实 DeepSeek 流式耗时 15-40s，超时调整为 120s） |
 
 **修复**: `auth.py` AUTH_WHITELIST 新增 `'health'`（原只有 `'health.health_check'`，不匹配直接注册在 app 上的函数名）
 

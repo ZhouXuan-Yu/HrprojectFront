@@ -109,10 +109,10 @@ python app.py               # http://127.0.0.1:5000
 # 前端
 cd frontend/
 npm install
-npm run dev                 # http://127.0.0.1:5173（/api 代理到 5000）
+npm run dev                 # http://127.0.0.1:7100（/api 代理到 5000）
 ```
 
-浏览器打开 `http://127.0.0.1:5173/login`，默认账号 `admin / admin123`。
+浏览器打开 `http://127.0.0.1:7100/login`，默认账号 `admin / admin123`。
 
 ### 运行测试
 

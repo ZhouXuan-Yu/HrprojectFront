@@ -618,6 +618,8 @@ test('recruit-ai conversation area exposes role=log and back-to-bottom contract'
 });
 
 test('recruit-ai JD tab shows thinking panel and structured result after generate', async ({ page }) => {
+  // 真实 DeepSeek 流式生成需 15-40s，并行跑时更长，默认 30s 超时不够
+  test.setTimeout(120000);
   await page.goto('/recruit-ai');
   // 填写 JD 表单并提交
   await page.locator('[data-slot="ai-input-area"] input[aria-label="岗位名称"]').fill('高级后端工程师');
@@ -629,7 +631,7 @@ test('recruit-ai JD tab shows thinking panel and structured result after generat
   await expect(thinking).toBeVisible({ timeout: 5000 });
   await expect(thinking.locator('[data-slot="ai-thinking-header"]')).toContainText('思考过程');
   // 结构化结果最终渲染（流式缺失时由阻塞式 API 兜底，mock fallback 保证必有内容）
-  await expect(page.locator('[data-slot="ai-jd-result"]')).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('[data-slot="ai-jd-result"]')).toBeVisible({ timeout: 90000 });
   await expect(page.locator('[data-slot="ai-jd-result"] [data-slot="ai-jd-skill-row"]').first()).toBeVisible();
   // 职责区块不再是占位符
   await expect(page.locator('[data-slot="ai-jd-result"]')).not.toContainText('请查看上方 Markdown');

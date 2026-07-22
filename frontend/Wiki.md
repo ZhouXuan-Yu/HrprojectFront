@@ -24,7 +24,7 @@
 | 组件 | `src/components/` | BaseAccordion / BaseModal / StatusBadge / FunnelHero |
 | 测试 | Playwright | 当前 33 个 E2E 用例，全部通过 |
 | 构建 | `npm run build` | Vite build |
-| 本地运行 | `npm run dev` | 默认 `127.0.0.1:5173` |
+| 本地运行 | `npm run dev` | 默认 `127.0.0.1:7100` |
 | 代码图谱 | codebase-memory-mcp | 索引了 `src/` 和文档；`public/` 被排除 |
 | 全局增强层 | `public/js/app.js` + `public/css/style.css` | 命令面板、表格排序/密度/列显隐、折叠面板、移动端壳 |
 

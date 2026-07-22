@@ -60,11 +60,7 @@ class Config:
     IAM_DB_URL = os.getenv('IAM_DB_URL', '')
 
     # CORS
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://127.0.0.1:5173').split(',')
-
-    # Boss CLI
-    BOSS_CLI_ENABLED = os.environ.get('BOSS_CLI_ENABLED', 'true').lower() == 'true'
-    BOSS_CLI_TIMEOUT = int(os.environ.get('BOSS_CLI_TIMEOUT', '120'))
+    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://127.0.0.1:7100').split(',')
 
     # Mock fallback — when False, DB errors are surfaced instead of silently
     # using mock data. Set to True only in development when DB is unavailable.
@@ -87,7 +83,6 @@ class Config:
 
     # Fallback strategies: 'cache' | 'local_ai' | 'mock' | 'error'
     DEEPSEEK_FALLBACK = os.environ.get('DEEPSEEK_FALLBACK', 'cache')
-    BOSS_CLI_FALLBACK = os.environ.get('BOSS_CLI_FALLBACK', 'error')
 
 
 class DevelopmentConfig(Config):
