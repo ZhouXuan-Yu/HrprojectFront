@@ -1431,24 +1431,6 @@ function openInternalContactModal(name, manager){
         nextTitle:'下一步',
         next:[['批量加入需求','已选择后','/recruit-demand-detail'],['安排技术一面','今日','/recruit-interview'],['导出候选人清单','随时','/recruit-demand-detail']]
       },
-      'recruit-talent': {
-        overline:'Talent Assets',
-        title:'人才资产工作台',
-        desc:'把外部候选人、内部人才、黑名单和最近联系记录统一成资产视角。',
-        links:[['外部候选人','/recruit-talent'],['需求详情','/recruit-demand-detail'],['沟通辅助','/recruit-ai']],
-        primaryTitle:'人才池质量分层',
-        primarySub:'优先推进高匹配、近期可联系的人才',
-        rows:[
-          ['ok','外部候选人','7 人可筛选入库','按技能和城市过滤'],
-          ['warn','内部人才','6 人可调岗评估','需联系直属上级'],
-          ['danger','黑名单隔离','2 人需风险留痕','禁止加入需求']
-        ],
-        sideTitle:'标签覆盖',
-        sideSub:'简历筛选所需结构化字段',
-        meters:[['技能标签',12,88],['城市意向',8,66],['薪资范围',5,46],['联系记录',4,34]],
-        nextTitle:'今日动作',
-        next:[['批量联系候选人','人工确认','/recruit-talent'],['加入前端工程师需求','筛选后','/recruit-demand-detail'],['生成沟通话术','草稿','/recruit-ai']]
-      },
       'recruit-interview': {
         overline:'Interview Flow',
         title:'面试任务流工作台',
