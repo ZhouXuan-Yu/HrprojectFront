@@ -164,7 +164,7 @@
       <div class="table-wrap">
         <table v-if="extFiltered.length > 0"><thead><tr>
           <th style="width:34px"><input type="checkbox" id="checkAllExt" @change="toggleAllExt"></th>
-          <th>编号</th><th>姓名</th><th>画像</th><th>学历</th><th>年限</th><th>核心技能</th><th>最近公司</th><th>来源</th><th>入库</th><th>状态</th><th>备注</th><th>操作</th>
+          <th>编号</th><th>姓名</th><th>画像</th><th>学历</th><th>年限</th><th>核心技能</th><th>最近公司</th><th>应聘岗位/匹配</th><th>来源</th><th>入库</th><th>状态</th><th>备注</th><th>操作</th>
         </tr></thead><tbody>
           <tr v-for="c in extFiltered" :key="c.id" :class="rowClass(c)">
             <td><input type="checkbox" class="ext-check" v-model="checkedExt[c.id]" :disabled="c.locked" @change="onCheckExt"></td>
@@ -173,7 +173,18 @@
             <td><span class="portrait-score" :class="c.portraitClass">{{ c.portrait }}</span></td>
             <td>{{ c.edu }}</td><td>{{ c.years }}</td>
             <td v-html="wrapSkills(c.skillsHtml)"></td>
-            <td>{{ c.company }}</td><td>{{ c.source }}</td><td>{{ c.inDate }}</td>
+            <td>{{ c.company }}</td>
+            <td>
+              <template v-if="c.linkedDemands && c.linkedDemands.length">
+                <div v-for="ld in c.linkedDemands" :key="ld.demandNo" style="font-size:11px;line-height:1.6">
+                  <span style="font-weight:600">{{ ld.position }}</span>
+                  <span v-if="ld.matchScore != null" class="portrait-score" :class="ld.matchScore >= 80 ? 'score-high' : (ld.matchScore >= 60 ? 'score-mid' : 'score-low')" style="margin-left:4px">{{ ld.matchScore }}</span>
+                </div>
+              </template>
+              <span v-else-if="c.targetPosition" style="font-size:11px;color:var(--c-sub)">{{ c.targetPosition }}</span>
+              <span v-else style="color:var(--c-sub)">—</span>
+            </td>
+            <td>{{ c.source }}</td><td>{{ c.inDate }}</td>
             <td><StatusBadge :type="c.status === 'available' ? 'done' : (c.status === 'locked' ? 'progress' : 'draft')">{{ c.statusLabel }}</StatusBadge></td>
             <td>
               <template v-if="c.note">
@@ -495,18 +506,26 @@ async function manualMailSync() {
   try {
     const res = await syncAllEmailAccounts();
     const r = (res && res.data) ? res.data : res;
-    syncProcess.value = (r && r.details) || [];
     lastSyncText.value = new Date().toLocaleString('zh-CN', { hour12: false });
-    if (r && r.accounts_checked === 0) {
-      toast.warning('没有已启用的收简历邮箱，请先在「基础配置」中添加');
-    } else if (r && (r.new_emails > 0 || r.resumes_ingested > 0)) {
-      toast.success(`收取完成：新邮件 ${r.new_emails} 封，新入库简历 ${r.resumes_ingested} 份`);
-    } else if (r && r.status === 'partial') {
-      toast.warning('部分邮箱同步失败，请检查邮箱配置');
+    if (r && r.accepted) {
+      // 异步模式：后台同步已开始，稍后刷新查看结果
+      toast.success(r.message || '同步已开始，请稍后刷新查看结果');
+      syncProcess.value = [];
+      setTimeout(() => { Promise.all([loadFromApi(), loadIngestLog()]).catch(() => {}); }, 8000);
     } else {
-      toast.success('收取完成：暂无新简历邮件');
+      // 兼容旧的同步返回契约
+      syncProcess.value = (r && r.details) || [];
+      if (r && r.accounts_checked === 0) {
+        toast.warning('没有已启用的收简历邮箱，请先在「基础配置」中添加');
+      } else if (r && (r.new_emails > 0 || r.resumes_ingested > 0)) {
+        toast.success(`收取完成：新邮件 ${r.new_emails} 封，新入库简历 ${r.resumes_ingested} 份`);
+      } else if (r && r.status === 'partial') {
+        toast.warning('部分邮箱同步失败，请检查邮箱配置');
+      } else {
+        toast.success('收取完成：暂无新简历邮件');
+      }
+      await Promise.all([loadFromApi(), loadIngestLog()]);
     }
-    await Promise.all([loadFromApi(), loadIngestLog()]);
   } catch (e) {
     toast.error('邮箱刷新失败: ' + e.message);
   } finally {

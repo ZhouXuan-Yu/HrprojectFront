@@ -67,7 +67,7 @@ class AuditLog(BaseModel):
 class ApiKeyConfig(BaseModel):
     __tablename__ = 't_hr_api_key'
 
-    key_name = Column(String(64), unique=True, nullable=False, comment='密钥标识: deepseek/feishu/dify/boss')
+    key_name = Column(String(64), unique=True, nullable=False, comment='密钥标识: deepseek/feishu/dify')
     value_encrypted = Column(String(512), nullable=False, comment='AES-256-GCM 加密后的值')
     display_label = Column(String(64), nullable=True, comment='前端显示名称')
     status = Column(Integer, nullable=False, default=1, comment='1启用 0停用')

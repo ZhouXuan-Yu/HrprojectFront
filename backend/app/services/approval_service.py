@@ -190,13 +190,17 @@ def approve(demand_id, level, approve_user_id, opinion=None):
         is_deleted=0,
     ).all()
 
+    demand = RecruitDemand.query.filter_by(id=demand_id, is_deleted=0).first()
     if all(r.approve_result == 2 for r in all_records):
-        demand = RecruitDemand.query.filter_by(id=demand_id, is_deleted=0).first()
         if demand:
             demand.demand_status = 2  # 2 = approved/open
             demand.approved_at = now
             log.info("需求 %s 全部审批通过", demand.demand_no)
         _fire_match_batch(demand_id)
+
+    # Refresh the audit_flow snapshot so list/detail reflect the new progress
+    if demand:
+        demand.audit_flow = get_approval_progress(demand_id)
 
     db.session.commit()
 
@@ -238,6 +242,8 @@ def reject(demand_id, level, approve_user_id, opinion=None):
     demand = RecruitDemand.query.filter_by(id=demand_id, is_deleted=0).first()
     if demand:
         demand.demand_status = 3  # 3 = rejected
+        # Refresh the audit_flow snapshot so list/detail reflect the rejection
+        demand.audit_flow = get_approval_progress(demand_id)
 
     db.session.commit()
 
@@ -287,6 +293,7 @@ def get_approval_progress(demand_id):
 
         result.append({
             'label': APPROVAL_LEVELS.get(r.approve_level, f'层级{r.approve_level}'),
+            'level': r.approve_level,
             'state': state,
             'actor': actor_name,
             'date': date_str,

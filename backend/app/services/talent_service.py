@@ -286,6 +286,7 @@ def list_talent(params):
             rows = q.order_by(Candidate.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
             if rows:
                 data = [_candidate_to_dict(r) for r in rows]
+                _attach_linked_demands(data, rows)
                 return data, total
 
         elif tab == 'internal':
@@ -300,6 +301,85 @@ def list_talent(params):
     except Exception as exc:
         log.error("DB query failed in list_talent: %s", exc, exc_info=True)
     return _mock_list_talent(params) if _mock_enabled() else ([], 0)
+
+
+def _attach_linked_demands(data, candidates):
+    """给人才库列表项附上 linkedDemands / targetPosition（应聘岗位 + 匹配衔接）。
+
+    linkedDemands: [{demandNo, position, matchScore, processStatus}]
+    无关联流程时回退到简历 extract_json 里的 target_position（主题提取值）。
+    """
+    try:
+        from app.models.candidate import Resume
+        from app.models.process import RecruitProcess, ResumeMatch
+        from app.models.demand import RecruitDemand
+
+        ids = [c.id for c in candidates]
+        if not ids:
+            return
+
+        processes = (RecruitProcess.query
+                     .filter(RecruitProcess.candidate_id.in_(ids),
+                             RecruitProcess.is_deleted == 0).all())
+        demand_ids = {p.demand_id for p in processes}
+        demands = {d.id: d for d in RecruitDemand.query.filter(
+            RecruitDemand.id.in_(demand_ids), RecruitDemand.is_deleted == 0).all()} if demand_ids else {}
+
+        resume_ids = {p.resume_id for p in processes if p.resume_id}
+        matches = (ResumeMatch.query
+                   .filter(ResumeMatch.resume_id.in_(resume_ids),
+                           ResumeMatch.is_deleted == 0)
+                   .order_by(ResumeMatch.calculate_time.desc()).all()) if resume_ids else []
+        match_map = {}  # (resume_id, demand_id) -> score
+        for m in matches:
+            key = (m.resume_id, m.demand_id)
+            if key not in match_map and m.match_score is not None:
+                match_map[key] = float(m.match_score)
+
+        by_candidate = {}
+        for p in processes:
+            d = demands.get(p.demand_id)
+            if not d:
+                continue
+            by_candidate.setdefault(p.candidate_id, []).append({
+                'demandNo': d.demand_no,
+                'position': d.position_name or _demand_position_fallback(d),
+                'matchScore': round(match_map.get((p.resume_id, p.demand_id)), 1)
+                              if match_map.get((p.resume_id, p.demand_id)) is not None else None,
+                'processStatus': p.process_status,
+            })
+
+        # 无流程候选人：取最新简历 extract_json 的 target_position 兜底
+        missing = [c.id for c in candidates if c.id not in by_candidate]
+        target_pos_map = {}
+        if missing:
+            latest_resumes = (Resume.query
+                              .filter(Resume.candidate_id.in_(missing), Resume.is_deleted == 0)
+                              .order_by(Resume.storage_time.desc()).all())
+            for r in latest_resumes:
+                if r.candidate_id in target_pos_map:
+                    continue
+                ej = r.extract_json or {}
+                tp = ej.get('target_position') or ''
+                if tp:
+                    target_pos_map[r.candidate_id] = tp
+
+        for item, c in zip(data, candidates):
+            linked = by_candidate.get(c.id, [])
+            item['linkedDemands'] = linked
+            item['targetPosition'] = (linked[0]['position'] if linked
+                                      else target_pos_map.get(c.id, ''))
+    except Exception as exc:
+        log.warning("attach linked demands failed (best-effort): %s", exc)
+        for item in data:
+            item.setdefault('linkedDemands', [])
+            item.setdefault('targetPosition', '')
+
+
+def _demand_position_fallback(demand):
+    """position_name 为空时从 jd 首行截一段作为展示名。"""
+    jd = (demand.jd_content or '').strip().splitlines()
+    return (jd[0][:20] if jd else '') or f'需求{demand.demand_no}'
 
 
 def _filter_and_sort(data, params):

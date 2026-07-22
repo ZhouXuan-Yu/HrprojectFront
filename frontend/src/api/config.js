@@ -2,6 +2,7 @@
 import { api } from './index.js';
 
 export async function fetchEmailAccounts()    { const r = await api.get('/config/email-accounts'); return r.data; }
+export async function resolveEmailServer(email) { const r = await api.get(`/config/email-accounts/resolve?email=${encodeURIComponent(email)}`); return r.data; }
 export async function createEmailAccount(d)   { const r = await api.post('/config/email-accounts', d); return r.data; }
 export async function updateEmailAccount(id,d){ const r = await api.put(`/config/email-accounts/${id}`, d); return r.data; }
 export async function deleteEmailAccount(id)  { const r = await api.delete(`/config/email-accounts/${id}`); return r.data; }

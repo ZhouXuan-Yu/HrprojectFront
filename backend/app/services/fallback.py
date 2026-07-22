@@ -1,6 +1,6 @@
 """Centralised fallback strategy for external service degradation.
 
-When an external service (DeepSeek API, boss-cli, database) is unavailable,
+When an external service (DeepSeek API, database) is unavailable,
 this module provides a unified decision layer that returns cached results,
 mock data, or surfaces the error — depending on configuration and context.
 
@@ -82,7 +82,6 @@ class FallbackConfig:
     Strategies per service (controlled via config):
 
         * ``DEEPSEEK_FALLBACK`` — ``'cache'`` | ``'local_ai'`` | ``'error'``
-        * ``BOSS_CLI_FALLBACK`` — ``'cache'`` | ``'error'``
         * ``DB_FALLBACK`` — ``'mock'`` | ``'error'``
     """
 
@@ -91,7 +90,7 @@ class FallbackConfig:
         """Return the fallback strategy for *service_name*.
 
         Args:
-            service_name: One of ``'deepseek'``, ``'boss_cli'``, ``'database'``.
+            service_name: One of ``'deepseek'``, ``'database'``.
 
         Returns:
             Strategy string: ``'cache'`` / ``'local_ai'`` / ``'mock'`` / ``'error'``.
@@ -130,7 +129,7 @@ def get_fallback(service_name: str, context: str = None) -> dict:
     """Unified entry point to obtain fallback content.
 
     Args:
-        service_name: Service identifier (``'deepseek'``, ``'boss_cli'``,
+        service_name: Service identifier (``'deepseek'``,
             ``'database'``).
         context: Workflow context key used for cache lookups when the
             strategy is ``'cache'`` (e.g. ``'deepseek:match'``).
@@ -205,7 +204,6 @@ def cache_success(workflow: str, data: Any, ttl: int = None):
 
 _MOCK_DATA: dict = {
     'deepseek': {'choices': [{'message': {'content': '[mock] DeepSeek response'}}]},
-    'boss_cli': {'positions': [], 'total': 0},
     'database': {'rows': [], 'affected': 0},
 }
 

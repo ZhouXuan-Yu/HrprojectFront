@@ -44,7 +44,9 @@
             <td>
               <div v-if="d.approvalNodes.length" class="approval-mini" style="margin-bottom:4px">
                 <template v-for="(node, ni) in d.approvalNodes" :key="ni">
-                  <span class="am-node" :class="node.state">{{ node.label }}</span>
+                  <span class="am-node" :class="node.state" :title="node.opinion || ''">
+                    {{ node.label }}<template v-if="node.actor"> · {{ node.actor }}</template><template v-if="node.date">（{{ node.date }}）</template>
+                  </span>
                   <span v-if="ni < d.approvalNodes.length - 1" class="am-arrow">→</span>
                 </template>
               </div>
@@ -61,8 +63,9 @@
             <td><StatusBadge :type="d.statusType">{{ d.statusLabel }}</StatusBadge></td>
             <td class="row-actions">
               <button class="btn btn-outline btn-sm" @click="goDetail">查看详情</button>
-              <button v-if="d.status === 'approval'" class="btn btn-primary btn-sm" @click="approveDemand(d.id)">同意</button>
+              <button v-if="d.status === 'approval'" class="btn btn-primary btn-sm" @click="approveDemand(d)">同意</button>
               <button v-if="d.status === 'draft'" class="btn btn-outline btn-sm" @click="openEditModal(d)">编辑</button>
+              <button v-if="['draft', 'rejected', 'cancelled'].includes(d.status)" class="btn btn-ghost btn-sm" style="color:var(--c-reject,#d4380d)" @click="removeDemand(d)">删除</button>
               <button class="btn btn-ghost btn-sm" @click="moreOps(d.id)">更多</button>
             </td>
           </tr>
@@ -113,7 +116,7 @@ import { useRouter } from 'vue-router';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import { DEMANDS, getLinkedCount } from '../data/demand.js';
 import { HR_DEPARTMENTS } from '../composables/useMockData.js';
-import { fetchDemands, createDemand, submitForApproval, approveDemandApi, rejectDemandApi } from '../api/demand.js';
+import { fetchDemands, createDemand, updateDemand, deleteDemand, submitForApproval, approveDemandApi, rejectDemandApi, fetchDemandDetail } from '../api/demand.js';
 import { api } from '../api/index.js';
 import { useToast } from '../composables/useToast.js';
 import { useAppError } from '../composables/useAppError.js';
@@ -156,7 +159,7 @@ const filteredDemands = computed(() => {
 
 const statusCounts = computed(() => {
   const counts = { approval: 0, open: 0, closed: 0, draft: 0 };
-  demands.value.forEach(d => { if (counts[d.status] !== undefined) counts[d.status]++; });
+  demandList.value.forEach(d => { if (counts[d.status] !== undefined) counts[d.status]++; });
   return counts;
 });
 
@@ -190,21 +193,33 @@ function openCreateModal(){
   showModal.value = true;
 }
 
-function openEditModal(d){
+async function openEditModal(d){
   editingId.value = d.id;
-  Object.assign(form, { dept: d.dept, position: d.position, hc: d.hc, urgency: d.urgencyLabel, salary: '', date: '', desc: '' });
+  Object.assign(form, { dept: d.dept, position: d.position, hc: d.hc, urgency: d.urgencyLabel || '普通', salary: d.salary || '', date: d.date || '', desc: d.desc || '' });
   showModal.value = true;
+  // 回填完整字段（列表数据可能缺 salary/date/desc）
+  try {
+    const detail = await fetchDemandDetail(d.id);
+    if (detail && editingId.value === d.id) {
+      Object.assign(form, {
+        dept: detail.dept || form.dept,
+        position: detail.position || form.position,
+        hc: detail.hc || form.hc,
+        urgency: detail.urgency || form.urgency,
+        salary: (detail.salary && detail.salary !== '面议') ? detail.salary : form.salary,
+        date: detail.date || form.date,
+        desc: detail.description || form.desc,
+      });
+    }
+  } catch (e) {
+    console.warn('[RecruitDemand] fetch detail for edit failed:', e);
+  }
 }
 
 function closeModal(){ showModal.value = false; }
 
-function saveDraft(){
-  if (!form.position) { toast.warning('请填写岗位名称'); return; }
-  submitApproval(); // save draft == submit in this flow
-}
-
-async function submitApproval(){
-  const payload = {
+function buildPayload(){
+  return {
     dept: form.dept,
     position: form.position,
     hc: form.hc,
@@ -213,9 +228,38 @@ async function submitApproval(){
     date: form.date,
     desc: form.desc,
   };
+}
+
+async function saveDraft(){
+  if (!form.position) { toast.warning('请填写岗位名称'); return; }
   try {
-    const res = await createDemand(payload);
-    const id = res?.id || '[sample] DM2026070010';
+    if (editingId.value) {
+      await updateDemand(editingId.value, buildPayload());
+      toast.success('草稿已保存：' + editingId.value);
+    } else {
+      const res = await createDemand(buildPayload());
+      toast.success('草稿已创建，需求编号：' + (res?.id || ''));
+    }
+    await loadFromApi();
+  } catch (e) {
+    handleError(e, 'RecruitDemand.saveDraft');
+  }
+  closeModal();
+}
+
+async function submitApproval(){
+  if (!form.position) { toast.warning('请填写岗位名称'); return; }
+  try {
+    let id = editingId.value;
+    if (id) {
+      // 编辑场景：先保存修改，再提交审批
+      await updateDemand(id, buildPayload());
+    } else {
+      const res = await createDemand(buildPayload());
+      id = res?.id;
+      if (!id) throw new Error('创建需求失败：未返回需求编号');
+    }
+    await submitForApproval(id);
     toast.success('已提交审批，需求编号：' + id);
     await loadFromApi(); // refresh list
   } catch (e) {
@@ -226,11 +270,26 @@ async function submitApproval(){
 
 async function approveDemand(d) {
   if (!confirm(`确认审批通过 "${d.id} ${d.position}"？`)) return;
+  // 找到当前待审批层级（state === 'current'），缺省退回第一个未完成节点
+  const nodes = d.approvalNodes || [];
+  let level = null;
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].state === 'current') { level = nodes[i].level || (i + 1); break; }
+  }
+  if (!level) {
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].state !== 'done') { level = nodes[i].level || (i + 1); break; }
+    }
+  }
+  if (!level) { toast.warning('该需求没有待审批节点'); return; }
   try {
-    await approveDemandApi(d.id, { level: 1, opinion: '批准' });
-    toast.success('审批通过：' + d.id);
+    await approveDemandApi(d.id, { level, opinion: '批准' });
+    toast.success(`审批通过（${nodes[level - 1]?.label || '层级' + level}）：` + d.id);
     await loadFromApi();
-  } catch (e) { handleError(e, 'RecruitDemand.approveDemand'); }
+  } catch (e) {
+    toast.error(e?.message || '审批失败');
+    handleError(e, 'RecruitDemand.approveDemand');
+  }
 }
 
 async function moreOps(d) {
@@ -251,6 +310,18 @@ async function moreOps(d) {
 }
 
 function goDetail(){ router.push('/recruit-demand-detail'); }
+
+async function removeDemand(d) {
+  if (!confirm(`确认删除需求 "${d.id} ${d.position}"？删除后不可恢复。`)) return;
+  try {
+    await deleteDemand(d.id);
+    toast.success('已删除：' + d.id);
+    await loadFromApi();
+  } catch (e) {
+    toast.error(e?.message || '删除失败');
+    handleError(e, 'RecruitDemand.removeDemand');
+  }
+}
 
 onMounted(() => {
   loadFromApi();

@@ -46,6 +46,8 @@ class RecruitDemand(BaseModel):
     urgency = Column(String(16), nullable=False, default='normal', comment='紧急度 very/high/normal')
     required_skills = Column(JSON, nullable=True, comment='必备技能列表')
     plus_skills = Column(JSON, nullable=True, comment='加分技能列表')
+    position_name = Column(String(128), nullable=True, comment='岗位名称（前端文本直存）')
+    dept_name = Column(String(64), nullable=True, comment='部门名称（前端文本直存）')
 
 
 class DemandApproval(BaseModel):

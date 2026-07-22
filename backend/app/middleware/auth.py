@@ -13,18 +13,6 @@ AUTH_WHITELIST = {
     # 候选人确认页/提交 —— 通过签名 token 鉴权，无需登录
     'confirm.confirm_page',
     'confirm.confirm_submit',
-    # Boss endpoints — auth is via boss-cli Puppeteer session, not JWT
-    'boss.boss_login',
-    'boss.get_status',
-    'boss.list_positions',
-    'boss.get_position_detail',
-    'boss.search_candidates',
-    'boss.chat_list',
-    'boss.chat_open',
-    'boss.chat_send',
-    'boss.action',
-    'boss.resume_preview',
-    'boss.greet_candidate',
 }
 
 # SSE streaming endpoints use query param for auth (EventSource doesn't support headers)

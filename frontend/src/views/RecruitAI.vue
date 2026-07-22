@@ -34,16 +34,6 @@
       <div v-if="toast.show" data-slot="ai-toast" :class="{ visible: toast.show }">{{ toast.text }}</div>
     </Teleport>
 
-    <!-- BOSS 直聘集成 -->
-    <div class="card" style="margin-top:24px">
-      <div class="card-title">
-        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        BOSS 直聘集成
-        <span class="card-subtitle">基于 boss-cli 浏览器自动化</span>
-      </div>
-      <BossIntegration :compact="true" />
-    </div>
-
     <!-- Embedded AI capabilities table -->
     <div style="margin-top:32px">
       <div class="section-label" style="font-size:14px;margin-bottom:12px">已嵌入各业务页面的辅助能力（流程内触发，不在此页面操作）</div>
@@ -71,7 +61,6 @@
 import { ref, reactive, computed, onBeforeUnmount, onMounted, provide } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import StatusBadge from '../components/StatusBadge.vue';
-import BossIntegration from '../components/BossIntegration.vue';
 import { AI_TABS, EMBEDDED_AI, MOCK_CANDIDATES, MOCK_DEMANDS } from '../data/ai.js';
 import { fetchDemands } from '../api/demand.js';
 import { fetchTalent } from '../api/talent.js';

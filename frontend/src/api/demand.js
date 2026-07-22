@@ -38,6 +38,16 @@ export async function createDemand(data) {
   return r.data;
 }
 
+export async function updateDemand(demandId, data) {
+  const r = await api.patch(`/demand/${demandId}`, data);
+  return r.data;
+}
+
+export async function deleteDemand(demandId) {
+  const r = await api.delete(`/demand/${demandId}`);
+  return r.data;
+}
+
 export async function linkCandidateToDemand(demandId, name) {
   const r = await api.post(`/demand/${demandId}/candidates/${name}/link`, { link: true });
   return r.data;

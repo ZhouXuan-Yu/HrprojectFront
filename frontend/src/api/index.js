@@ -236,13 +236,11 @@ async function handleResponse(resp, method, path, options = {}) {
   }
 
   if (!resp.ok) {
-    // 502 — only boss-cli endpoints get the boss-cli hint; others are generic gateway errors
     if (resp.status === 502) {
-      const isBoss = path.includes('/boss')
       const msg = json?.error?.message || json?.message || json?.error
-        || (isBoss ? '服务暂不可用，请检查 boss-cli 安装状态' : '服务暂时不可用，请稍后重试')
+        || '服务暂时不可用，请稍后重试'
       const err = new Error(msg)
-      err.code = isBoss ? 'BOSS_UNAVAILABLE' : 'GATEWAY_ERROR'
+      err.code = 'GATEWAY_ERROR'
       err.status = 502
       if (!silent) dispatchApiError(err)
       throw err

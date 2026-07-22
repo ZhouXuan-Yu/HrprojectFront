@@ -23,7 +23,46 @@ def calc_decay_coefficient(storage_time, now=None):
         return 0.70
 
 
-def calc_profile_score(edu_level=0, school_level=0, work_years=0, big_company=0, cert_count=0):
+def _years_score_flat(work_years):
+    """Legacy absolute scale (smoothed — 0 年不再恒 0，分段更平缓)."""
+    if work_years >= 10:
+        return 25
+    if work_years >= 8:
+        return 23
+    if work_years >= 5:
+        return 20
+    if work_years >= 4:
+        return 18
+    if work_years >= 3:
+        return 15
+    if work_years >= 2:
+        return 11
+    if work_years >= 1:
+        return 8
+    return 2
+
+
+def _years_score_relative(work_years, exp_min):
+    """Score work years relative to the demand's minimum requirement (max 25)."""
+    if exp_min <= 0:
+        # 应届/不限经验岗：年限不再一刀切为 0，给基础分
+        return _years_score_flat(work_years)
+    ratio = work_years / exp_min
+    if ratio >= 1.5:
+        return 25
+    if ratio >= 1.2:
+        return 22
+    if ratio >= 1.0:
+        return 20
+    if ratio >= 0.7:
+        return 14
+    if ratio >= 0.4:
+        return 8
+    return 4
+
+
+def calc_profile_score(edu_level=0, school_level=0, work_years=0, big_company=0,
+                       cert_count=0, exp_min=None, skill_count=0):
     """
     Static profile score using hard rules (0-100 scale).
 
@@ -32,6 +71,9 @@ def calc_profile_score(edu_level=0, school_level=0, work_years=0, big_company=0,
     WorkYears: actual integer
     BigCompany: 0=no, 1=yes
     CertCount: integer count
+    exp_min (optional): 目标岗位最低年限。传入后年限项按相对达成度打分；
+        exp_min=0（应届岗）时年限权重按技能/在校表现折算，不再恒低。
+    skill_count (optional): 技能数量，应届上下文下参与年限项折算。
     """
     score = 0
     # Education (max 25)
@@ -41,14 +83,15 @@ def calc_profile_score(edu_level=0, school_level=0, work_years=0, big_company=0,
     school_scores = {0: 0, 1: 5, 2: 10, 3: 15, 4: 20}
     score += school_scores.get(school_level, 0)
     # Work years (max 25)
-    if work_years >= 10:
-        score += 25
-    elif work_years >= 5:
-        score += 20
-    elif work_years >= 3:
-        score += 15
-    elif work_years >= 1:
-        score += 8
+    if exp_min is not None and exp_min <= 0:
+        # 应届岗上下文：年限项由在校层次 + 技能储备折算，不再恒 0
+        school_bonus = {0: 0, 1: 4, 2: 8, 3: 12, 4: 15}.get(school_level, 4)
+        skill_score = min(int(skill_count or 0) * 2, 10)
+        score += min(25, school_bonus + skill_score)
+    elif exp_min is not None:
+        score += _years_score_relative(work_years or 0, exp_min)
+    else:
+        score += _years_score_flat(work_years or 0)
     # Big company (max 20)
     score += 20 if big_company else 0
     # Certificates (max 10)

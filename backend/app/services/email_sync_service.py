@@ -50,6 +50,87 @@ _DOMAIN_IMAP_FALLBACK = {
 }
 
 
+# MX 记录指纹（子串匹配）→ (服务商, IMAP 主机)
+# 覆盖主流企业邮箱服务商；按顺序首个命中生效
+_MX_FINGERPRINTS = [
+    (('exmail.qq.com', 'mxbiz'),        ('腾讯企业邮', 'imap.exmail.qq.com')),
+    (('qiye.163', 'ym.163'),            ('网易企业邮', 'imap.qiye.163.com')),
+    (('mxhichina', 'qiye.aliyun', 'aliyun'), ('阿里企业邮', 'imap.qiye.aliyun.com')),
+    (('outlook', 'office365', 'protection.outlook'), ('Microsoft 365', 'outlook.office365.com')),
+    (('google', 'gmail', 'googlemail'), ('Gmail / Google Workspace', 'imap.gmail.com')),
+    (('zoho',),                          ('Zoho Mail', 'imap.zoho.com')),
+    (('263.net', '263xmail'),            ('263 企业邮箱', 'imap.263.net')),
+    (('sina',),                          ('新浪企业邮箱', 'imap.ex.sina.com')),
+    (('feishu', 'larksuite'),            ('飞书邮箱', 'imap.feishu.cn')),
+]
+
+# 域名本身包含的关键字 → (服务商, IMAP 主机)（MX 查询失败时的兜底）
+_DOMAIN_KEYWORD_FALLBACK = [
+    (('exmail.qq',),   ('腾讯企业邮', 'imap.exmail.qq.com')),
+    (('qiye.163',),    ('网易企业邮', 'imap.qiye.163.com')),
+    (('qq',),          ('QQ邮箱', 'imap.qq.com')),
+    (('163',),         ('163邮箱', 'imap.163.com')),
+    (('126',),         ('126邮箱', 'imap.126.com')),
+    (('gmail', 'googlemail'), ('Gmail', 'imap.gmail.com')),
+    (('outlook', 'hotmail', 'live'), ('Outlook', 'outlook.office365.com')),
+    (('aliyun',),      ('阿里企业邮', 'imap.qiye.aliyun.com')),
+    (('zoho',),        ('Zoho Mail', 'imap.zoho.com')),
+    (('sina',),        ('新浪邮箱', 'imap.sina.com')),
+    (('139',),         ('139邮箱', 'imap.139.com')),
+]
+
+
+def resolve_mail_server(email_address):
+    """通过 MX 记录自动识别企业邮箱服务商，返回收件服务器配置建议。
+
+    流程：拆域名 → dnspython 查 MX（短超时，任何异常都不抛出）→
+    指纹匹配 → 域名关键字兜底 → imap.<domain> 通用猜测。
+
+    返回 dict:
+        {provider, imap_host, imap_port: 993, encryption: 'SSL/TLS',
+         confidence: 'high'|'medium'|'low', detection: 'mx'|'domain'|'pattern'|'unknown'}
+    """
+    result = {
+        'provider': '未知', 'imap_host': '', 'imap_port': 993,
+        'encryption': 'SSL/TLS', 'confidence': 'low', 'detection': 'unknown',
+    }
+    domain = email_address.split('@')[-1].strip().lower() if '@' in (email_address or '') else ''
+    if not domain:
+        return result
+
+    # 1. MX 记录查询（3-5 秒短超时；DNS 失败绝不抛出）
+    mx_hosts = []
+    try:
+        import dns.resolver
+        resolver = dns.resolver.Resolver()
+        resolver.lifetime = 5.0
+        resolver.timeout = 3.0
+        answers = resolver.resolve(domain, 'MX')
+        mx_hosts = [str(r.exchange).rstrip('.').lower()
+                    for r in sorted(answers, key=lambda r: r.preference)]
+    except Exception as exc:
+        log.info("MX lookup failed for %s: %s", domain, exc)
+
+    for mx in mx_hosts:
+        for keywords, (provider, host) in _MX_FINGERPRINTS:
+            if any(k in mx for k in keywords):
+                result.update(provider=provider, imap_host=host,
+                              confidence='high', detection='mx')
+                return result
+
+    # 2. 域名关键字兜底（MX 查询失败或未命中时）
+    for keywords, (provider, host) in _DOMAIN_KEYWORD_FALLBACK:
+        if any(k in domain for k in keywords):
+            result.update(provider=provider, imap_host=host,
+                          confidence='medium', detection='domain')
+            return result
+
+    # 3. 通用猜测 imap.<domain>
+    result.update(provider=f'{domain} 邮箱', imap_host=f'imap.{domain}',
+                  confidence='low', detection='pattern')
+    return result
+
+
 def detect_imap_server(email_address):
     """Auto-detect IMAP server from email domain.
 
@@ -310,8 +391,61 @@ def sync_mail_account(account_id):
     return result
 
 
+def _match_demand_for_position(position):
+    """按岗位名在已通过需求中模糊匹配（position_name / jd_content）。
+
+    Returns RecruitDemand or None.
+    """
+    if not position:
+        return None
+    try:
+        from app.models.demand import RecruitDemand
+        from sqlalchemy import or_
+
+        q = RecruitDemand.query.filter(
+            RecruitDemand.is_deleted == 0,
+            RecruitDemand.demand_status == 2,  # 已通过
+        )
+        like = f'%{position}%'
+        rows = q.filter(or_(
+            RecruitDemand.position_name.like(like),
+            RecruitDemand.jd_content.like(like),
+        )).all()
+        if rows:
+            return rows[0]
+
+        # 反向匹配：岗位名包含需求 position_name（"Java开发工程师" ⊇ "Java开发"）
+        for d in q.filter(RecruitDemand.position_name.isnot(None)).all():
+            pn = (d.position_name or '').strip()
+            if pn and len(pn) >= 2 and pn in position:
+                return d
+    except Exception as exc:
+        log.warning("demand match for position '%s' failed: %s", position, exc)
+    return None
+
+
+def _link_to_demand(demand, candidate_name):
+    """复用 link_candidate_to_demand 逻辑建 RecruitProcess + ResumeMatch。"""
+    try:
+        from app.services.demand_service import link_candidate_to_demand
+        return link_candidate_to_demand(demand.demand_no, candidate_name)
+    except Exception as exc:
+        log.warning("auto-link to demand %s failed: %s", demand.demand_no, exc)
+        return {'linked': False, 'reason': str(exc)}
+
+
+def _mark_seen(conn, num):
+    try:
+        conn.store(num, '+FLAGS', '\\Seen')
+    except Exception as exc:
+        log.warning("mark \\Seen failed for msg %s: %s", num, exc)
+
+
 def _process_one_message(conn, num, account, resume_service):
-    """Fetch and process a single email. Returns a detail dict or None."""
+    """Fetch and process a single email. Returns a detail dict or None.
+
+    无论成败都写 detail；处理完毕的邮件一律标记 \\Seen，避免下轮重拉死循环。
+    """
     from app.extensions import db
 
     status, msg_data = conn.fetch(num, '(RFC822)')
@@ -323,6 +457,14 @@ def _process_one_message(conn, num, account, resume_service):
     sender = parseaddr(_decode_str(msg.get('From')))[1]
 
     detail = {'subject': subject[:80], 'from': sender, 'ingested': False}
+
+    # 1. 从主题解析应聘岗位 + 匹配已通过需求（提取失败留空，不阻塞入库）
+    target_position = resume_service.extract_target_position(subject)
+    demand = _match_demand_for_position(target_position)
+    if target_position:
+        detail['target_position'] = target_position
+    if demand:
+        detail['target_demand'] = demand.demand_no
 
     attachments = [
         (fn, payload) for fn, payload in _iter_attachments(msg)
@@ -337,6 +479,9 @@ def _process_one_message(conn, num, account, resume_service):
                         payload, fn,
                         source_channel='邮箱',
                         mail_account_id=account.id,
+                        mail_subject=subject,
+                        target_position=target_position,
+                        target_demand_id=demand.id if demand else None,
                     )
                     detail.update(
                         ingested=True, file=fn,
@@ -344,16 +489,25 @@ def _process_one_message(conn, num, account, resume_service):
                         candidate_no=r['candidate_no'],
                         engine=r['parse_engine'],
                     )
-                    # Mark as seen only after successful ingest
-                    conn.store(num, '+FLAGS', '\\Seen')
+                    # 命中需求 → 自动建 RecruitProcess + ResumeMatch
+                    if demand:
+                        link = _link_to_demand(demand, r['candidate_name'])
+                        detail['linked'] = bool(link.get('linked'))
+                        if link.get('matchScore') is not None:
+                            detail['match_score'] = link['matchScore']
+                    _mark_seen(conn, num)
                     break  # one resume per email is enough
                 except ValueError as exc:
+                    # 附件类型不支持 / 无法提取文本：标记已读，不再重拉
                     log.warning("Attachment %s skipped: %s", fn, exc)
                     detail['note'] = str(exc)
+                    _mark_seen(conn, num)
                 except Exception as exc:
+                    # 其他入库失败：记录并标记已读，避免每轮死循环重拉
                     log.error("Attachment %s ingest failed: %s", fn, exc, exc_info=True)
                     db.session.rollback()
                     detail['note'] = f'入库失败: {exc}'
+                    _mark_seen(conn, num)
         else:
             # No resume attachment — check whether the body itself is a resume
             body = _extract_body(msg)
@@ -365,6 +519,9 @@ def _process_one_message(conn, num, account, resume_service):
                         source_channel='邮箱',
                         mail_account_id=account.id,
                         raw_text=body,
+                        mail_subject=subject,
+                        target_position=target_position,
+                        target_demand_id=demand.id if demand else None,
                     )
                     detail.update(
                         ingested=True, file='(邮件正文)',
@@ -372,16 +529,28 @@ def _process_one_message(conn, num, account, resume_service):
                         candidate_no=r['candidate_no'],
                         engine=r['parse_engine'],
                     )
-                    conn.store(num, '+FLAGS', '\\Seen')
+                    if demand:
+                        link = _link_to_demand(demand, r['candidate_name'])
+                        detail['linked'] = bool(link.get('linked'))
+                        if link.get('matchScore') is not None:
+                            detail['match_score'] = link['matchScore']
+                    _mark_seen(conn, num)
+                except ValueError as exc:
+                    log.warning("Body not ingestable (%s): %s", subject[:40], exc)
+                    detail['note'] = f'正文无法解析: {exc}'
+                    _mark_seen(conn, num)
                 except Exception as exc:
                     log.error("Body ingest failed (%s): %s", subject[:40], exc, exc_info=True)
                     db.session.rollback()
                     detail['note'] = f'正文解析失败: {exc}'
+                    _mark_seen(conn, num)
             else:
                 detail['note'] = '非简历邮件，跳过'
+                _mark_seen(conn, num)
     except Exception as exc:
         log.error("Message processing failed: %s", exc, exc_info=True)
         detail['note'] = str(exc)
+        _mark_seen(conn, num)
 
     return detail
 

@@ -43,6 +43,49 @@ USER_NAMES = {1: '刘博', 2: '张HR', 3: '陈总', 4: '周博', 5: '李面试�
 
 EDU_LEVEL_LABELS = {1: '大专', 2: '本科', 3: '硕士', 4: '博士'}
 
+DEPT_IDS = {v: k for k, v in DEPT_NAMES.items()}
+
+_URGENCY_ALIAS = {
+    '普通': 'normal', '紧急': 'high', '非常紧急': 'very',
+    'normal': 'normal', 'high': 'high', 'very': 'very',
+}
+
+
+def _normalize_urgency(value):
+    """Map frontend Chinese urgency labels to backend enum codes."""
+    if not value:
+        return 'normal'
+    return _URGENCY_ALIAS.get(str(value).strip(), 'normal')
+
+
+_name_cols_ensured = False
+
+
+def _ensure_name_columns():
+    """Best-effort ALTER TABLE to add position_name/dept_name for existing SQLite DBs.
+
+    New databases get the columns via create_all / migrations; this only patches
+    legacy hr_recruit.db files that predate the columns.
+    """
+    global _name_cols_ensured
+    if _name_cols_ensured:
+        return
+    _name_cols_ensured = True
+    try:
+        from app.extensions import db
+        from sqlalchemy import text, inspect
+        insp = inspect(db.engine)
+        cols = {c['name'] for c in insp.get_columns('t_hr_recruit_demand')}
+        with db.engine.begin() as conn:
+            if 'position_name' not in cols:
+                conn.execute(text('ALTER TABLE t_hr_recruit_demand ADD COLUMN position_name VARCHAR(128)'))
+                log.info("Added column position_name to t_hr_recruit_demand")
+            if 'dept_name' not in cols:
+                conn.execute(text('ALTER TABLE t_hr_recruit_demand ADD COLUMN dept_name VARCHAR(64)'))
+                log.info("Added column dept_name to t_hr_recruit_demand")
+    except Exception as exc:
+        log.warning("ensure name columns failed (non-fatal): %s", exc)
+
 
 def _validate_demand_transition(demand, target_status):
     """Validate demand status transition. Raises AppError on invalid transition."""
@@ -153,8 +196,8 @@ def _extract_skills_from_jd(jd_content):
 
 def _demand_to_dict(d):
     """Convert a RecruitDemand ORM object to API dict."""
-    pos_name = POS_NAMES.get(d.position_id, str(d.position_id))
-    dept_name = DEPT_NAMES.get(d.dept_id, str(d.dept_id))
+    pos_name = getattr(d, 'position_name', None) or POS_NAMES.get(d.position_id, str(d.position_id))
+    dept_name = getattr(d, 'dept_name', None) or DEPT_NAMES.get(d.dept_id, str(d.dept_id))
     submitter = USER_NAMES.get(d.creator_id, str(d.creator_id))
 
     st = d.demand_status
@@ -170,10 +213,20 @@ def _demand_to_dict(d):
         'status': {0: 'draft', 1: 'approval', 2: 'open', 3: 'rejected', 4: 'closed', 5: 'cancelled'}.get(st, 'draft'),
         'statusLabel': STATUS_LABELS.get(st, '草稿'),
         'statusType': STATUS_TYPES.get(st, 'draft'),
+        'salary': d.salary_range or '',
+        'date': d.expect_entry_date.strftime('%Y-%m-%d') if d.expect_entry_date else '',
+        'desc': d.jd_content or '',
         'linkedCount': 0,
     }
 
-    if d.audit_flow:
+    if st == 1:  # approval — always use live progress; audit_flow may be a stale snapshot
+        try:
+            from app.services.approval_service import get_approval_progress
+            live = get_approval_progress(d.id)
+            result['approvalNodes'] = live if live else _default_approval_nodes(st)
+        except Exception:
+            result['approvalNodes'] = d.audit_flow or _default_approval_nodes(st)
+    elif d.audit_flow:
         result['approvalNodes'] = d.audit_flow
     else:
         result['approvalNodes'] = _default_approval_nodes(st)
@@ -215,6 +268,8 @@ def submit_for_approval(demand_id):
     from app.models.demand import RecruitDemand
     from app.extensions import db
 
+    _ensure_name_columns()
+
     d = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
     if not d:
         raise AppError('NOT_FOUND', f'需求 {demand_id} 不存在')
@@ -223,9 +278,12 @@ def submit_for_approval(demand_id):
 
     d.demand_status = 1  # approval
 
-    # Initialize approval records
+    # Initialize approval records (idempotent — create_demand may have done it already)
     from app.services.approval_service import init_approval
-    init_approval(d.id)
+    from app.models.demand import DemandApproval
+    existing = DemandApproval.query.filter_by(demand_id=d.id, is_deleted=0).count()
+    if existing == 0:
+        init_approval(d.id)
 
     # Build audit_flow snapshot
     from app.services.approval_service import get_approval_progress
@@ -247,6 +305,7 @@ def list_demands(params):
 
     try:
         from app.models.demand import RecruitDemand
+        _ensure_name_columns()
         q = RecruitDemand.query.filter(RecruitDemand.is_deleted == 0)
 
         if search:
@@ -364,6 +423,8 @@ def create_demand(data):
         from app.extensions import db
         from datetime import datetime
 
+        _ensure_name_columns()
+
         now = datetime.now()
         prefix = f"DM{now.strftime('%Y%m')}"
         latest = RecruitDemand.query.filter(
@@ -374,21 +435,35 @@ def create_demand(data):
         seq = int(latest.demand_no[-4:]) + 1 if latest else 1
         demand_no = f"{prefix}{seq:04d}"
 
+        dept_text = (data.get('dept') or '').strip()
+        position_text = (data.get('position') or '').strip()
+
+        entry_date = None
+        raw_date = data.get('date') or data.get('expectEntryDate')
+        if raw_date:
+            try:
+                entry_date = datetime.strptime(str(raw_date)[:10], '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                entry_date = None
+
         d = RecruitDemand(
             demand_no=demand_no,
-            dept_id=data.get('deptId') or 1,
+            dept_id=data.get('deptId') or DEPT_IDS.get(dept_text) or 1,
+            dept_name=dept_text or None,
             position_id=data.get('positionId') or 1,
+            position_name=position_text or None,
             recruit_type=data.get('recruitType') or 1,
             plan_headcount=data.get('hc') or data.get('planHeadcount') or 1,
             demand_status=0,  # draft
-            urgency=data.get('urgency') or 'normal',
+            urgency=_normalize_urgency(data.get('urgency')),
             creator_id=data.get('creatorId') or 1,
             hr_owner_id=data.get('hrOwnerId') or 1,
-            jd_content=data.get('description', ''),
+            jd_content=data.get('description') or data.get('desc', ''),
             salary_range=data.get('salary', ''),
             work_city=data.get('workCity', ''),
             edu_min=data.get('eduMin', ''),
             exp_min=data.get('expMin'),
+            expect_entry_date=entry_date,
             required_skills=data.get('requiredSkills'),
             plus_skills=data.get('plusSkills'),
         )
@@ -415,6 +490,10 @@ def update_demand(demand_id, data):
     try:
         from app.models.demand import RecruitDemand
         from app.extensions import db
+        from datetime import datetime
+
+        _ensure_name_columns()
+
         d = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
         if not d:
             raise AppError('NOT_FOUND', f'需求 {demand_id} 不存在')
@@ -424,13 +503,41 @@ def update_demand(demand_id, data):
             raise AppError('INVALID_STATE', f'需求已{STATUS_LABELS.get(d.demand_status, "关闭")}，无法编辑')
 
         if 'urgency' in data:
-            d.urgency = data['urgency']
+            d.urgency = _normalize_urgency(data['urgency'])
         if 'position' in data:
-            d.position_name = data['position']
-        if 'description' in data:
-            d.jd_content = data['description']
+            d.position_name = (data['position'] or '').strip() or None
+        if 'dept' in data:
+            dept_text = (data['dept'] or '').strip()
+            d.dept_name = dept_text or None
+            if dept_text in DEPT_IDS:
+                d.dept_id = DEPT_IDS[dept_text]
+        if 'deptId' in data and data['deptId']:
+            d.dept_id = data['deptId']
+        if 'positionId' in data and data['positionId']:
+            d.position_id = data['positionId']
+        if 'description' in data or 'desc' in data:
+            d.jd_content = data.get('description') or data.get('desc') or ''
         if 'salary' in data:
             d.salary_range = data['salary']
+        if 'hc' in data or 'planHeadcount' in data:
+            hc = data.get('hc') or data.get('planHeadcount')
+            if hc:
+                d.plan_headcount = int(hc)
+        if 'date' in data or 'expectEntryDate' in data:
+            raw_date = data.get('date') or data.get('expectEntryDate')
+            if raw_date:
+                try:
+                    d.expect_entry_date = datetime.strptime(str(raw_date)[:10], '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    pass
+            else:
+                d.expect_entry_date = None
+        if 'eduMin' in data:
+            d.edu_min = data['eduMin']
+        if 'expMin' in data:
+            d.exp_min = data['expMin']
+        if 'workCity' in data:
+            d.work_city = data['workCity']
         db.session.commit()
         updated = True
     except AppError:
@@ -452,6 +559,8 @@ def close_demand(demand_id):
         from app.models.demand import RecruitDemand
         from app.extensions import db
         from datetime import datetime
+
+        _ensure_name_columns()
 
         d = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
         if not d:
@@ -485,6 +594,8 @@ def delete_demand(demand_id):
         from app.models.demand import RecruitDemand
         from app.extensions import db
 
+        _ensure_name_columns()
+
         d = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
         if not d:
             raise AppError('NOT_FOUND', f'需求 {demand_id} 不存在')
@@ -510,10 +621,11 @@ def get_demand_detail(demand_id):
     """Return demand detail with approval nodes — DB first, mock fallback."""
     try:
         from app.models.demand import RecruitDemand
+        _ensure_name_columns()
         d = RecruitDemand.query.filter_by(demand_no=demand_id, is_deleted=0).first()
         if d:
-            pos_name = POS_NAMES.get(d.position_id, str(d.position_id))
-            dept_name = DEPT_NAMES.get(d.dept_id, str(d.dept_id))
+            pos_name = getattr(d, 'position_name', None) or POS_NAMES.get(d.position_id, str(d.position_id))
+            dept_name = getattr(d, 'dept_name', None) or DEPT_NAMES.get(d.dept_id, str(d.dept_id))
             submitter = USER_NAMES.get(d.creator_id, str(d.creator_id))
 
             req_skills = d.required_skills or []

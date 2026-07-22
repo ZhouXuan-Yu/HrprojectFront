@@ -9,7 +9,7 @@ Pattern::
        │            ▼
        └──(1 success)── HALF_OPEN ──(1 failure)──►  OPEN
 
-Protects against cascading failures when external services (DeepSeek, boss-cli)
+Protects against cascading failures when external services (DeepSeek)
 are unavailable.  Each service should have its own ``CircuitBreaker`` instance.
 """
 

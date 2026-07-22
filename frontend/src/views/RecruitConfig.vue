@@ -280,7 +280,7 @@
         <div class="modal-box" style="width:560px">
           <h3>{{ editingEmail ? '编辑邮箱' : '添加收简历邮箱' }}</h3>
           <div class="form-row">
-            <div class="form-group"><label>邮箱地址 *</label><input type="email" v-model="emailForm.addr" placeholder="hr-recruit@company.com"></div>
+            <div class="form-group"><label>邮箱地址 *</label><input type="email" v-model="emailForm.addr" placeholder="hr-recruit@company.com" @blur="onEmailAddrBlur"><div v-if="emailAddrError" class="field-error">{{ emailAddrError }}</div></div>
             <div class="form-group"><label>邮箱类型 *</label><select v-model="emailForm.type" @change="onEmailTypeChange"><option value="">请选择...</option><option value="qq">QQ 邮箱</option><option value="163">163 邮箱</option><option value="gmail">Gmail</option><option value="corp">企业邮箱（Exchange）</option><option value="custom">自定义</option></select></div>
           </div>
           <div class="form-row">
@@ -364,7 +364,7 @@ import { api } from '../api/index.js';
 import {
   fetchEmailAccounts, fetchChannels, fetchScoreRules, fetchNotifyTemplates,
   fetchRolePermissions, fetchAuditLogs, fetchApiKeys, saveApiKeys, testApiKey, fetchTencentStatus, fetchFeishuStatus,
-  createEmailAccount, updateEmailAccount, deleteEmailAccount,
+  createEmailAccount, updateEmailAccount, deleteEmailAccount, resolveEmailServer,
   createChannel, updateChannel,
   updateScoreRules,
   createNotifyTemplate, updateNotifyTemplate,
@@ -417,6 +417,11 @@ const statCards = computed(() => [
   { key: 'role', label: '角色权限', value: rolePermissions.value.length, hint: '权限分组', icon: KPI_ICONS.users },
 ]);
 
+const emailAddrError = ref('');
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+// 是否已通过 MX 检测自动填充（检测后类型下拉不再强制覆盖服务器配置）
+const emailServerDetected = ref(false);
+
 const emailForm = reactive({
   addr: '', type: '', proto: 'IMAP（推荐）', port: '993',
   server: '', ssl: 'SSL/TLS', user: '', pass: '',
@@ -431,10 +436,27 @@ import { EMAIL_PRESETS } from '../data/config.js';
 // 监听邮箱地址变化，自动检测服务商
 let _detectTimer = null;
 watch(() => emailForm.addr, (newAddr) => {
+  emailAddrError.value = '';
+  emailServerDetected.value = false;
   if (!newAddr || !newAddr.includes('@')) return;
   clearTimeout(_detectTimer);
   _detectTimer = setTimeout(() => autoDetectEmail(), 600);
 });
+
+function validateEmailAddr() {
+  const addr = (emailForm.addr || '').trim();
+  if (!addr) { emailAddrError.value = '请填写邮箱地址'; return false; }
+  if (!EMAIL_REGEX.test(addr)) { emailAddrError.value = '邮箱格式不正确，请检查'; return false; }
+  emailAddrError.value = '';
+  return true;
+}
+
+function onEmailAddrBlur() {
+  // 失焦即校验并触发 MX 检测（填完邮箱必须检测，不靠类型下拉死定义服务器）
+  if (!emailForm.addr || !emailForm.addr.includes('@')) return;
+  clearTimeout(_detectTimer);
+  if (validateEmailAddr()) autoDetectEmail();
+}
 
 const normalizeStatus = (s) => s === '启用' || s === 1 || s === '1' || s === true;
 const reverseStatus = (s) => normalizeStatus(s) ? 0 : 1;
@@ -446,12 +468,12 @@ async function loadAll() {
       fetchNotifyTemplates(), fetchRolePermissions(), fetchAuditLogs(),
       fetchApiKeys(), fetchTencentStatus(), fetchFeishuStatus(),
     ]);
-    if (emails && emails.length) emailAccounts.value = emails;
-    if (chs && chs.length) channels.value = chs;
+    if (emails) emailAccounts.value = emails;
+    if (chs) channels.value = chs;
     if (rules) Object.assign(scoreRules, rules);
-    if (notifs && notifs.length) notifyTemplates.value = notifs;
-    if (roles && roles.length) rolePermissions.value = roles;
-    if (logs && logs.length) auditLogs.value = logs;
+    if (notifs) notifyTemplates.value = notifs;
+    if (roles) rolePermissions.value = roles;
+    if (logs) auditLogs.value = logs;
     if (keys) {
       secretKeys.value = Object.values(keys)
         .filter(k => !k.key_name.startsWith('tencent_') && k.key_name !== 'feishu' && k.key_name !== 'feishu_app_id')
@@ -597,6 +619,8 @@ async function testFeishu() {
 // ── Email ──
 function openAddEmail() {
   editingEmail.value = null;
+  emailAddrError.value = '';
+  emailServerDetected.value = false;
   Object.assign(emailForm, {
     addr: '', type: '', proto: 'IMAP（推荐）', port: '993',
     server: '', ssl: 'SSL/TLS', user: '', pass: '',
@@ -607,6 +631,8 @@ function openAddEmail() {
 }
 function editEmail(acct) {
   editingEmail.value = acct;
+  emailAddrError.value = '';
+  emailServerDetected.value = false;
   Object.assign(emailForm, {
     addr: acct.address || '', type: acct.type || '',
     proto: acct.proto || 'IMAP（推荐）', port: acct.port || '993',
@@ -643,40 +669,38 @@ async function deleteEmail(acct) {
   await loadAll();
 }
 function onEmailTypeChange() {
+  // 类型下拉降级为手动覆盖：已通过 MX 检测出服务器时不再强制覆盖
+  if (emailServerDetected.value && emailForm.server) return;
   const preset = EMAIL_PRESETS[emailForm.type];
   if (preset) {
-    emailForm.server = preset.server;
-    emailForm.port = preset.port;
+    if (preset.server || !emailForm.server) emailForm.server = preset.server;
+    if (preset.port || !emailForm.port) emailForm.port = preset.port;
     emailForm.proto = preset.proto;
     emailForm.ssl = preset.ssl;
   }
 }
 async function autoDetectEmail() {
   if (!emailForm.addr) return;
-  // 校验邮箱格式
-  const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
-  if (!emailRegex.test(emailForm.addr.trim())) {
-    toast.warning('邮箱格式不正确，请检查');
-    return;
-  }
+  if (!validateEmailAddr()) return;
   try {
-    const res = await api.post('/config/email-accounts/detect', { email: emailForm.addr.trim() });
-    const d = res.data;
+    const d = await resolveEmailServer(emailForm.addr.trim());
     if (d && d.imap_host) {
-      // 自动匹配邮箱类型
+      // 回填类型显示（仅展示，不反向驱动服务器配置）
       const domain = emailForm.addr.split('@')[1]?.toLowerCase();
       if (domain === 'qq.com') emailForm.type = 'qq';
       else if (domain === '163.com') emailForm.type = '163';
       else if (domain === 'gmail.com') emailForm.type = 'gmail';
       else emailForm.type = 'corp';
-      // 自动填服务器信息
+      // 自动填服务器信息（MX 检测结果优先于类型预设）
       emailForm.server = d.imap_host;
-      emailForm.port = d.imap_port || 993;
-      emailForm.ssl = 'SSL/TLS';
+      emailForm.port = String(d.imap_port || 993);
+      emailForm.ssl = d.encryption || 'SSL/TLS';
       emailForm.proto = 'IMAP（推荐）';
+      emailServerDetected.value = true;
       toast.info('已识别：' + d.provider + ' → ' + d.imap_host);
-    } else if (emailForm.type === 'corp' && !emailForm.server) {
-      toast.warning('未识别到邮箱服务商，请手动填写收件服务器');
+    } else {
+      emailServerDetected.value = false;
+      if (!emailForm.server) toast.warning('未识别到邮箱服务商，请手动填写收件服务器');
     }
   } catch (e) { /* silent */ }
 }
@@ -692,7 +716,7 @@ async function testConnection() {
   toast.success('连接成功！\n服务器：' + emailForm.server + '\n端口：' + emailForm.port);
 }
 async function submitEmail() {
-  if (!emailForm.addr) { toast.warning('请填写邮箱地址'); return; }
+  if (!validateEmailAddr()) return;
   if (!editingEmail.value && !emailForm.pass) { toast.warning('请填写密码/授权码'); return; }
   emailSaving.value = true;
   const folder = emailForm.folder === 'custom' ? emailForm.folderCustom : 'INBOX';
@@ -822,6 +846,7 @@ async function submitTemplate() {
 .row-actions .btn-text, .row-actions .btn-text-danger { display: inline; padding: 0 4px; font-size: 12px; }
 .config-divider { margin: 16px 0; border-color: var(--c-border); }
 .field-hint { font-size: 11px; color: var(--c-sub); font-weight: 400; }
+.field-error { font-size: 12px; color: var(--c-reject); margin-top: 4px; font-weight: 500; }
 .save-msg { margin-left: 12px; font-size: 13px; font-weight: 600; }
 .save-msg.ok { color: var(--c-done); }
 .save-msg.error { color: var(--c-reject); }

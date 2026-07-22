@@ -260,10 +260,78 @@ def _normalize_deepseek_result(data, raw_text):
     }
 
 
-def _detect_big_company(company, raw_text):
-    """1 when recent company or resume text mentions a known big company."""
-    haystack = (company or '') + ' ' + (raw_text or '')
+def _detect_big_company(company, raw_text=None):
+    """1 when the *recent company* field mentions a known big company.
+
+    只依据 recent_company 字段匹配，不再扫描简历全文（避免把"期望入职大厂"
+    之类的表述误判为大厂经历）。raw_text 参数保留仅为兼容旧调用方签名。
+    """
+    haystack = company or ''
     return 1 if any(c in haystack for c in _BIG_COMPANIES) else 0
+
+
+# ===========================================================================
+# Name fallback helpers (DeepSeek / regex 解析失败时)
+# ===========================================================================
+
+_NAME_RE = r'[一-鿿]{2,4}'
+
+
+def _name_from_filename(filename):
+    """从附件文件名提取姓名：张三-Java-3年.pdf / 李四_前端_5年.docx / 王五的简历.pdf"""
+    stem = os.path.splitext(os.path.basename(filename or ''))[0]
+    for pat in (
+        rf'^({_NAME_RE})[-_–—\s]',            # 张三-Java-3年
+        rf'^({_NAME_RE})的?简历',              # 张三简历 / 张三的简历
+        rf'简历[-_–—\s]*({_NAME_RE})',        # 简历-张三
+    ):
+        m = re.search(pat, stem)
+        if m:
+            return m.group(1)
+    return ''
+
+
+def _name_from_subject(subject):
+    """从邮件主题提取姓名：应聘：Java开发工程师-张三 / 张三应聘前端"""
+    s = subject or ''
+    for pat in (
+        rf'[-_–—：:\s]({_NAME_RE})\s*$',      # 结尾 "-张三"
+        rf'^({_NAME_RE})\s*(应聘|求职|申请)',  # 张三应聘…
+    ):
+        m = re.search(pat, s.strip())
+        if m:
+            return m.group(1)
+    return ''
+
+
+# ===========================================================================
+# Target-position extraction from mail subject
+# ===========================================================================
+
+_POSITION_PATTERNS = [
+    r'(?:应聘|求职|申请)\s*[:：]?\s*(?:岗位|职位)?\s*[:：]?\s*(.+?)\s*(?:岗位|职位|工程师|经理|专员|主管|总监|简历|$)',
+    r'(?:岗位|职位)\s*[:：]\s*(.+?)\s*(?:简历|求职|应聘|$)',
+]
+
+
+def extract_target_position(subject):
+    """从邮件主题解析应聘岗位名，提取不到返回 ''（不依赖 LLM）。"""
+    s = (subject or '').strip()
+    if not s:
+        return ''
+    for pat in _POSITION_PATTERNS:
+        m = re.search(pat, s)
+        if m:
+            pos = m.group(1).strip(' -_–—：:')
+            # 附带岗位后缀时补回（"Java开发" → "Java开发工程师" 语境更准）
+            suffix = re.search(r'(工程师|经理|专员|主管|总监)\s*$', m.group(0))
+            if suffix and suffix.group(1) not in pos:
+                pos = pos + suffix.group(1)
+            # 去掉结尾的候选人姓名分隔（"Java开发工程师-张三"）
+            pos = re.split(r'[-_–—]', pos)[0].strip()
+            if 2 <= len(pos) <= 30:
+                return pos
+    return ''
 
 
 # ===========================================================================
@@ -292,7 +360,8 @@ def looks_like_resume(subject, body):
 
 
 def ingest_resume(file_bytes, filename, source_channel='邮箱', mail_account_id=None,
-                  raw_text=None):
+                  raw_text=None, mail_subject=None, target_position=None,
+                  target_demand_id=None):
     """Full ingest pipeline: extract → parse → dedup → persist.
 
     Args:
@@ -301,10 +370,13 @@ def ingest_resume(file_bytes, filename, source_channel='邮箱', mail_account_id
         source_channel: 候选人来源（邮箱 / 手动上传 / Boss ...）.
         mail_account_id: 采集邮箱 ID（邮件渠道时传入）.
         raw_text: pre-extracted text (skips extraction when given).
+        mail_subject: 邮件主题（邮件渠道时传入，写入 extract_json）.
+        target_position: 从主题解析出的应聘岗位（写入 extract_json）.
+        target_demand_id: 自动关联到的需求 ID（写入 extract_json）.
 
     Returns dict: {
         candidate_no, candidate_name, is_new_candidate, parse_engine,
-        resume_id, skills, summary
+        resume_id, skills, summary, target_position
     }
     """
     from app.extensions import db
@@ -317,16 +389,44 @@ def ingest_resume(file_bytes, filename, source_channel='邮箱', mail_account_id
 
     parsed = parse_resume_content(text)
 
-    # ---- dedup: mobile_hash first, then email-based hash ----
+    # ---- name fallback: 解析不出姓名时从文件名 / 邮件主题兜底 ----
+    name = (parsed.get('name') or '').strip()
+    if (not name or name == '未知'
+            or not (2 <= len(name) <= 4)
+            or re.search(r'简历|求职|应聘|个人', name)):
+        name = (_name_from_filename(filename)
+                or _name_from_subject(mail_subject)
+                or '未知')
+        parsed['name'] = name
+
+    # ---- dedup: mobile_hash → email → 内容指纹 ----
     mobile_hash = hashlib.sha256(parsed['phone'].encode()).hexdigest() if parsed['phone'] else None
     email_hash = hashlib.sha256(parsed['email'].lower().encode()).hexdigest() if parsed['email'] else None
+    # 内容指纹：正文前 2000 字符 sha256，用于无手机号/邮箱时的兜底去重
+    content_fp = hashlib.sha256(text.strip()[:2000].encode('utf-8')).hexdigest()
 
     candidate = None
     if mobile_hash:
         candidate = Candidate.active().filter_by(mobile_hash=mobile_hash).first()
     if candidate is None and email_hash:
-        # email column stores plaintext in current schema; match directly
-        candidate = Candidate.active().filter_by(email=parsed['email']).first()
+        # email column stores plaintext in current schema; match directly（统一 lower 兼容）
+        candidate = Candidate.active().filter_by(email=parsed['email'].lower()).first()
+        if candidate is None:
+            candidate = Candidate.active().filter_by(email=parsed['email']).first()
+    if candidate is None:
+        # 内容指纹命中同候选人历史简历 → 视为重复（更新而非新建）。
+        # 最近 N 份简历内做 Python 侧比对（SQLite/MySQL 通用，且该路径本就是
+        # 无手机号/邮箱时的兜底，量小可接受）。
+        try:
+            recent = (Resume.active()
+                      .order_by(Resume.id.desc()).limit(500).all())
+            hit = next((r for r in recent
+                        if (r.extract_json or {}).get('content_fingerprint') == content_fp),
+                       None)
+            if hit:
+                candidate = Candidate.active().filter_by(id=hit.candidate_id).first()
+        except Exception as exc:
+            log.warning("content-fingerprint dedup failed (best-effort): %s", exc)
 
     is_new = candidate is None
     if is_new:
@@ -364,6 +464,7 @@ def ingest_resume(file_bytes, filename, source_channel='邮箱', mail_account_id
         work_years=candidate.work_years or 0,
         big_company=candidate.big_company_flag,
         cert_count=candidate.cert_count,
+        skill_count=len(parsed.get('skills', [])),
     )
 
     db.session.flush()  # assign candidate.id
@@ -385,6 +486,10 @@ def ingest_resume(file_bytes, filename, source_channel='邮箱', mail_account_id
             **parsed,
             'source_file': filename,
             'parsed_at': datetime.now().isoformat(timespec='seconds'),
+            'content_fingerprint': content_fp,
+            'mail_subject': (mail_subject or '')[:200],
+            'target_position': target_position or '',
+            'target_demand_id': target_demand_id,
         },
         mail_account_id=mail_account_id,
     )
@@ -392,9 +497,9 @@ def ingest_resume(file_bytes, filename, source_channel='邮箱', mail_account_id
     db.session.commit()
 
     log.info(
-        "Resume ingested: candidate=%s(%s) new=%s engine=%s file=%s",
+        "Resume ingested: candidate=%s(%s) new=%s engine=%s file=%s target=%s",
         candidate.candidate_name, candidate.candidate_no, is_new,
-        parsed['parse_engine'], filename,
+        parsed['parse_engine'], filename, target_position or '-',
     )
 
     return {
@@ -405,6 +510,8 @@ def ingest_resume(file_bytes, filename, source_channel='邮箱', mail_account_id
         'resume_id': resume.id,
         'skills': parsed['skills'],
         'summary': parsed['summary'],
+        'target_position': target_position or '',
+        'target_demand_id': target_demand_id,
     }
 
 

@@ -21,6 +21,39 @@ def detect_email_server():
     return success(result)
 
 
+# 进程内短缓存：{email: (timestamp, result)}，10 分钟过期
+_RESOLVE_CACHE: dict = {}
+_RESOLVE_CACHE_TTL = 600
+
+
+@bp.route('/email-accounts/resolve')
+def resolve_email_server():
+    """GET /api/config/email-accounts/resolve?email=... — MX 记录识别邮箱服务商。
+
+    DNS 查询失败时返回兜底结果，绝不因 DNS 异常返回 500。
+    """
+    import time
+    from app.services.email_sync_service import resolve_mail_server
+    email = (request.args.get('email') or '').strip()
+    if not email or '@' not in email:
+        return error('BAD_REQUEST', '请提供有效的邮箱地址')
+
+    now = time.time()
+    cached = _RESOLVE_CACHE.get(email.lower())
+    if cached and now - cached[0] < _RESOLVE_CACHE_TTL:
+        return success(cached[1])
+
+    try:
+        result = resolve_mail_server(email)
+    except Exception as exc:  # 兜底：任何异常都不应让接口 500
+        log.warning("resolve_mail_server failed for %s: %s", email, exc)
+        result = {'provider': '未知', 'imap_host': '', 'imap_port': 993,
+                  'encryption': 'SSL/TLS', 'confidence': 'low', 'detection': 'unknown'}
+
+    _RESOLVE_CACHE[email.lower()] = (now, result)
+    return success(result)
+
+
 @bp.route('/email-accounts')
 def get_email_accounts():
     """GET /api/config/email-accounts"""
@@ -67,23 +100,66 @@ def delete_email_account(account_id):
     return success(result)
 
 
+def _run_sync_in_background(app, account_id=None):
+    """无 Celery/Redis 环境的降级：后台线程执行同步。"""
+    import threading
+
+    def _job():
+        with app.app_context():
+            try:
+                from app.services.email_sync_service import (
+                    sync_all_accounts, sync_mail_account,
+                )
+                if account_id:
+                    sync_mail_account(account_id)
+                else:
+                    sync_all_accounts()
+            except Exception as exc:
+                log.error("Background email sync failed: %s", exc, exc_info=True)
+
+    t = threading.Thread(target=_job, name='email-sync', daemon=True)
+    t.start()
+    return f'thread-{t.ident}'
+
+
+def _enqueue_sync(account_id=None):
+    """优先投递 Celery 任务；无 Redis/Celery 时降级后台线程。返回 (mode, task_id)。"""
+    try:
+        if account_id:
+            from tasks.email_sync import sync_single_mailbox
+            task = sync_single_mailbox.delay(account_id)
+        else:
+            from tasks.email_sync import sync_all_mailboxes
+            task = sync_all_mailboxes.delay()
+        return 'celery', str(task.id)
+    except Exception as exc:
+        log.warning("Celery enqueue failed (%s), falling back to background thread", exc)
+        from flask import current_app
+        return 'thread', _run_sync_in_background(current_app._get_current_object(), account_id)
+
+
 @bp.route('/email-accounts/sync', methods=['POST'])
 def sync_all_email_accounts():
-    """POST /api/config/email-accounts/sync — 手动刷新：同步所有启用邮箱。
+    """POST /api/config/email-accounts/sync — 手动刷新：异步同步所有启用邮箱。
 
-    同步执行 IMAP 拉取 → 简历识别 → 文本提取 → DeepSeek 解析 → 入库。
+    立即返回 accepted；实际 IMAP 拉取 → 简历识别 → 解析 → 入库在后台执行，
+    前端提示"同步已开始，稍后刷新"。
     """
-    from app.services.email_sync_service import sync_all_accounts
-    result = sync_all_accounts()
-    return success(result)
+    mode, task_id = _enqueue_sync()
+    return success({
+        'accepted': True, 'mode': mode, 'taskId': task_id,
+        'message': '同步已开始，请稍后刷新查看结果',
+    })
 
 
 @bp.route('/email-accounts/<account_id>/sync', methods=['POST'])
 def sync_email_account(account_id):
-    """POST /api/config/email-accounts/{account_id}/sync — 手动刷新单个邮箱。"""
-    from app.services.email_sync_service import sync_mail_account
-    result = sync_mail_account(account_id)
-    return success(result)
+    """POST /api/config/email-accounts/{account_id}/sync — 异步手动刷新单个邮箱。"""
+    mode, task_id = _enqueue_sync(account_id)
+    return success({
+        'accepted': True, 'mode': mode, 'taskId': task_id,
+        'message': '同步已开始，请稍后刷新查看结果',
+    })
 
 
 @bp.route('/channels')

@@ -246,14 +246,26 @@ def _mock_email_accounts():
     ]
 
 
+# 邮箱地址格式校验（后端权威校验，与前端保持一致）
+_EMAIL_RE = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+
+
+def _validate_email_address(address):
+    """Raise VALIDATION_ERROR when the address is not a valid email format."""
+    import re as _re
+    if not address:
+        raise AppError('VALIDATION_ERROR', '邮箱地址不能为空')
+    if not _re.fullmatch(_EMAIL_RE, str(address).strip()):
+        raise AppError('VALIDATION_ERROR', f'邮箱地址格式不正确：{address}')
+
+
 def create_email_account(data):
     """Create a new email account — DB first, mock fallback.
 
     Reuses soft-deleted accounts instead of failing on duplicate.
     """
-    address = data.get('address')
-    if not address:
-        raise AppError('VALIDATION_ERROR', '邮箱地址不能为空')
+    address = (data.get('address') or '').strip()
+    _validate_email_address(address)
 
     try:
         from app.models.auxiliary import RecruitMailAccount
@@ -263,12 +275,15 @@ def create_email_account(data):
         existing = RecruitMailAccount.query.filter_by(email_address=address).first()
         if existing:
             if existing.is_deleted:
-                # Reactivate soft-deleted account
+                # Reactivate soft-deleted account: apply new config, reset state
                 existing.is_deleted = 0
                 existing.imap_host = data.get('server') or existing.imap_host
                 existing.imap_port = int(data.get('port')) if data.get('port') else existing.imap_port
                 existing.password_encrypted = _encrypt_mail_password(data.get('pass')) or existing.password_encrypted
                 existing.mail_type = data.get('type') or existing.mail_type
+                existing.monitor_folder = data.get('folder') or existing.monitor_folder or 'INBOX'
+                existing.status = 1
+                existing.last_sync_time = None
                 db.session.commit()
                 return {'created': True, 'id': existing.id, 'address': address, 'reactivated': True}
             else:
@@ -306,6 +321,12 @@ def create_email_account(data):
     except AppError:
         raise
     except Exception as exc:
+        from sqlalchemy.exc import IntegrityError
+        if isinstance(exc, IntegrityError):
+            db.session.rollback()
+            log.error("Integrity error in create_email_account: %s", exc)
+            raise AppError('VALIDATION_ERROR',
+                           f'邮箱 {address} 已存在或数据冲突，请检查后重试')
         log.error("DB write failed in create_email_account: %s", exc, exc_info=True)
         if not _mock_enabled():
             raise
@@ -316,6 +337,8 @@ def create_email_account(data):
 
 def update_email_account(account_id, data):
     """Update or soft-delete an email account."""
+    if 'address' in data and data['address']:
+        _validate_email_address(str(data['address']).strip())
     try:
         from app.models.auxiliary import RecruitMailAccount
         from app.extensions import db

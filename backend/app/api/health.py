@@ -37,9 +37,6 @@ def health_check():
             'deepseek': {
                 'key_configured': bool(Config.DEEPSEEK_API_KEY),
             },
-            'boss_cli': {
-                'enabled': Config.BOSS_CLI_ENABLED,
-            },
         }), 503
 
     return success({
@@ -51,8 +48,5 @@ def health_check():
         'mock_fallback': bool(current_app.config.get('MOCK_FALLBACK', False)),
         'deepseek': {
             'key_configured': bool(Config.DEEPSEEK_API_KEY),
-        },
-        'boss_cli': {
-            'enabled': Config.BOSS_CLI_ENABLED,
         },
     })
