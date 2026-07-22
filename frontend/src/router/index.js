@@ -59,10 +59,9 @@ export const router = createRouter({
 router.beforeEach((to, from, next) => {
   const redirect = checkAuth(to);
   if (redirect && redirect !== to.path) {
-    next(redirect);
-  } else {
-    next();
+    return redirect;
   }
+  return true;
 });
 
 router.afterEach((to) => {
