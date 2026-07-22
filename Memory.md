@@ -2,11 +2,67 @@
 
 ## 当前状态
 
-**日期**：2026-07-21
-**阶段**：✅ **阶段 0-4 完成 | BOSS 登录打通 | 飞书 HTTP 直连 | 去重 | 抽屉 | Toast | 面试会议链接**
-**状态**：系统稳定，18/18 后端测试，45/45 E2E 全绿
+**日期**：2026-07-22
+**阶段**：✅ 阶段 0-4 完成 | 项目复现 | 邮箱配置增强 | MySQL 云数据库就绪
+**状态**：后端 Flask 运行中 (:5000)，前端 Vite 运行中 (:5173)，前后端联通
 
-**最终验证**：18/18 backend ✅ + build ✅ + 45/45 E2E ✅（commit `a8b991c`）
+## 2026-07-22 项目复现 & 配置
+
+### 环境复现
+- Python 3.13.14 + Node 22.12.0 环境确认
+- 后端依赖全部安装，前端 `npm install` 完成
+- `.env` 配置开发密钥（SECRET_KEY / JWT_SECRET_KEY），MOCK_FALLBACK=true
+- 修复 `auth.py`：health 端点加入 AUTH_WHITELIST
+- 数据库重建：31 张表 + 种子数据
+- 前后端联通验证：6 个 API 端点全部通过
+
+### 邮箱配置增强
+- 新增邮箱域名 MX 自动检测：`email_sync_service.py` → `detect_imap_server()`
+- 新增 API 端点：`POST /api/config/email-accounts/detect`
+- 支持服务商：QQ/163/Gmail/Outlook/腾讯企业邮/网易企业邮/阿里企业邮
+- 前端自动检测：输入邮箱地址 → 自动填服务器/端口/加密方式/邮箱类型
+- 邮箱格式校验：无效格式提示用户
+- 修复重复添加邮箱 500 错误：`config_service.py` → `create_email_account()` 去重处理
+
+### MySQL 云数据库
+- **阿里云 RDS**：`rm-8vb7m858r8wt3b10hjo.mysql.zhangbei.rds.aliyuncs.com:3306`
+- 数据库：`hr_recruitment_db`，账号：`hr_recruitment`
+- 当前为空库，待建表
+
+### DeepSeek AI 配置
+- `.env` 中 DEEPSEEK_API_KEY 留空，改为网页配置
+- `config.py`：DEEPSEEK_API_KEY 不再强制要求
+- `deepseek_client.py`：env 为空时自动从数据库读取
+- 配置路径：招聘基础配置 → API 密钥管理 → DeepSeek
+
+### 审批流程（已还原）
+- 识别了需求管理审批的 9 个 bug（创建→提交→审批全链路）
+- 修复后按用户要求全部还原业务代码
+- 保留的修复：health 白名单、.env 配置
+
+### 代码改动清单（当前保留）
+
+| 文件 | 改动 |
+|------|------|
+| `backend/.env` | 开发密钥 + MySQL 连接串 |
+| `backend/config.py` | DEEPSEEK_API_KEY 可选 |
+| `backend/app/middleware/auth.py` | health 加白名单 |
+| `backend/app/services/email_sync_service.py` | +detect_imap_server() MX 检测 |
+| `backend/app/api/config.py` | +detect 端点 |
+| `backend/app/services/config_service.py` | 邮箱去重 |
+| `backend/app/services/deepseek_client.py` | DB key fallback |
+| `frontend/src/views/RecruitConfig.vue` | 邮箱自动检测 + 格式校验 |
+| `frontend/src/data/config.js` | 企业邮箱不写死服务器 |
+
+## 质量基线 🔒
+
+| 项目 | 结果 |
+|------|:--:|
+| Backend health | ✅ |
+| Frontend build | ✅ ~800ms |
+| Playwright E2E | ⚠️ 未重跑（端口冲突） |
+| MySQL 连接 | ✅ 已连通 |
+| DeepSeek 连接 | ✅ 用户测试成功 |
 
 ### 2026-07-21 思考过程面板内容修正 ✅
 
@@ -211,6 +267,22 @@ cd backend/ && python -m pytest tests/ -v                # 37/37
 cd frontend/ && npm run dev                              # :5173
 cd frontend/ && npx playwright test --workers=2          # 49/49 E2E
 ```
+
+## 2026-07-22 项目复现 ✅
+
+| 检查项 | 结果 |
+|--------|:--:|
+| Python 3.13.14 + pip 依赖 | ✅ 全部就绪 |
+| Node 22.12.0 + npm 10.9.0 | ✅ |
+| 后端 .env 配置 | ✅ 生成 dev 密钥，MOCK_FALLBACK=true |
+| 数据库 31 张表 | ✅ db.create_all() + seed.py 种子数据 |
+| Flask :5000 | ✅ health/login/demand/talent/interview/AI 全部正常 |
+| 前端 npm install | ✅ 82 packages |
+| Vite dev server :5174 | ✅ (5173 被旧进程占用) |
+| npm run build | ✅ 839ms |
+| Playwright E2E | **46/49** 通过。3 个失败：2 个 timeout（看板折叠面板/经营台）+ 1 个 workspace 元素缺失，均为测试连旧端口 5173 导致 |
+
+**修复**: `auth.py` AUTH_WHITELIST 新增 `'health'`（原只有 `'health.health_check'`，不匹配直接注册在 app 上的函数名）
 
 ## 2026-07-22 凌晨批次 ✅
 

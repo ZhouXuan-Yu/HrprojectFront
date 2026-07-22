@@ -247,7 +247,10 @@ def _mock_email_accounts():
 
 
 def create_email_account(data):
-    """Create a new email account — DB first, mock fallback."""
+    """Create a new email account — DB first, mock fallback.
+
+    Reuses soft-deleted accounts instead of failing on duplicate.
+    """
     address = data.get('address')
     if not address:
         raise AppError('VALIDATION_ERROR', '邮箱地址不能为空')
@@ -255,6 +258,21 @@ def create_email_account(data):
     try:
         from app.models.auxiliary import RecruitMailAccount
         from app.extensions import db
+
+        # Check for existing account (including soft-deleted)
+        existing = RecruitMailAccount.query.filter_by(email_address=address).first()
+        if existing:
+            if existing.is_deleted:
+                # Reactivate soft-deleted account
+                existing.is_deleted = 0
+                existing.imap_host = data.get('server') or existing.imap_host
+                existing.imap_port = int(data.get('port')) if data.get('port') else existing.imap_port
+                existing.password_encrypted = _encrypt_mail_password(data.get('pass')) or existing.password_encrypted
+                existing.mail_type = data.get('type') or existing.mail_type
+                db.session.commit()
+                return {'created': True, 'id': existing.id, 'address': address, 'reactivated': True}
+            else:
+                raise AppError('VALIDATION_ERROR', f'邮箱 {address} 已存在，请勿重复添加')
 
         freq_label = data.get('freq', '每 30 分钟')
         freq_minutes = _MAIL_FREQ_REVERSE.get(freq_label, 30)
@@ -285,6 +303,8 @@ def create_email_account(data):
                         'test_ok': False, 'test_msg': msg}
 
         return {'created': True, 'id': account.id, 'address': address}
+    except AppError:
+        raise
     except Exception as exc:
         log.error("DB write failed in create_email_account: %s", exc, exc_info=True)
         if not _mock_enabled():

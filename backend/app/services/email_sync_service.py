@@ -1,5 +1,7 @@
 """Enterprise mailbox sync service — real IMAP pipeline.
 
+Auto-detection of IMAP server based on domain MX records.
+
 Pulls unread emails from configured recruit mailboxes, detects resume
 attachments (or resume-like bodies), runs the resume ingest pipeline
 (extract → DeepSeek parse → dedup → DB), and records sync state.
@@ -25,6 +27,74 @@ _MAX_EMAILS_PER_SYNC = 50
 # ===========================================================================
 # Credential handling
 # ===========================================================================
+
+# Known MX → IMAP mapping
+_MX_IMAP_MAP = {
+    'mxbiz1.qq.com':  ('腾讯企业邮箱', 'imap.exmail.qq.com', 993),
+    'mxbiz2.qq.com':  ('腾讯企业邮箱', 'imap.exmail.qq.com', 993),
+    'mx.qiye.163.com':('网易企业邮', 'imap.qiye.163.com', 993),
+    'mx.qiye.aliyun.com':('阿里企业邮', 'imap.qiye.aliyun.com', 993),
+    'aspmx.l.google.com':('Gmail / Google Workspace', 'imap.gmail.com', 993),
+    'mx1.hc.aliyun.com':('阿里云邮箱', 'imap.qiye.aliyun.com', 993),
+}
+
+# Domain → IMAP fallback (no MX lookup)
+_DOMAIN_IMAP_FALLBACK = {
+    'qq.com':          ('QQ邮箱', 'imap.qq.com', 993),
+    '163.com':         ('163邮箱', 'imap.163.com', 993),
+    'gmail.com':       ('Gmail', 'imap.gmail.com', 993),
+    'outlook.com':     ('Outlook', 'outlook.office365.com', 993),
+    'hotmail.com':     ('Outlook', 'outlook.office365.com', 993),
+    'aliyun.com':      ('阿里企业邮', 'imap.qiye.aliyun.com', 993),
+    'exmail.qq.com':   ('腾讯企业邮箱', 'imap.exmail.qq.com', 993),
+}
+
+
+def detect_imap_server(email_address):
+    """Auto-detect IMAP server from email domain.
+
+    Returns dict with {provider, imap_host, imap_port}.
+    First checks MX records, then falls back to known domain patterns,
+    finally suggests common IMAP servers.
+    """
+    import socket
+    domain = email_address.split('@')[-1].lower() if '@' in email_address else ''
+
+    # 1. Check domain fallback first (fast, no DNS)
+    if domain in _DOMAIN_IMAP_FALLBACK:
+        provider, host, port = _DOMAIN_IMAP_FALLBACK[domain]
+        return {'provider': provider, 'imap_host': host, 'imap_port': port, 'detection': 'domain'}
+
+    # 2. Try MX record lookup
+    try:
+        import dns.resolver
+        answers = dns.resolver.resolve(domain, 'MX')
+        for rdata in sorted(answers, key=lambda r: r.preference):
+            mx = str(rdata.exchange).rstrip('.').lower()
+            if mx in _MX_IMAP_MAP:
+                provider, host, port = _MX_IMAP_MAP[mx]
+                return {'provider': provider, 'imap_host': host, 'imap_port': port, 'detection': 'mx'}
+    except Exception:
+        pass
+
+    # 3. Common patterns: try imap.<domain>
+    common_try = f'imap.{domain}'
+    try:
+        socket.getaddrinfo(common_try, 993)
+        return {'provider': f'{domain} 邮箱', 'imap_host': common_try, 'imap_port': 993, 'detection': 'pattern'}
+    except Exception:
+        pass
+
+    # 4. Try mail.<domain>
+    common_try = f'mail.{domain}'
+    try:
+        socket.getaddrinfo(common_try, 993)
+        return {'provider': f'{domain} 邮箱', 'imap_host': common_try, 'imap_port': 993, 'detection': 'pattern'}
+    except Exception:
+        pass
+
+    return {'provider': '未知', 'imap_host': '', 'imap_port': 993, 'detection': 'unknown'}
+
 
 def _get_password(account):
     """Decrypt the stored IMAP password/authorization code.

@@ -353,13 +353,14 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted } from 'vue';
+import { reactive, ref, computed, onMounted, watch } from 'vue';
 import WorkbenchLayout from '../layouts/WorkbenchLayout.vue';
 import StatCardRow from '../components/StatCardRow.vue';
 import StatusBadge from '../components/StatusBadge.vue';
 import { KPI_ICONS } from '../components/kpiIcons.js';
 import { useToast } from '../composables/useToast.js';
 import { useAppError } from '../composables/useAppError.js';
+import { api } from '../api/index.js';
 import {
   fetchEmailAccounts, fetchChannels, fetchScoreRules, fetchNotifyTemplates,
   fetchRolePermissions, fetchAuditLogs, fetchApiKeys, saveApiKeys, testApiKey, fetchTencentStatus, fetchFeishuStatus,
@@ -426,6 +427,14 @@ const chanForm = reactive({ name: '', type: '第三方平台', cost: '¥0' });
 const tplForm = reactive({ name: '', type: '面试', method: '飞书', subject: '', body: '' });
 
 import { EMAIL_PRESETS } from '../data/config.js';
+
+// 监听邮箱地址变化，自动检测服务商
+let _detectTimer = null;
+watch(() => emailForm.addr, (newAddr) => {
+  if (!newAddr || !newAddr.includes('@')) return;
+  clearTimeout(_detectTimer);
+  _detectTimer = setTimeout(() => autoDetectEmail(), 600);
+});
 
 const normalizeStatus = (s) => s === '启用' || s === 1 || s === '1' || s === true;
 const reverseStatus = (s) => normalizeStatus(s) ? 0 : 1;
@@ -635,11 +644,41 @@ async function deleteEmail(acct) {
 }
 function onEmailTypeChange() {
   const preset = EMAIL_PRESETS[emailForm.type];
-  if (!preset) return;
-  emailForm.server = preset.server;
-  emailForm.port = preset.port;
-  emailForm.proto = preset.proto;
-  emailForm.ssl = preset.ssl;
+  if (preset) {
+    emailForm.server = preset.server;
+    emailForm.port = preset.port;
+    emailForm.proto = preset.proto;
+    emailForm.ssl = preset.ssl;
+  }
+}
+async function autoDetectEmail() {
+  if (!emailForm.addr) return;
+  // 校验邮箱格式
+  const emailRegex = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(emailForm.addr.trim())) {
+    toast.warning('邮箱格式不正确，请检查');
+    return;
+  }
+  try {
+    const res = await api.post('/config/email-accounts/detect', { email: emailForm.addr.trim() });
+    const d = res.data;
+    if (d && d.imap_host) {
+      // 自动匹配邮箱类型
+      const domain = emailForm.addr.split('@')[1]?.toLowerCase();
+      if (domain === 'qq.com') emailForm.type = 'qq';
+      else if (domain === '163.com') emailForm.type = '163';
+      else if (domain === 'gmail.com') emailForm.type = 'gmail';
+      else emailForm.type = 'corp';
+      // 自动填服务器信息
+      emailForm.server = d.imap_host;
+      emailForm.port = d.imap_port || 993;
+      emailForm.ssl = 'SSL/TLS';
+      emailForm.proto = 'IMAP（推荐）';
+      toast.info('已识别：' + d.provider + ' → ' + d.imap_host);
+    } else if (emailForm.type === 'corp' && !emailForm.server) {
+      toast.warning('未识别到邮箱服务商，请手动填写收件服务器');
+    }
+  } catch (e) { /* silent */ }
 }
 function onFolderChange() {
   if (emailForm.folder !== 'custom') emailForm.folderCustom = '';
